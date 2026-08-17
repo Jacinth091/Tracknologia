@@ -1,0 +1,225 @@
+# 13 — Conceptual Data Model
+
+## Design goal
+
+The MVP schema should be **information-rich without becoming table-heavy**.
+
+Rule:
+
+> Keep single-valued or Repair-snapshot information as columns. Create separate tables only for genuinely repeating relationships/history or relationships that need their own constraints.
+
+## Core tables
+
+1. `providers`
+2. `provider_memberships`
+3. `provider_service_modes`
+4. `repair_requests`
+5. `repairs`
+6. `repair_status_events`
+7. `repair_updates`
+
+Supabase manages `auth.users` separately.
+
+`tracking_events` is optional validation telemetry, not a required domain table.
+
+## providers
+
+```text
+id                    uuid PK
+provider_type         SHOP | INDEPENDENT
+display_name          text
+slug                  text UNIQUE
+description           text nullable
+profile_image_url     text nullable
+contact_phone         text
+contact_email         text nullable
+public_address        text nullable
+service_area          text nullable
+supported_devices     text[] nullable
+accepting_requests    boolean default true
+created_at            timestamptz
+updated_at            timestamptz
+```
+
+A `SHOP` may have only one Provider User, including an owner who is also the working technician. No separate technician table is required.
+
+An `INDEPENDENT` Provider may leave `public_address` null and use `service_area` instead.
+
+## provider_memberships
+
+```text
+id                    uuid PK
+provider_id           uuid FK -> providers.id
+user_id               uuid FK -> auth.users.id
+role                  OWNER | STAFF
+created_at            timestamptz
+
+UNIQUE(provider_id, user_id)
+```
+
+This table links Supabase identity to Tracknologia Provider authority.
+
+## provider_service_modes
+
+```text
+provider_id           uuid FK -> providers.id
+mode                  DROP_OFF | MEETUP | HOME_SERVICE | OTHER
+details               text nullable
+
+PRIMARY KEY(provider_id, mode)
+```
+
+A Provider may support several modes; therefore this remains a separate repeating relation.
+
+## repair_requests
+
+```text
+id                         uuid PK
+provider_id                uuid FK -> providers.id
+reference_code             text UNIQUE
+
+customer_name              text
+customer_phone             text
+customer_email             text nullable
+
+device_type                text
+brand                      text nullable
+model                      text nullable
+serial_number              text nullable
+color_variant              text nullable
+device_specs               text nullable
+
+reported_problem           text
+problem_started_at         text nullable
+preceding_event            text nullable
+troubleshooting_attempted  text nullable
+additional_information     text nullable
+
+preferred_service_mode     service_mode nullable
+service_mode_details       text nullable
+
+status                     SUBMITTED | ACCEPTED | DECLINED
+submitted_at               timestamptz
+accepted_at                timestamptz nullable
+declined_at                timestamptz nullable
+accepted_by_user_id        uuid nullable
+declined_by_user_id        uuid nullable
+```
+
+A Repair Request belongs to exactly one Provider and is not an authoritative Repair.
+
+## repairs
+
+```text
+id                     uuid PK
+provider_id            uuid FK -> providers.id
+repair_request_id      uuid UNIQUE nullable
+origin                 CUSTOMER_REQUEST | PROVIDER_CREATED
+
+ticket_number          text
+tracking_code           text UNIQUE
+
+customer_name          text
+customer_phone         text
+customer_email         text nullable
+
+device_type            text
+brand                  text nullable
+model                   text nullable
+serial_number           text nullable
+color_variant           text nullable
+device_specs            text nullable
+physical_condition     text nullable
+accessories_received   text nullable
+
+reported_problem       text
+initial_observation    text nullable
+diagnosis              text nullable
+internal_notes         text nullable
+
+service_mode           service_mode nullable
+service_mode_details   text nullable
+
+current_status         IN_PROGRESS | WAITING_FOR_PARTS | AWAITING_APPROVAL | READY | COMPLETED
+
+created_by_user_id     uuid FK -> auth.users.id
+created_at             timestamptz
+updated_at             timestamptz
+completed_at           timestamptz nullable
+```
+
+### Request relationship
+
+`repair_request_id` is nullable and unique:
+
+- direct Provider creation -> `NULL`, origin `PROVIDER_CREATED`;
+- accepted Request -> source Request id, origin `CUSTOMER_REQUEST`.
+
+This enforces "one Repair Request can produce at most one Repair" at the database level.
+
+## repair_status_events
+
+```text
+id                     uuid PK
+repair_id              uuid FK -> repairs.id
+from_status            repair_status nullable
+to_status              repair_status
+changed_by_user_id     uuid nullable
+created_at             timestamptz
+```
+
+The initial event is `NULL -> IN_PROGRESS`.
+
+Status history remains separate because it is inherently repeating and required for lifecycle history/validation.
+
+## repair_updates
+
+```text
+id                     uuid PK
+repair_id              uuid FK -> repairs.id
+message                text
+created_by_user_id     uuid FK -> auth.users.id
+created_at             timestamptz
+```
+
+Customer Updates are independent of status changes. A Provider can post several updates while a Repair remains `IN_PROGRESS`.
+
+## Why no customers table yet
+
+Customer identity is not currently an account or reusable profile. Contact information is stored as a snapshot on Request/Repair.
+
+Normalize Customer only if repeat-customer history becomes a validated requirement.
+
+## Why no devices table yet
+
+Tracknologia needs the device state at intake, not a permanent asset registry. Device information remains a Repair-owned snapshot.
+
+Normalize Device only if reusable device history becomes a validated requirement.
+
+## Suggested indexes and constraints
+
+- unique `providers.slug`
+- unique `(provider_id, user_id)` membership
+- primary/unique `(provider_id, mode)` service mode
+- unique `repair_requests.reference_code`
+- index `repair_requests(provider_id, status, submitted_at)`
+- unique `repairs.tracking_code`
+- unique `repairs.repair_request_id` where non-null
+- unique `(provider_id, ticket_number)`
+- index `repairs(provider_id, current_status, updated_at)`
+- index `repairs(provider_id, created_at)`
+- index `repair_status_events(repair_id, created_at)`
+- index `repair_updates(repair_id, created_at)`
+
+## RLS ownership path
+
+For Provider-owned rows:
+
+```text
+auth.uid()
+  -> provider_memberships.user_id
+  -> provider_memberships.provider_id
+  -> repair/provider provider_id
+```
+
+Child history tables derive Provider ownership through their parent Repair.
