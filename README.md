@@ -1,110 +1,336 @@
-# Tracknologia Technical Documentation v0.3
+# Tracknologia
 
-**Project:** Tracknologia  
-**Subject context:** FreLean MVP project  
-**Status:** Current working technical baseline  
-**Revision focus:** MVP implementation architecture, security, database depth, repository structure, and reproducible development environment.
+Tracknologia is a lightweight electronics-repair lifecycle and customer-tracking platform for **repair shops** and **independent repairers**.
 
-## Current system direction
+Providers can create repairs directly or accept customer-submitted Repair Requests. Once a Repair exists, Tracknologia gives the customer a tracking credential so they can view safe repair progress without creating an account.
 
-Tracknologia is a lightweight repair-management and customer-tracking platform for **Repair Shops** and **Independent Repairers**. Both are equal first-class **Repair Providers**.
+## MVP goals
 
-A Repair can begin through either:
+Tracknologia's MVP focuses on:
 
-1. a **Customer Repair Request** submitted to one specific Provider; or
-2. **direct Provider creation** for a walk-in, meetup, home-service, drop-off, or verbally described job.
+- repair-provider accounts and profiles;
+- repair shops and independent repairers as equal Provider types;
+- direct Repair creation by a Provider;
+- customer Repair Requests sent to one specific Provider;
+- structured device intake;
+- lightweight repair states;
+- customer-visible repair updates;
+- accountless public tracking;
+- provider isolation and role-aware authorization;
+- real pilot usage and validation metrics.
 
-Once a Repair exists, both paths use the same lifecycle and accountless customer-tracking flow.
+The MVP intentionally does **not** include a repair marketplace, Google Maps discovery, inventory, payments, accounting, payroll, AI diagnosis, or a native mobile app.
 
-## v0.3 implementation baseline
+## Technology stack
 
-The current MVP software direction is:
+| Area | Technology |
+|---|---|
+| Web application | Next.js App Router + React |
+| Language | TypeScript |
+| Styling | Tailwind CSS |
+| UI primitives | shadcn/ui |
+| Validation | Zod |
+| Authentication | Supabase Auth |
+| Database | PostgreSQL via Supabase |
+| Database authorization | PostgreSQL Row Level Security (RLS) |
+| Development environment | Docker + Docker Compose |
+| Module/component testing | Vitest + React Testing Library |
+| End-to-end testing | Playwright |
 
-- Next.js App Router + React + TypeScript
-- Tailwind CSS + selectively added shadcn/ui components
-- Zod for server-side/runtime input validation
-- Supabase Auth for authentication
-- Supabase-hosted PostgreSQL for persistence
-- PostgreSQL Row Level Security as database-level tenant isolation
-- responsive web first; native mobile deferred
-- Docker + Docker Compose for a reproducible cross-platform development environment
-- Vitest/React Testing Library for module/component tests
-- Playwright for critical end-to-end flows
-- feature-oriented source structure (`src/features`) rather than global `services/`, `controllers/`, or `repositories/` folders
+### Intentionally not used for the MVP
 
-The MVP deliberately does **not** require Express, NestJS, Axios, React Router, Prisma, Redux, Zustand, or React Native.
+- Express
+- NestJS
+- Axios
+- React Router
+- Prisma
+- Redux / Zustand
+- React Native / Expo
 
-## Package map
+These can be reconsidered only when Tracknologia develops a requirement that justifies them.
 
-### Canonical domain context
+---
 
-- [`CONTEXT.md`](CONTEXT.md)
+# Quick start
 
-### Product and process
+## 1. Prerequisites
 
-- [`docs/01_PRODUCT_CONTEXT.md`](docs/01_PRODUCT_CONTEXT.md)
-- [`docs/02_PROBLEM_AND_HYPOTHESES.md`](docs/02_PROBLEM_AND_HYPOTHESES.md)
-- [`docs/03_MVP_SCOPE.md`](docs/03_MVP_SCOPE.md)
-- [`docs/04_USER_ROLES_AND_PROVIDER_TYPES.md`](docs/04_USER_ROLES_AND_PROVIDER_TYPES.md)
-- [`docs/05_BUSINESS_PROCESS.md`](docs/05_BUSINESS_PROCESS.md)
-- [`docs/06_USER_SYSTEM_FLOWS.md`](docs/06_USER_SYSTEM_FLOWS.md)
-- [`docs/07_USE_CASES.md`](docs/07_USE_CASES.md)
-- [`docs/08_DOMAIN_MODEL.md`](docs/08_DOMAIN_MODEL.md)
-- [`docs/09_STATE_MODELS.md`](docs/09_STATE_MODELS.md)
+Install:
 
-### Software design
+- Git
+- Docker Desktop on Windows/macOS, or Docker Engine + Compose plugin on Linux
 
-- [`docs/10_MODULES.md`](docs/10_MODULES.md)
-- [`docs/11_SYSTEM_ARCHITECTURE.md`](docs/11_SYSTEM_ARCHITECTURE.md)
-- [`docs/12_TECHNOLOGY_STACK.md`](docs/12_TECHNOLOGY_STACK.md)
-- [`docs/13_DATA_MODEL.md`](docs/13_DATA_MODEL.md)
-- [`docs/14_INTERFACE_CONTRACTS.md`](docs/14_INTERFACE_CONTRACTS.md)
-- [`docs/15_SECURITY_AND_PRIVACY.md`](docs/15_SECURITY_AND_PRIVACY.md)
-- [`docs/16_VALIDATION_AND_ANALYTICS.md`](docs/16_VALIDATION_AND_ANALYTICS.md)
-- [`docs/17_TESTING_STRATEGY.md`](docs/17_TESTING_STRATEGY.md)
-- [`docs/18_UI_INFORMATION_ARCHITECTURE.md`](docs/18_UI_INFORMATION_ARCHITECTURE.md)
-- [`docs/19_IMPLEMENTATION_PLAN.md`](docs/19_IMPLEMENTATION_PLAN.md)
-- [`docs/20_DECISIONS_AND_OPEN_QUESTIONS.md`](docs/20_DECISIONS_AND_OPEN_QUESTIONS.md)
-- [`docs/21_CHANGELOG_FROM_V0_1.md`](docs/21_CHANGELOG_FROM_V0_1.md)
-- [`docs/22_REPOSITORY_STRUCTURE.md`](docs/22_REPOSITORY_STRUCTURE.md)
-- [`docs/23_HTTP_AND_ROUTE_SURFACES.md`](docs/23_HTTP_AND_ROUTE_SURFACES.md)
-- [`docs/24_DEPENDENCIES_AND_PACKAGES.md`](docs/24_DEPENDENCIES_AND_PACKAGES.md)
-- [`docs/25_DOCKER_DEVELOPMENT.md`](docs/25_DOCKER_DEVELOPMENT.md)
-- [`docs/26_DATABASE_SCHEMA_DRAFT.md`](docs/26_DATABASE_SCHEMA_DRAFT.md)
-- [`docs/27_CHANGELOG_FROM_V0_2.md`](docs/27_CHANGELOG_FROM_V0_2.md)
+Node.js is optional for the normal Docker workflow. The repository's Dockerfile defines the Node runtime used by the project.
 
-### ADRs
+Verify:
 
-- [`docs/adr/0001-modular-monolith-for-mvp.md`](docs/adr/0001-modular-monolith-for-mvp.md)
-- [`docs/adr/0002-provider-is-not-user.md`](docs/adr/0002-provider-is-not-user.md)
-- [`docs/adr/0003-dual-repair-intake-paths.md`](docs/adr/0003-dual-repair-intake-paths.md)
-- [`docs/adr/0004-accountless-public-tracking.md`](docs/adr/0004-accountless-public-tracking.md)
-- [`docs/adr/0005-provider-centric-shop-and-independent-model.md`](docs/adr/0005-provider-centric-shop-and-independent-model.md)
-- [`docs/adr/0006-minimal-meaningful-repair-statuses.md`](docs/adr/0006-minimal-meaningful-repair-statuses.md)
-- [`docs/adr/0007-separate-ticket-and-tracking-identifiers.md`](docs/adr/0007-separate-ticket-and-tracking-identifiers.md)
-- [`docs/adr/0008-nextjs-full-stack-mvp.md`](docs/adr/0008-nextjs-full-stack-mvp.md)
-- [`docs/adr/0009-supabase-auth-and-rls-security-model.md`](docs/adr/0009-supabase-auth-and-rls-security-model.md)
-- [`docs/adr/0010-docker-development-baseline.md`](docs/adr/0010-docker-development-baseline.md)
-- [`docs/adr/0011-feature-oriented-source-structure.md`](docs/adr/0011-feature-oriented-source-structure.md)
-- [`docs/adr/0012-lean-relational-mvp-schema.md`](docs/adr/0012-lean-relational-mvp-schema.md)
+```bash
+git --version
+docker --version
+docker compose version
+```
 
-### Development templates
+## 2. Clone the repository
 
-- [`templates/Dockerfile`](templates/Dockerfile)
-- [`templates/compose.yaml`](templates/compose.yaml)
-- [`templates/.dockerignore`](templates/.dockerignore)
-- [`templates/.env.example`](templates/.env.example)
+```bash
+git clone <REPOSITORY_URL>
+cd tracknologia
+```
 
-## Explicitly deferred
+## 3. Create local environment variables
 
-- Google Maps / Google Places
-- general nearby-provider marketplace
-- non-Tracknologia provider discovery
-- global Repair Request pool or provider bidding
-- ratings/reviews
-- full POS/accounting/payroll
-- full inventory/parts management
-- AI diagnosis
-- native Android/iOS application
-- dedicated NestJS/Express backend
-- advanced analytics infrastructure
+Copy the example file:
+
+```bash
+cp .env.example .env.local
+```
+
+On PowerShell:
+
+```powershell
+Copy-Item .env.example .env.local
+```
+
+Fill in the Supabase values:
+
+```env
+NEXT_PUBLIC_SUPABASE_URL=
+NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY=
+```
+
+Never commit `.env.local`.
+
+Never expose a Supabase secret/service-role key through a `NEXT_PUBLIC_*` variable.
+
+## 4. Start Tracknologia
+
+```bash
+docker compose up --build
+```
+
+Open:
+
+```text
+http://localhost:3000
+```
+
+After the initial build, normal startup is:
+
+```bash
+docker compose up
+```
+
+Stop the environment with:
+
+```bash
+docker compose down
+```
+
+## 5. Run commands inside the development container
+
+Install/update dependencies:
+
+```bash
+docker compose run --rm web npm install
+```
+
+Run linting:
+
+```bash
+docker compose run --rm web npm run lint
+```
+
+Run module/component tests:
+
+```bash
+docker compose run --rm web npm test
+```
+
+Run end-to-end tests:
+
+```bash
+docker compose run --rm web npx playwright test
+```
+
+Create a production build:
+
+```bash
+docker compose run --rm web npm run build
+```
+
+---
+
+# Repository structure
+
+```text
+tracknologia/
+├── README.md
+├── CONTEXT.md
+├── CONTRIBUTING.md
+├── Dockerfile
+├── compose.yaml
+├── .dockerignore
+├── .env.example
+├── package.json
+├── package-lock.json
+├── public/
+├── docs/
+│   ├── adr/
+│   └── ...
+├── tests/
+│   └── e2e/
+└── src/
+    ├── app/
+    ├── features/
+    │   ├── auth/
+    │   ├── providers/
+    │   ├── repair-requests/
+    │   ├── repairs/
+    │   ├── tracking/
+    │   └── analytics/
+    ├── components/
+    │   ├── ui/
+    │   └── shared/
+    └── lib/
+        └── supabase/
+```
+
+## Source responsibilities
+
+### `src/app/`
+
+Next.js routing, layouts, pages, Server Actions, Route Handlers, and rendering adapters.
+
+Business rules should not live directly in pages or actions.
+
+### `src/features/`
+
+Tracknologia's business capabilities. Each feature acts as a module with a small interface and hides its implementation.
+
+Examples:
+
+- `auth` — authenticated user, Provider context, membership and role checks;
+- `providers` — Provider profile and supported service modes;
+- `repair-requests` — submission, acceptance and decline behavior;
+- `repairs` — Repair creation, querying, lifecycle rules and completion;
+- `tracking` — restricted public tracking view;
+- `analytics` — lightweight MVP/pilot instrumentation.
+
+### `src/components/`
+
+Reusable visual code. `ui/` contains shadcn primitives; `shared/` contains genuinely cross-feature UI.
+
+### `src/lib/`
+
+Infrastructure integration code. Keep this directory small. Supabase browser/server clients belong here.
+
+## Dependency direction
+
+```text
+Next.js routes/UI
+      |
+      v
+Tracknologia features
+      |
+      v
+Persistence / Supabase adapter
+      |
+      v
+PostgreSQL
+```
+
+Features must not depend on Next.js pages or React UI.
+
+---
+
+# Core domain model
+
+```text
+Supabase auth.users
+        |
+        v
+provider_memberships
+        |
+        v
+providers
+   |             |
+   v             v
+repair_requests  repairs
+                    |
+          +---------+----------+
+          |                    |
+          v                    v
+repair_status_events     repair_updates
+```
+
+A customer Repair Request is not yet a Repair. A Provider may also create a Repair without any Repair Request.
+
+The normal Repair lifecycle is:
+
+```text
+IN_PROGRESS
+   |
+   +--> WAITING_FOR_PARTS ----+
+   |                          |
+   +--> AWAITING_APPROVAL ----+
+   |                          |
+   +<-------------------------+
+   |
+   v
+READY
+   |
+   v
+COMPLETED
+```
+
+The waiting states are optional, Provider-selected states rather than mandatory stages.
+
+---
+
+# Security baseline
+
+Tracknologia uses layered security:
+
+```text
+Supabase Auth
+    -> Tracknologia authorization
+    -> PostgreSQL RLS
+    -> restricted feature interfaces
+```
+
+Required principles:
+
+- Supabase handles authentication/session identity.
+- Tracknologia handles Provider membership, roles, ownership and business permissions.
+- RLS provides database-level Provider isolation.
+- Server Actions and Route Handlers must still authorize every mutation.
+- Zod validates untrusted input on the server.
+- Public tracking returns a restricted `PublicRepairView`, never a complete Repair row.
+- Database/server implementation files should be server-only.
+- Privileged Supabase keys must never reach browser code.
+
+See [`docs/SECURITY.md`](docs/SECURITY.md).
+
+---
+
+# Documentation
+
+Start with [`docs/README.md`](docs/README.md).
+
+Recommended reading order for developers:
+
+1. [`CONTEXT.md`](CONTEXT.md) — canonical domain vocabulary
+2. [`docs/SETUP.md`](docs/SETUP.md) — detailed workstation/project setup
+3. [`docs/DEVELOPMENT.md`](docs/DEVELOPMENT.md) — day-to-day workflow
+4. [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md) — source and module design
+5. [`docs/DATABASE.md`](docs/DATABASE.md) — initial relational model
+6. [`docs/SECURITY.md`](docs/SECURITY.md) — security model
+7. [`docs/TESTING.md`](docs/TESTING.md) — testing expectations
+8. [`CONTRIBUTING.md`](CONTRIBUTING.md) — contribution workflow
+9. `docs/adr/` — accepted architecture decisions
+
+---
+
+# Project status
+
+Tracknologia is currently an MVP-oriented student product under active design and implementation. Scope should remain deliberately constrained: new dependencies, tables, modules, and workflows must solve a demonstrated Tracknologia requirement rather than anticipated future complexity.

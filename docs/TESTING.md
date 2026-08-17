@@ -1,0 +1,46 @@
+# Testing Strategy
+
+Tracknologia prioritizes tests around business invariants and critical user flows.
+
+## Layers
+
+### Module tests — Vitest
+
+Test feature interfaces directly without rendering UI where possible.
+
+High-value examples:
+
+- new Repair starts `IN_PROGRESS`;
+- Provider cannot mutate another Provider's Repair;
+- accepted Repair Request creates at most one Repair;
+- declined Request creates no Repair;
+- `COMPLETED` Repair rejects unsupported transitions;
+- public tracking projection excludes private fields.
+
+### Component tests — React Testing Library
+
+Use for interactive UI behavior where rendering adds value.
+
+Avoid testing implementation details or Tailwind class strings unless they are functionally significant.
+
+### End-to-end tests — Playwright
+
+Critical flows:
+
+1. Provider authentication -> create Repair -> receive tracking code -> customer tracks Repair.
+2. Customer submits Repair Request -> Provider accepts -> Repair created -> customer tracks Repair.
+3. Provider tenant isolation across protected routes/actions.
+
+## Commands
+
+```bash
+docker compose run --rm web npm test
+docker compose run --rm web npx playwright test
+```
+
+Before merging a substantial change also run:
+
+```bash
+docker compose run --rm web npm run lint
+docker compose run --rm web npm run build
+```
