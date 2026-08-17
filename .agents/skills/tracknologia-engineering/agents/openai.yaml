@@ -1,0 +1,3 @@
+interface:
+  display_name: "Tracknologia Engineering"
+  short_description: "Codebase structure, routes, UI, and design system guidance for Tracknologia"
