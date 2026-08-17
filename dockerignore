@@ -1,0 +1,43 @@
+# Dependencies
+node_modules
+
+# Next.js build output
+.next
+out
+
+# Local environment files / secrets
+.env
+.env.local
+.env.*.local
+
+# Tests / coverage artifacts
+coverage
+playwright-report
+test-results
+
+# VCS
+.git
+.gitignore
+
+# Editor / OS files
+.vscode
+.idea
+.DS_Store
+Thumbs.db
+
+# Logs
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+
+# Documentation and local metadata not required to build the app
+docs
+*.md
+
+# Docker files do not need to be copied into the image
+Dockerfile*
+compose.yaml
+compose.yml
+docker-compose*.yml
+docker-compose*.yaml
