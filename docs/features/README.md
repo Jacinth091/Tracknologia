@@ -9,14 +9,14 @@ The repository uses `src/features/` as the physical directory name, while each f
 
 ## Feature map
 
-| Feature | Primary goal | Main actors | Key system relationship |
-|---|---|---|---|
-| [Auth / Provider Access](01_AUTH.md) | Establish trusted authenticated Provider context | Provider User | Supplies authorization context to protected features |
-| [Providers](02_PROVIDERS.md) | Represent and configure a Repair Provider | Provider User, Customer (public view) | Supplies Provider identity/configuration to Requests and Tracking |
-| [Repair Requests](03_REPAIR_REQUESTS.md) | Capture customer pre-repair intake for one Provider | Customer, Provider User | May create exactly one Repair when accepted |
-| [Repairs](04_REPAIRS.md) | Manage the authoritative repair record and lifecycle | Provider User | Central operational feature consumed by Tracking and observed by Analytics |
-| [Tracking](05_TRACKING.md) | Give Customers safe accountless repair visibility | Customer | Reads a restricted public projection of Repair data |
-| [Analytics / Pilot Metrics](06_ANALYTICS.md) | Measure whether the MVP is producing the intended behavior | Product/team | Observes important events without becoming a domain dependency |
+| Feature                                      | Primary goal                                               | Main actors                           | Key system relationship                                                    |
+| -------------------------------------------- | ---------------------------------------------------------- | ------------------------------------- | -------------------------------------------------------------------------- |
+| [Auth / Provider Access](01_AUTH.md)         | Establish trusted authenticated Provider context           | Provider User                         | Supplies authorization context to protected features                       |
+| [Providers](02_PROVIDERS.md)                 | Represent and configure a Repair Provider                  | Provider User, Customer (public view) | Supplies Provider identity/configuration to Requests and Tracking          |
+| [Repair Requests](03_REPAIR_REQUESTS.md)     | Capture customer pre-repair intake for one Provider        | Customer, Provider User               | May create exactly one Repair when accepted                                |
+| [Repairs](04_REPAIRS.md)                     | Manage the authoritative repair record and lifecycle       | Provider User                         | Central operational feature consumed by Tracking and observed by Analytics |
+| [Tracking](05_TRACKING.md)                   | Give Customers safe accountless repair visibility          | Customer                              | Reads a restricted public projection of Repair data                        |
+| [Analytics / Pilot Metrics](06_ANALYTICS.md) | Measure whether the MVP is producing the intended behavior | Product/team                          | Observes important events without becoming a domain dependency             |
 
 See [00_FEATURE_INTEGRATION_MAP.md](00_FEATURE_INTEGRATION_MAP.md) for end-to-end interaction flows and dependency rules.
 

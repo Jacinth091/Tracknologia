@@ -1,11 +1,12 @@
 name: Dependency Review
 
 on:
-  pull_request:
-    branches:
-      - "feature/**"
-      - staging
-      - master
+  # pull_request:
+  #   branches:
+  #     - "feature/**"
+  #     - staging
+  #     - master
+  workflow_dispatch:
 
 permissions:
   contents: read

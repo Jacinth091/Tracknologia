@@ -65,7 +65,7 @@ A feature may expose a small `index.ts` as its public interface.
 Good:
 
 ```ts
-import { createRepair, getRepair } from "@/features/repairs"
+import { createRepair, getRepair } from "@/features/repairs";
 ```
 
 Avoid repository-wide barrels that re-export unrelated features/components.

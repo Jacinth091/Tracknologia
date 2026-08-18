@@ -55,9 +55,9 @@ Do not create every file automatically. Small features may use fewer files.
 Use `index.ts` as the feature Interface when it clarifies what callers may use.
 
 ```ts
-export { createRepair, changeRepairStatus } from "./commands"
-export { getRepair, listRepairs } from "./queries"
-export type { RepairStatus } from "./types"
+export { createRepair, changeRepairStatus } from "./commands";
+export { getRepair, listRepairs } from "./queries";
+export type { RepairStatus } from "./types";
 ```
 
 Cross-feature callers should normally import from `@/features/repairs`, not deep implementation paths.
