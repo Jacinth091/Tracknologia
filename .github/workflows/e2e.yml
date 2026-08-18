@@ -1,15 +1,15 @@
 name: E2E
 
 on:
-  pull_request:
-    branches:
-      - staging
-      - master
+  # pull_request:
+  #   branches:
+  #     - staging
+  #     - master
 
-  push:
-    branches:
-      - staging
-      - master
+  # push:
+  #   branches:
+  #     - staging
+  #     - master
 
   workflow_dispatch:
 
