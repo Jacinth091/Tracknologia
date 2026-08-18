@@ -159,7 +159,7 @@ Use `index.ts` only at a meaningful Module seam.
 Good:
 
 ```ts
-import { createRepair, getRepair } from "@/features/repairs"
+import { createRepair, getRepair } from "@/features/repairs";
 ```
 
 Avoid global barrels such as `src/features/index.ts`, `src/components/index.ts`, or `src/lib/index.ts` that re-export unrelated code.

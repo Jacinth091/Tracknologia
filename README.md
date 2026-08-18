@@ -35,8 +35,6 @@ The easiest way to deploy your Next.js app is to use the [Vercel Platform](https
 
 Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
 
-
-
 # Tracknologia
 
 Tracknologia is a lightweight electronics-repair lifecycle and customer-tracking platform for **repair shops** and **independent repairers**.
@@ -62,19 +60,19 @@ The MVP intentionally does **not** include a repair marketplace, Google Maps dis
 
 ## Technology stack
 
-| Area | Technology |
-|---|---|
-| Web application | Next.js App Router + React |
-| Language | TypeScript |
-| Styling | Tailwind CSS |
-| UI primitives | shadcn/ui |
-| Validation | Zod |
-| Authentication | Supabase Auth |
-| Database | PostgreSQL via Supabase |
-| Database authorization | PostgreSQL Row Level Security (RLS) |
-| Development environment | Docker + Docker Compose |
-| Module/component testing | Vitest + React Testing Library |
-| End-to-end testing | Playwright |
+| Area                     | Technology                          |
+| ------------------------ | ----------------------------------- |
+| Web application          | Next.js App Router + React          |
+| Language                 | TypeScript                          |
+| Styling                  | Tailwind CSS                        |
+| UI primitives            | shadcn/ui                           |
+| Validation               | Zod                                 |
+| Authentication           | Supabase Auth                       |
+| Database                 | PostgreSQL via Supabase             |
+| Database authorization   | PostgreSQL Row Level Security (RLS) |
+| Development environment  | Docker + Docker Compose             |
+| Module/component testing | Vitest + React Testing Library      |
+| End-to-end testing       | Playwright                          |
 
 ### Intentionally not used for the MVP
 

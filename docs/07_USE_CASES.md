@@ -7,6 +7,7 @@
 **Actor:** Customer  
 **Precondition:** Customer has opened a Provider-specific request page.  
 **Main flow:**
+
 1. Customer enters contact information.
 2. Customer selects Device Type.
 3. Customer optionally enters Brand, Model, identifier, and technical details.
@@ -22,6 +23,7 @@
 **Actor:** Customer  
 **Precondition:** An accepted Repair with a valid Tracking Code exists.  
 **Main flow:**
+
 1. Customer enters Tracking Code.
 2. System validates lookup.
 3. System returns customer-safe Repair view.

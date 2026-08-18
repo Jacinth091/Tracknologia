@@ -4,14 +4,14 @@ This directory contains the repository-facing engineering documentation for Trac
 
 ## Developer documentation
 
-| Document | Purpose |
-|---|---|
-| [SETUP.md](SETUP.md) | Complete local setup and Docker onboarding |
-| [DEVELOPMENT.md](DEVELOPMENT.md) | Day-to-day development workflow and conventions |
+| Document                           | Purpose                                                        |
+| ---------------------------------- | -------------------------------------------------------------- |
+| [SETUP.md](SETUP.md)               | Complete local setup and Docker onboarding                     |
+| [DEVELOPMENT.md](DEVELOPMENT.md)   | Day-to-day development workflow and conventions                |
 | [ARCHITECTURE.md](ARCHITECTURE.md) | Source layout, feature modules, seams and dependency direction |
-| [DATABASE.md](DATABASE.md) | Initial MVP relational model and invariants |
-| [SECURITY.md](SECURITY.md) | Authentication, authorization, RLS and public-surface security |
-| [TESTING.md](TESTING.md) | Unit/module, component and E2E testing strategy |
+| [DATABASE.md](DATABASE.md)         | Initial MVP relational model and invariants                    |
+| [SECURITY.md](SECURITY.md)         | Authentication, authorization, RLS and public-surface security |
+| [TESTING.md](TESTING.md)           | Unit/module, component and E2E testing strategy                |
 
 ## Domain documentation
 

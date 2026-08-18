@@ -8,7 +8,6 @@ This block is written and re-added by `next dev` — verify at `node_modules/nex
 
 <!-- END:nextjs-agent-rules -->
 
-
 # Tracknologia Engineering Rules
 
 These instructions apply to all code, tests, database changes, configuration, and documentation in this repository.
@@ -216,11 +215,7 @@ src/features/repairs/index.ts
 Callers should normally import through that Interface:
 
 ```ts
-import {
-  createRepair,
-  getRepair,
-  type RepairStatus,
-} from "@/features/repairs"
+import { createRepair, getRepair, type RepairStatus } from "@/features/repairs";
 ```
 
 Avoid deep imports across feature boundaries.
@@ -411,7 +406,7 @@ Use the authentication/authorization feature to resolve trusted context.
 Conceptually:
 
 ```ts
-const context = await requireProviderContext()
+const context = await requireProviderContext();
 ```
 
 The trusted Provider must be derived from authenticated membership.
@@ -477,7 +472,7 @@ Prefer Server Components unless browser interactivity requires a Client Componen
 Add:
 
 ```ts
-"use client"
+"use client";
 ```
 
 only when required for things such as:
@@ -494,7 +489,7 @@ Sensitive code and persistence implementations must remain server-only.
 Use:
 
 ```ts
-import "server-only"
+import "server-only";
 ```
 
 where appropriate.

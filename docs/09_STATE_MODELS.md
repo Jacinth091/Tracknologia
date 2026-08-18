@@ -75,15 +75,15 @@ MVP rules should be simple rather than attempting to model every real-world exce
 
 Current proposed valid transitions:
 
-| From | To |
-|---|---|
-| creation | IN_PROGRESS |
-| IN_PROGRESS | WAITING_FOR_PARTS |
-| IN_PROGRESS | AWAITING_APPROVAL |
-| WAITING_FOR_PARTS | IN_PROGRESS |
-| AWAITING_APPROVAL | IN_PROGRESS |
-| IN_PROGRESS | READY |
-| READY | COMPLETED |
+| From              | To                |
+| ----------------- | ----------------- |
+| creation          | IN_PROGRESS       |
+| IN_PROGRESS       | WAITING_FOR_PARTS |
+| IN_PROGRESS       | AWAITING_APPROVAL |
+| WAITING_FOR_PARTS | IN_PROGRESS       |
+| AWAITING_APPROVAL | IN_PROGRESS       |
+| IN_PROGRESS       | READY             |
+| READY             | COMPLETED         |
 
 Future evidence may justify:
 

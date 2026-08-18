@@ -19,21 +19,21 @@ Use a cool neutral foundation with a restrained teal technology/service accent.
 
 Suggested light-theme reference values:
 
-| Token | Reference |
-|---|---|
-| Background | `#F8FAFC` |
-| Surface/Card | `#FFFFFF` |
-| Foreground | `#0F172A` |
+| Token         | Reference |
+| ------------- | --------- |
+| Background    | `#F8FAFC` |
+| Surface/Card  | `#FFFFFF` |
+| Foreground    | `#0F172A` |
 | Muted surface | `#F1F5F9` |
-| Muted text | `#64748B` |
-| Border | `#E2E8F0` |
-| Primary | `#0F766E` |
+| Muted text    | `#64748B` |
+| Border        | `#E2E8F0` |
+| Primary       | `#0F766E` |
 | Primary hover | `#115E59` |
-| Soft accent | `#CCFBF1` |
-| Focus/accent | `#14B8A6` |
-| Success | `#15803D` |
-| Warning | `#B45309` |
-| Destructive | `#B91C1C` |
+| Soft accent   | `#CCFBF1` |
+| Focus/accent  | `#14B8A6` |
+| Success       | `#15803D` |
+| Warning       | `#B45309` |
+| Destructive   | `#B91C1C` |
 
 Treat these as a coherent design direction, not permission to scatter raw hex values. Map them into CSS/theme variables and use semantic tokens in components.
 
