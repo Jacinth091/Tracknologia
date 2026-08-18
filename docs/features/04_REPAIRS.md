@@ -1,0 +1,365 @@
+# Feature — Repairs
+
+**Code location:** `src/features/repairs/`
+
+## Description
+
+The Repairs feature is the **authoritative operational core of Tracknologia**. It represents accepted repair work from intake through completion.
+
+A Repair may originate from:
+
+- an accepted Repair Request; or
+- direct Provider creation.
+
+After creation, both origins use exactly the same lifecycle.
+
+## Primary goal
+
+Give Providers one reliable, low-friction source of truth for active and completed repair work while giving Customers enough structured information for meaningful public tracking.
+
+## Feature goals
+
+- Allow direct Repair creation without requiring a Repair Request.
+- Accept verified Request-originated intake from the Repair Requests feature.
+- Store customer/device information as Repair-owned snapshots for the MVP.
+- Keep `Reported Problem` separate from `Diagnosis`.
+- Generate a human-readable Ticket Number and unpredictable Tracking Code.
+- Start every new Repair automatically as `IN_PROGRESS`.
+- Use only meaningful lifecycle states rather than forcing technicians through artificial activity stages.
+- Maintain durable status history through Status Events.
+- Keep customer-visible Customer Updates separate from lifecycle Status Events.
+- Keep Internal Notes private.
+- Support completion and historical Repair lookup.
+- Preserve Provider isolation and authorization on every protected operation.
+
+## Non-goals
+
+The MVP Repairs feature does not include:
+
+- inventory/parts catalog management;
+- supplier management;
+- invoicing/payments/POS;
+- appointments;
+- technician assignment/workload scheduling;
+- reusable Customer records;
+- reusable Device registry;
+- AI diagnosis;
+- customizable status workflows;
+- branches.
+
+## Main actors
+
+- **Provider User** — creates and maintains Repairs.
+- **Customer** — indirectly consumes the customer-safe projection through Tracking.
+
+## Owned data
+
+### `repairs`
+
+Authoritative repair snapshot including:
+
+- Provider ownership;
+- optional source Repair Request;
+- origin;
+- ticket/tracking identifiers;
+- customer snapshot;
+- device snapshot;
+- Reported Problem;
+- intake observation;
+- Diagnosis;
+- Internal Notes;
+- Service Mode;
+- current status;
+- creator/timestamps/completion.
+
+### `repair_status_events`
+
+Append-oriented lifecycle history.
+
+### `repair_updates`
+
+Customer-visible progress messages that do not require status changes.
+
+## Why customer/device data stays on Repair
+
+The MVP needs the facts captured for **this repair engagement**, not a full CRM or device registry.
+
+Therefore:
+
+```text
+Customer snapshot → columns on Repair
+Device snapshot   → columns on Repair
+```
+
+Do not add `customers` or `devices` tables until repeat-customer/device history is a validated product requirement.
+
+## Repair origins
+
+```text
+CUSTOMER_REQUEST
+PROVIDER_CREATED
+```
+
+Origin is useful for validation/analytics and traceability. It must not produce separate lifecycle implementations.
+
+## State model
+
+```text
+creation → IN_PROGRESS
+IN_PROGRESS → WAITING_FOR_PARTS
+IN_PROGRESS → AWAITING_APPROVAL
+WAITING_FOR_PARTS → IN_PROGRESS
+AWAITING_APPROVAL → IN_PROGRESS
+IN_PROGRESS → READY
+READY → COMPLETED
+```
+
+### `IN_PROGRESS`
+
+General active work. It intentionally covers diagnosing, repairing, testing, and similar technical activity.
+
+### `WAITING_FOR_PARTS`
+
+Optional blocked state when required parts/materials prevent continuation.
+
+### `AWAITING_APPROVAL`
+
+Optional blocked state when Customer approval is required to continue.
+
+### `READY`
+
+Repair work is finished and the device is ready for return/handover according to its Service Mode.
+
+### `COMPLETED`
+
+Repair engagement and return/handover are finished.
+
+## Conceptual Interface
+
+```ts
+createRepair(context, input): RepairResult
+getRepair(context, repairId): RepairDetail
+listRepairs(context, filter?): RepairSummary[]
+updateRepairDetails(context, repairId, input): RepairDetail
+changeRepairStatus(context, repairId, input): RepairDetail
+addCustomerUpdate(context, repairId, message): CustomerUpdate
+completeRepair(context, repairId): RepairDetail
+```
+
+The Interface should hide ticket/tracking generation, ownership checks, transition validation, Status Event creation, and persistence coordination.
+
+## Direct creation workflow
+
+```text
+Provider User
+  ↓ Auth / ProviderContext
+/dashboard/repairs/new
+  ↓
+Enter customer snapshot
+  ↓
+Enter device snapshot
+  ↓
+Enter Reported Problem
+  ↓
+Optional intake observation / condition / accessories
+  ↓
+Validate
+  ↓
+Create Repair
+  ↓
+origin = PROVIDER_CREATED
+status = IN_PROGRESS
+Ticket Number + Tracking Code generated
+Initial Status Event recorded
+```
+
+## Request-origin creation workflow
+
+The Repair Requests feature provides verified intake data.
+
+```text
+Verified accepted-request input
+       ↓
+Repairs creates authoritative Repair
+       ↓
+origin = CUSTOMER_REQUEST
+repair_request_id = source request
+status = IN_PROGRESS
+```
+
+The database should enforce at most one Repair per source Request.
+
+## Active Repair workflow
+
+```text
+Open Repair detail
+    ↓
+Review device/problem/intake
+    ↓
+Maintain Diagnosis / Internal Notes
+    ↓
+Add Customer Update when useful
+    ↓
+Change status only when operational state meaningfully changes
+```
+
+A Customer Update does not need to change Repair Status.
+
+## Completion workflow
+
+```text
+IN_PROGRESS
+   ↓ work finished
+READY
+   ↓ device returned/handover finished
+COMPLETED
+```
+
+`completed_at` should remain consistent with `COMPLETED` state.
+
+## Routes and UI
+
+```text
+/dashboard/repairs
+/dashboard/repairs/new
+/dashboard/repairs/[repairId]
+```
+
+Dashboard may surface Repair summaries but should not duplicate Repairs business rules.
+
+### Repair list design
+
+Prefer device-first recognition, for example:
+
+```text
+Lenovo IdeaPad 3
+TN-2026-00125
+Juan Dela Cruz
+Battery issue
+IN_PROGRESS
+Updated 10:32
+```
+
+### Repair detail UI
+
+Suggested sections:
+
+- status and primary actions;
+- Customer information;
+- Device Snapshot;
+- Reported Problem;
+- intake observation/condition/accessories;
+- Diagnosis;
+- Internal Notes;
+- Customer Updates;
+- lifecycle history;
+- ticket/tracking information.
+
+Provider-private and customer-visible information must be visually distinguishable.
+
+## Relationships with other features
+
+### Auth
+
+All protected reads/mutations require `ProviderContext` and ownership checks.
+
+### Providers
+
+Every Repair belongs to one Provider. Provider Service Modes may influence selected service arrangement and READY wording.
+
+### Repair Requests
+
+Repair Requests may create a Repair. Repairs does not require a Request for direct creation.
+
+### Tracking
+
+Tracking consumes a restricted public projection of Repair, Provider identity, and Customer Updates.
+
+### Analytics
+
+Important events include Repair created, origin, status changed, and completed.
+
+## Important invariants
+
+1. Repair belongs to exactly one Provider.
+2. Provider identity is derived from trusted context for protected creation/action.
+3. New Repair starts `IN_PROGRESS` automatically.
+4. Source Request is optional.
+5. `repair_request_id` is unique when present.
+6. Ticket Number is unique within chosen Provider scope.
+7. Tracking Code is globally unique/unpredictable enough for public credential use.
+8. Reported Problem and Diagnosis remain separate.
+9. Internal Notes never appear in public Tracking.
+10. Every lifecycle transition creates a matching Status Event.
+11. `current_status` and the Status Event must not contradict each other after a successful mutation.
+12. Customer Updates do not imply status changes.
+13. `WAITING_FOR_PARTS` and `AWAITING_APPROVAL` are optional branches, not mandatory stages.
+
+## Persistence/transaction expectations
+
+Operations that change lifecycle state should coordinate:
+
+```text
+repair.current_status
++
+repair_status_event
++
+completed_at when applicable
+```
+
+as one logical operation. Do not report a transition as successful if durable state is inconsistent.
+
+Request acceptance should also avoid partial success between the source Request and created Repair.
+
+## Security expectations
+
+- Provider A cannot read/write Provider B Repairs.
+- Route ids do not authorize access.
+- Server-side validation is required.
+- RLS provides defense in depth.
+- Customer/public projections exclude private fields.
+
+## Important edge cases
+
+### Direct creation
+
+Valid even if no Repair Request ever existed.
+
+### Waiting state
+
+A Repair may return from a waiting state to `IN_PROGRESS`; waiting is not completion.
+
+### Attempted invalid transition
+
+Example:
+
+```text
+WAITING_FOR_PARTS → COMPLETED
+```
+
+This is not in the current MVP transition model and should fail unless requirements are explicitly changed.
+
+### Reopening completed work
+
+Not supported by the current MVP baseline. Treat as a future decision rather than silently adding behavior.
+
+## Testing expectations
+
+Test:
+
+- direct creation;
+- Request-origin creation;
+- initial status/event;
+- ticket/tracking uniqueness behavior;
+- allowed and rejected transitions;
+- status/event consistency;
+- completed timestamp behavior;
+- Customer Update without status change;
+- Internal Notes not present in public projection;
+- Provider isolation;
+- list/search/filter behavior;
+- one Request cannot create two Repairs.
+
+## Definition of done
+
+The feature is healthy when Providers can manage the complete accepted-repair lifecycle with minimal operational friction, consistent durable state, strong Provider isolation, and enough safe data for Customers to understand repair progress.

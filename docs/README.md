@@ -30,3 +30,21 @@ Use an ADR only when a decision is:
 ## Documentation rule
 
 When implementation and documentation disagree, do not silently choose one. Determine which represents the accepted Tracknologia decision, correct the implementation or documentation, and record an ADR only when warranted.
+
+# Tracknologia Per-Feature Documentation Package
+
+This package contains repository-ready documentation for Tracknologia's current feature Modules.
+
+Copy the `docs/features/` directory into the Tracknologia repository.
+
+Included features:
+
+- Auth / Provider Access
+- Providers
+- Repair Requests
+- Repairs
+- Tracking
+- Analytics / Pilot Metrics
+- Cross-feature Integration Map
+
+These documents are aligned to the current Tracknologia v0.3 MVP model: Provider-centric architecture, `SHOP` and `INDEPENDENT` parity, optional customer Repair Requests, direct Provider Repair creation, minimal meaningful Repair statuses, accountless Tracking, and the lean seven-table core data model.

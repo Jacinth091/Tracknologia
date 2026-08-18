@@ -1,0 +1,205 @@
+# Feature — Tracking
+
+**Code location:** `src/features/tracking/`
+
+## Description
+
+The Tracking feature gives Customers **accountless, customer-safe visibility into an accepted Repair** through an unpredictable Tracking Code.
+
+Tracking is intentionally a restricted public read model rather than public access to the internal Repairs feature.
+
+## Primary goal
+
+Reduce repeated status inquiries by giving Customers a simple, trustworthy view of meaningful repair progress without requiring a Tracknologia account.
+
+## Feature goals
+
+- Allow public lookup by Tracking Code.
+- Require no Customer login/account.
+- Return a purpose-built `PublicRepairView` rather than a raw Repair record.
+- Show only information useful and safe for Customers.
+- Show current Repair Status and customer-visible updates.
+- Use Provider-neutral wording that works for Shops and Independent Repairers.
+- Avoid leaking whether arbitrary internal ids/resources exist.
+- Protect the public lookup surface against code enumeration/abuse.
+- Record tracking-view metrics when validation instrumentation is enabled.
+
+## Non-goals
+
+The MVP Tracking feature does not provide:
+
+- customer mutation of Repair data;
+- customer approval workflow inside Tracknologia;
+- customer chat;
+- customer authentication/profile;
+- full Repair history/internal status audit;
+- Internal Notes;
+- Provider-private Diagnosis/technical data unless explicitly deemed public-safe;
+- map/navigation features.
+
+## Main actor
+
+- **Customer** — person tracking an accepted Repair.
+
+Provider Users may preview the public view, but the Interface is designed for unauthenticated access.
+
+## Conceptual Interface
+
+```ts
+lookupRepairByTrackingCode(code): PublicRepairView | NotFound
+```
+
+Keep the public Interface narrow.
+
+## PublicRepairView
+
+May include:
+
+- Provider display name;
+- safe device summary;
+- current Repair Status;
+- Customer Updates;
+- last-updated timestamp;
+- selected Service Mode where useful;
+- customer-safe handover wording when `READY`.
+
+Must not include:
+
+- customer phone/email;
+- Internal Notes;
+- raw internal ids;
+- authenticated user ids;
+- Provider-private fields;
+- unrelated customer information;
+- unrestricted internal technical notes.
+
+## Workflow
+
+```text
+Customer opens /track
+        ↓
+Enter Tracking Code
+        ↓
+Validate input format
+        ↓
+Lookup restricted public projection
+        ↓
+Not found OR PublicRepairView
+        ↓
+Render Provider + Device + Status + Customer Updates
+```
+
+## Routes and UI
+
+```text
+/track
+```
+
+The page can contain:
+
+### Lookup state
+
+- Tracking Code input;
+- clear submit action;
+- minimal help text.
+
+### Success state
+
+Emphasize:
+
+1. current status;
+2. device identity;
+3. Provider identity;
+4. latest Customer Update;
+5. last updated;
+6. service/handover context where useful.
+
+### Failure state
+
+Use a neutral result such as invalid/not found without exposing internal lookup details.
+
+## Relationships with other features
+
+### Repairs
+
+Tracking reads only a customer-safe projection of Repair state and Customer Updates. Tracking never mutates Repair lifecycle.
+
+### Providers
+
+Tracking may display intentionally public Provider identity.
+
+### Auth
+
+No Provider authentication is required for normal customer lookup.
+
+### Analytics
+
+A successful or attempted tracking view may be measured to validate customer usage. Avoid collecting unnecessary personal information.
+
+## Security requirements
+
+### Tracking Code
+
+The Tracking Code acts as a public credential and therefore must be:
+
+- non-trivial;
+- difficult to enumerate/guess;
+- distinct from human-readable Ticket Number.
+
+Do not expose sequential ticket numbers as the only public lookup credential.
+
+### Rate limiting
+
+Apply reasonable rate limiting to public lookup when infrastructure supports it. Tune based on real usage/abuse rather than making the normal customer experience cumbersome.
+
+### Data minimization
+
+Public output is whitelisted field-by-field. Never serialize a full Repair object and then attempt to remove a few private fields afterward.
+
+## Status presentation
+
+Use customer-friendly meanings consistent with the domain:
+
+- `IN_PROGRESS` — repair is actively being worked on;
+- `WAITING_FOR_PARTS` — work is waiting on required part/material;
+- `AWAITING_APPROVAL` — Provider is waiting for Customer approval;
+- `READY` — work is finished and device is ready for the appropriate handover arrangement;
+- `COMPLETED` — repair engagement and handover are finished.
+
+Do not invent mandatory sub-stages such as Diagnosing/Testing unless the domain model changes.
+
+## Important edge cases
+
+### Valid Ticket Number but wrong Tracking Code
+
+Ticket Number alone should not grant public access unless product requirements explicitly change.
+
+### Unknown Tracking Code
+
+Return a minimal not-found result. Do not reveal internal identifiers or Provider/customer details.
+
+### Internal Note exists
+
+It remains invisible regardless of current status.
+
+### Customer Update exists while status is unchanged
+
+Show the update. Customer Updates and status transitions are independent concepts.
+
+## Testing expectations
+
+Test:
+
+- valid Tracking Code returns safe view;
+- invalid/unknown code returns minimal failure;
+- customer contact information is excluded;
+- Internal Notes are excluded;
+- internal ids/auth ids are excluded;
+- Customer Updates are included;
+- status labels/semantics are correct;
+- Provider-neutral READY presentation;
+- rate-limit behavior where implemented.
+
+## Definition of done
+
+The feature is healthy when a Customer can understand where an accepted Repair currently stands without contacting the Provider, while the system reveals no Provider-private or unrelated customer data.
