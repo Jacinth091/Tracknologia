@@ -35,8 +35,14 @@ export async function registerProviderAccount(params: RegisterInput & { emailRed
   });
 
   if (error) {
-    // If Supabase hits its built-in email rate limit during development, try signing in directly if account already exists
-    if (error.message.includes("rate limit") || error.status === 429) {
+    // If Supabase encountered an email delivery failure (e.g. SMTP config / rate limit), check if user was created and can sign in
+    const isEmailError =
+      error.message.includes("confirmation email") ||
+      error.message.includes("rate limit") ||
+      error.message.includes("SMTP") ||
+      error.status === 429;
+
+    if (isEmailError) {
       try {
         const signInResult = await supabase.auth.signInWithPassword({
           email: params.email,
@@ -54,11 +60,11 @@ export async function registerProviderAccount(params: RegisterInput & { emailRed
           return signInResult.data;
         }
       } catch {
-        // fall through to error throw
+        // continue
       }
 
       throw new Error(
-        "Supabase email rate limit exceeded. Please disable 'Confirm email' in your Supabase Dashboard under Authentication -> Email, or connect Resend Custom SMTP.",
+        "Email delivery failed. If using Custom SMTP, verify your SMTP credentials (or Google App Password). To skip email verification in development, disable 'Confirm email' in Supabase -> Authentication -> Email.",
       );
     }
 
