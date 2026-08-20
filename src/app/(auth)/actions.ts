@@ -98,9 +98,23 @@ export async function registerAction(
     };
   }
 
-  // If email confirmation is disabled or auto-confirmed, redirect directly
+  // 1. If email confirmation is disabled on Supabase, session is active immediately
   if (signUpResult.session) {
     redirect("/dashboard");
+  }
+
+  // 2. If email confirmation is disabled via dev environment toggle, auto-authenticate
+  const requireEmailConfirmation = process.env.NEXT_PUBLIC_REQUIRE_EMAIL_CONFIRMATION !== "false";
+  if (!requireEmailConfirmation) {
+    try {
+      await loginWithPassword({
+        email: parsed.data.email,
+        password: parsed.data.password,
+      });
+      redirect("/dashboard");
+    } catch {
+      // If auto-signin fails (e.g. Supabase project still requires verification), show confirmation message
+    }
   }
 
   return {

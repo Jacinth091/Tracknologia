@@ -7,6 +7,7 @@ import {
   staffInvitationSchema,
 } from "@/features/providers";
 import { createClient } from "@/lib/supabase/server";
+import { sendStaffInviteEmail } from "@/lib/email/client";
 import { revalidatePath } from "next/cache";
 
 export type InviteStaffState = {
@@ -60,10 +61,21 @@ export async function inviteStaffAction(
       parseResult.data.email,
     );
 
+    const appUrl = process.env.NEXT_PUBLIC_APP_URL || "http://localhost:3000";
+    const fullInviteUrl = `${appUrl}/register?invite=${token}`;
+
+    // Send invitation email via Resend (or logs to console in dev)
+    await sendStaffInviteEmail({
+      to: invitation.email,
+      shopName: context.providerName,
+      inviteCode: token,
+      inviteUrl: fullInviteUrl,
+    });
+
     revalidatePath("/dashboard/team");
 
     return {
-      success: `Invitation created successfully for ${invitation.email}`,
+      success: `Invitation sent to ${invitation.email}`,
       token,
       inviteUrl: `/register?invite=${token}`,
     };
