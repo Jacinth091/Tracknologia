@@ -34,12 +34,10 @@ export function OnboardingClient({
   initialDisplayName,
   initialEmail,
 }: OnboardingClientProps) {
-  const [activeTab, setActiveTab] = useState<"INDEPENDENT" | "SHOP" | "STAFF">(
-    defaultInviteToken
-      ? "STAFF"
-      : initialProviderType === "SHOP"
-        ? "SHOP"
-        : "INDEPENDENT",
+  // If the user registered as a specific provider type or has an invite token, lock to that sole flow
+  const lockedType = defaultInviteToken ? "STAFF" : initialProviderType;
+  const [selectedType, setSelectedType] = useState<"INDEPENDENT" | "SHOP" | "STAFF">(
+    lockedType ?? "INDEPENDENT",
   );
 
   const [indState, indAction, indPending] = useActionState(onboardIndependentAction, null);
@@ -47,61 +45,67 @@ export function OnboardingClient({
   const [staffState, staffAction, staffPending] = useActionState(acceptStaffInviteAction, null);
 
   const isPending = indPending || shopPending || staffPending;
+  const currentFlow = lockedType ?? selectedType;
 
   return (
     <div className="space-y-6">
-      {/* Tab Switcher */}
-      <div className="grid grid-cols-3 gap-2 p-1 bg-muted/60 rounded-2xl border border-border/80">
-        <button
-          type="button"
-          onClick={() => setActiveTab("INDEPENDENT")}
-          disabled={isPending}
-          className={cn(
-            "rounded-xl py-2.5 px-3 text-xs font-semibold transition-all cursor-pointer",
-            activeTab === "INDEPENDENT"
-              ? "bg-background text-foreground shadow-xs ring-1 ring-border/50"
-              : "text-muted-foreground hover:text-foreground",
-          )}
-        >
-          Independent
-        </button>
+      {/* Only show tab switcher if the user did not register as a specific account type */}
+      {!lockedType && (
+        <div className="grid grid-cols-3 gap-2 p-1 bg-muted/60 rounded-2xl border border-border/80">
+          <button
+            type="button"
+            onClick={() => setSelectedType("INDEPENDENT")}
+            disabled={isPending}
+            className={cn(
+              "rounded-xl py-2.5 px-3 text-xs font-semibold transition-all cursor-pointer",
+              selectedType === "INDEPENDENT"
+                ? "bg-background text-foreground shadow-xs ring-1 ring-border/50"
+                : "text-muted-foreground hover:text-foreground",
+            )}
+          >
+            Independent
+          </button>
 
-        <button
-          type="button"
-          onClick={() => setActiveTab("SHOP")}
-          disabled={isPending}
-          className={cn(
-            "rounded-xl py-2.5 px-3 text-xs font-semibold transition-all cursor-pointer",
-            activeTab === "SHOP"
-              ? "bg-background text-foreground shadow-xs ring-1 ring-border/50"
-              : "text-muted-foreground hover:text-foreground",
-          )}
-        >
-          Repair Shop
-        </button>
+          <button
+            type="button"
+            onClick={() => setSelectedType("SHOP")}
+            disabled={isPending}
+            className={cn(
+              "rounded-xl py-2.5 px-3 text-xs font-semibold transition-all cursor-pointer",
+              selectedType === "SHOP"
+                ? "bg-background text-foreground shadow-xs ring-1 ring-border/50"
+                : "text-muted-foreground hover:text-foreground",
+            )}
+          >
+            Repair Shop
+          </button>
 
-        <button
-          type="button"
-          onClick={() => setActiveTab("STAFF")}
-          disabled={isPending}
-          className={cn(
-            "rounded-xl py-2.5 px-3 text-xs font-semibold transition-all cursor-pointer",
-            activeTab === "STAFF"
-              ? "bg-background text-foreground shadow-xs ring-1 ring-border/50"
-              : "text-muted-foreground hover:text-foreground",
-          )}
-        >
-          Shop Staff (Invite)
-        </button>
-      </div>
+          <button
+            type="button"
+            onClick={() => setSelectedType("STAFF")}
+            disabled={isPending}
+            className={cn(
+              "rounded-xl py-2.5 px-3 text-xs font-semibold transition-all cursor-pointer",
+              selectedType === "STAFF"
+                ? "bg-background text-foreground shadow-xs ring-1 ring-border/50"
+                : "text-muted-foreground hover:text-foreground",
+            )}
+          >
+            Shop Staff (Invite)
+          </button>
+        </div>
+      )}
 
-      {/* 1. Independent Repairer Onboarding */}
-      {activeTab === "INDEPENDENT" && (
+      {/* 1. Independent Repairer Sole Onboarding */}
+      {currentFlow === "INDEPENDENT" && (
         <form action={indAction} className="space-y-4">
-          <div className="rounded-xl border border-border/80 bg-muted/30 p-4">
-            <h3 className="text-sm font-semibold text-foreground">Independent Repairer Profile</h3>
-            <p className="text-xs text-muted-foreground mt-0.5">
-              Designed for freelancers, mobile techs, and home-service specialists. No store address required.
+          <div className="rounded-2xl border border-border/80 bg-muted/30 p-4 space-y-1">
+            <div className="flex items-center gap-2">
+              <span className="text-base">🛠️</span>
+              <h3 className="text-sm font-semibold text-foreground">Independent Repairer Setup</h3>
+            </div>
+            <p className="text-xs text-muted-foreground">
+              Confirm your repair brand and coverage area to start managing repairs. No physical shop address required.
             </p>
           </div>
 
@@ -151,17 +155,17 @@ export function OnboardingClient({
           </div>
 
           <div className="space-y-2">
-            <Label htmlFor="ind-area">Service Area / Coverage</Label>
+            <Label htmlFor="ind-area">Service Area / Coverage (Optional)</Label>
             <Input
               id="ind-area"
               name="serviceArea"
-              placeholder="e.g. Cebu City, Mandaue, Home Service"
+              placeholder="e.g. Metro Cebu, Mandaue, Home Service"
               disabled={isPending}
             />
           </div>
 
           <div className="space-y-2">
-            <Label className="text-xs text-muted-foreground">Supported Devices (Optional)</Label>
+            <Label className="text-xs text-muted-foreground">Supported Device Categories (Optional)</Label>
             <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
               {DEVICE_OPTIONS.map((device) => (
                 <label
@@ -188,19 +192,22 @@ export function OnboardingClient({
                 Setting up Independent Provider...
               </span>
             ) : (
-              "Complete Independent Onboarding"
+              "Complete Setup & Go to Dashboard"
             )}
           </Button>
         </form>
       )}
 
-      {/* 2. Shop Owner Onboarding */}
-      {activeTab === "SHOP" && (
+      {/* 2. Repair Shop Owner Sole Onboarding */}
+      {currentFlow === "SHOP" && (
         <form action={shopAction} className="space-y-4">
-          <div className="rounded-xl border border-border/80 bg-muted/30 p-4">
-            <h3 className="text-sm font-semibold text-foreground">Repair Shop Profile</h3>
-            <p className="text-xs text-muted-foreground mt-0.5">
-              For storefront repair centers, workshops, and multi-technician teams.
+          <div className="rounded-2xl border border-border/80 bg-muted/30 p-4 space-y-1">
+            <div className="flex items-center gap-2">
+              <span className="text-base">🏬</span>
+              <h3 className="text-sm font-semibold text-foreground">Repair Shop Setup</h3>
+            </div>
+            <p className="text-xs text-muted-foreground">
+              Confirm your shop information and storefront address to start managing your repair shop.
             </p>
           </div>
 
@@ -226,7 +233,7 @@ export function OnboardingClient({
           </div>
 
           <div className="space-y-2">
-            <Label htmlFor="shop-address">Public Shop Address</Label>
+            <Label htmlFor="shop-address">Public Shop Address (Optional)</Label>
             <Input
               id="shop-address"
               name="publicAddress"
@@ -237,7 +244,7 @@ export function OnboardingClient({
 
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <div className="space-y-2">
-              <Label htmlFor="shop-email">Shop Email</Label>
+              <Label htmlFor="shop-email">Shop Contact Email</Label>
               <Input
                 id="shop-email"
                 name="contactEmail"
@@ -248,7 +255,7 @@ export function OnboardingClient({
               />
             </div>
             <div className="space-y-2">
-              <Label htmlFor="shop-phone">Shop Phone</Label>
+              <Label htmlFor="shop-phone">Shop Phone (Optional)</Label>
               <Input
                 id="shop-phone"
                 name="contactPhone"
@@ -260,7 +267,7 @@ export function OnboardingClient({
           </div>
 
           <div className="space-y-2">
-            <Label htmlFor="shop-area">Service Area / Region</Label>
+            <Label htmlFor="shop-area">Service Area / Region (Optional)</Label>
             <Input
               id="shop-area"
               name="serviceArea"
@@ -270,7 +277,7 @@ export function OnboardingClient({
           </div>
 
           <div className="space-y-2">
-            <Label className="text-xs text-muted-foreground">Supported Devices (Optional)</Label>
+            <Label className="text-xs text-muted-foreground">Supported Device Categories (Optional)</Label>
             <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
               {DEVICE_OPTIONS.map((device) => (
                 <label
@@ -297,19 +304,22 @@ export function OnboardingClient({
                 Registering Repair Shop...
               </span>
             ) : (
-              "Complete Shop Onboarding"
+              "Complete Setup & Go to Dashboard"
             )}
           </Button>
         </form>
       )}
 
-      {/* 3. Shop Staff Invitation Acceptance */}
-      {activeTab === "STAFF" && (
+      {/* 3. Shop Staff Invitation Acceptance Sole Flow */}
+      {currentFlow === "STAFF" && (
         <form action={staffAction} className="space-y-4">
-          <div className="rounded-xl border border-border/80 bg-muted/40 p-4 space-y-1">
-            <h4 className="text-sm font-semibold text-foreground">Join an Existing Repair Shop</h4>
+          <div className="rounded-2xl border border-border/80 bg-muted/40 p-4 space-y-1">
+            <div className="flex items-center gap-2">
+              <span className="text-base">👥</span>
+              <h4 className="text-sm font-semibold text-foreground">Join Repair Shop</h4>
+            </div>
             <p className="text-xs text-muted-foreground leading-relaxed">
-              Tracknologia requires an Owner-authorized invitation to join a shop. If you received an invite link or token, enter it below.
+              Enter the invitation code provided by your Shop Owner to complete joining the shop.
             </p>
           </div>
 
