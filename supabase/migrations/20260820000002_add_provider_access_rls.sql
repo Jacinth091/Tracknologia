@@ -15,6 +15,7 @@ GRANT SELECT ON public.provider_memberships TO authenticated;
 GRANT SELECT, INSERT, UPDATE ON public.provider_invitations TO authenticated;
 
 -- Helper function: Returns provider IDs that the current authenticated user is a member of (Non-recursive SECURITY DEFINER)
+DROP FUNCTION IF EXISTS public.get_auth_user_provider_ids();
 CREATE OR REPLACE FUNCTION public.get_auth_user_provider_ids()
 RETURNS SETOF UUID
 LANGUAGE sql
@@ -28,7 +29,9 @@ $$;
 GRANT EXECUTE ON FUNCTION public.get_auth_user_provider_ids() TO authenticated;
 
 -- 3. RLS Policies on provider_memberships
--- Members of a provider can view all memberships within their provider
+DROP POLICY IF EXISTS "Users can view own memberships" ON public.provider_memberships;
+DROP POLICY IF EXISTS "Members can view provider memberships" ON public.provider_memberships;
+
 CREATE POLICY "Members can view provider memberships"
   ON public.provider_memberships
   FOR SELECT
@@ -41,7 +44,10 @@ CREATE POLICY "Members can view provider memberships"
 -- All membership creations occur via atomic SECURITY DEFINER functions (Owner onboarding / Staff invitation acceptance).
 
 -- 4. RLS Policies on providers
--- Members can view their associated provider
+DROP POLICY IF EXISTS "Provider members can view their provider" ON public.providers;
+DROP POLICY IF EXISTS "Public can view active providers" ON public.providers;
+DROP POLICY IF EXISTS "Owners can update provider" ON public.providers;
+
 CREATE POLICY "Provider members can view their provider"
   ON public.providers
   FOR SELECT
@@ -50,14 +56,12 @@ CREATE POLICY "Provider members can view their provider"
     id IN (SELECT public.get_auth_user_provider_ids())
   );
 
--- Public can view active providers for intake
 CREATE POLICY "Public can view active providers"
   ON public.providers
   FOR SELECT
   TO anon, authenticated
   USING (accepting_requests = true);
 
--- Only OWNERs can update provider details
 CREATE POLICY "Owners can update provider"
   ON public.providers
   FOR UPDATE
@@ -70,7 +74,10 @@ CREATE POLICY "Owners can update provider"
   );
 
 -- 5. RLS Policies on provider_invitations
--- Only OWNERs can view/manage invitations for their provider
+DROP POLICY IF EXISTS "Owners can view invitations" ON public.provider_invitations;
+DROP POLICY IF EXISTS "Owners can create invitations" ON public.provider_invitations;
+DROP POLICY IF EXISTS "Owners can update invitations" ON public.provider_invitations;
+
 CREATE POLICY "Owners can view invitations"
   ON public.provider_invitations
   FOR SELECT
@@ -106,6 +113,7 @@ CREATE POLICY "Owners can update invitations"
   );
 
 -- 6. Atomic RPC: Create Provider with Initial OWNER (Independent or Shop Owner Onboarding)
+DROP FUNCTION IF EXISTS public.create_provider_with_owner(TEXT, public.provider_type);
 CREATE OR REPLACE FUNCTION public.create_provider_with_owner(
   p_display_name TEXT,
   p_provider_type public.provider_type
@@ -182,6 +190,7 @@ END;
 $$;
 
 -- 7. Atomic RPC: Accept Staff Invitation (Shop Staff Onboarding)
+DROP FUNCTION IF EXISTS public.accept_staff_invitation(TEXT);
 CREATE OR REPLACE FUNCTION public.accept_staff_invitation(
   p_token_hash TEXT
 )
@@ -250,6 +259,7 @@ END;
 $$;
 
 -- 8. Safe RPC: Resolve Invitation & Shop Details (For Staff Onboarding UI)
+DROP FUNCTION IF EXISTS public.get_invitation_details(TEXT);
 CREATE OR REPLACE FUNCTION public.get_invitation_details(
   p_token_hash TEXT
 )
@@ -272,14 +282,14 @@ BEGIN
   RETURN QUERY
   SELECT 
     pi.id AS invitation_id,
-    pi.email,
+    pi.email::TEXT,
     pi.role,
     p.id AS provider_id,
-    p.display_name AS shop_name,
-    p.public_address,
-    p.service_area,
-    p.contact_email,
-    p.contact_phone
+    p.display_name::TEXT AS shop_name,
+    p.public_address::TEXT,
+    p.service_area::TEXT,
+    p.contact_email::TEXT,
+    p.contact_phone::TEXT
   FROM public.provider_invitations pi
   JOIN public.providers p ON p.id = pi.provider_id
   WHERE pi.token_hash = p_token_hash
@@ -291,6 +301,7 @@ END;
 $$;
 
 -- 9. Safe RPC: Resolve Provider Team Members with User Profiles
+DROP FUNCTION IF EXISTS public.get_provider_team_members(UUID);
 CREATE OR REPLACE FUNCTION public.get_provider_team_members(
   p_provider_id UUID
 )
@@ -323,10 +334,10 @@ BEGIN
     pm.role,
     COALESCE(
       NULLIF(trim(u.raw_user_meta_data->>'display_name'), ''),
-      NULLIF(trim(u.email), ''),
+      NULLIF(trim(u.email::TEXT), ''),
       'Staff Member'
-    ) AS display_name,
-    u.email::TEXT,
+    )::TEXT AS display_name,
+    u.email::TEXT AS email,
     (u.raw_user_meta_data->>'contact_phone')::TEXT AS contact_phone,
     pm.created_at
   FROM public.provider_memberships pm

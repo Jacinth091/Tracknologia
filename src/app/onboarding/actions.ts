@@ -122,10 +122,10 @@ export async function acceptStaffInviteAction(
   }
 
   try {
-    // 1. Atomically consume staff invitation and create membership
-    await acceptStaffInvitation(supabase, token);
+    // 1. Atomically consume staff invitation and store staff profile on membership
+    await acceptStaffInvitation(supabase, token, fullName, contactPhone);
 
-    // 2. Update staff user metadata with their full name & phone
+    // 2. Update staff user auth metadata with their full name & phone
     await supabase.auth.updateUser({
       data: {
         display_name: fullName,

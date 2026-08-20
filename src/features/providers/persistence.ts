@@ -65,9 +65,13 @@ export async function createProviderWithOwner(
 export async function acceptStaffInvitation(
   supabase: SupabaseClient,
   tokenHash: string,
+  displayName?: string,
+  contactPhone?: string,
 ): Promise<{ providerId: string; membershipId: string; role: "STAFF" }> {
   const { data, error } = await supabase.rpc("accept_staff_invitation", {
     p_token_hash: tokenHash,
+    p_display_name: displayName || null,
+    p_contact_phone: contactPhone || null,
   });
 
   if (error) {
@@ -196,43 +200,23 @@ export async function listTeamMembers(
   supabase: SupabaseClient,
   providerId: string,
 ): Promise<TeamMember[]> {
-  const { data, error } = await supabase.rpc("get_provider_team_members", {
-    p_provider_id: providerId,
-  });
+  const { data, error } = await supabase
+    .from("provider_memberships")
+    .select("id, provider_id, user_id, role, display_name, contact_email, contact_phone, created_at")
+    .eq("provider_id", providerId)
+    .order("created_at", { ascending: true });
 
-  if (error || !data) {
-    // Fallback query if RPC is not yet pushed
-    const fallback = await supabase
-      .from("provider_memberships")
-      .select("id, provider_id, user_id, role, created_at")
-      .eq("provider_id", providerId)
-      .order("created_at", { ascending: true });
-
-    return (fallback.data || []).map((row) => ({
-      membershipId: row.id,
-      userId: row.user_id,
-      role: row.role,
-      displayName: row.role === "OWNER" ? "Shop Owner" : "Staff Technician",
-      email: null,
-      contactPhone: null,
-      createdAt: row.created_at,
-    }));
+  if (error) {
+    console.error("[listTeamMembers error]:", error);
+    throw new Error(`Failed to list team members: ${error.message}`);
   }
 
-  return (data || []).map((row: {
-    membership_id: string;
-    user_id: string;
-    role: "OWNER" | "STAFF";
-    display_name: string;
-    email: string | null;
-    contact_phone: string | null;
-    created_at: string;
-  }) => ({
-    membershipId: row.membership_id,
+  return (data || []).map((row) => ({
+    membershipId: row.id,
     userId: row.user_id,
     role: row.role,
-    displayName: row.display_name,
-    email: row.email,
+    displayName: row.display_name || row.contact_email || (row.role === "OWNER" ? "Shop Owner" : "Staff Technician"),
+    email: row.contact_email,
     contactPhone: row.contact_phone,
     createdAt: row.created_at,
   }));
