@@ -40,11 +40,11 @@ export function RegisterForm({ initialInvite }: { initialInvite?: string }) {
       {/* 3 Onboarding Path Cards (LD-01) */}
       <div className="space-y-2">
         <Label className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">
-          Select Your Path
+          Select Your Account Type
         </Label>
         <div
           role="radiogroup"
-          aria-label="Provider Onboarding Path"
+          aria-label="Provider Account Type"
           className="grid grid-cols-1 sm:grid-cols-3 gap-2.5"
         >
           {/* Path 1: Independent */}
@@ -66,7 +66,7 @@ export function RegisterForm({ initialInvite }: { initialInvite?: string }) {
               <span className="text-sm font-semibold text-foreground">Independent</span>
             </div>
             <span className="text-[11px] text-muted-foreground leading-relaxed">
-              Mobile techs & solo repairers. No store address needed.
+              Mobile techs & solo repairers. No physical shop needed.
             </span>
           </button>
 
@@ -112,16 +112,16 @@ export function RegisterForm({ initialInvite }: { initialInvite?: string }) {
               <span className="text-sm font-semibold text-foreground">Shop Staff</span>
             </div>
             <span className="text-[11px] text-muted-foreground leading-relaxed">
-              Joining an existing repair shop via owner invite.
+              Join an existing shop via Owner invitation link.
             </span>
           </button>
         </div>
       </div>
 
-      {/* Path 1 & 2: Provider Owner Registration (Independent & Shop Owner) */}
-      {onboardingType !== "STAFF" && (
+      {/* Path 1: Independent Repairer Registration */}
+      {onboardingType === "INDEPENDENT" && (
         <form action={registerFormAction} className="space-y-4">
-          <input type="hidden" name="providerType" value={onboardingType} />
+          <input type="hidden" name="providerType" value="INDEPENDENT" />
 
           {registerState?.error && !registerState.fieldErrors && (
             <div className="rounded-xl border border-destructive/20 bg-destructive/10 p-3 text-xs text-destructive font-medium">
@@ -136,14 +136,12 @@ export function RegisterForm({ initialInvite }: { initialInvite?: string }) {
           )}
 
           <div className="space-y-2">
-            <Label htmlFor="displayName">
-              {onboardingType === "SHOP" ? "Shop / Business Name *" : "Your Name / Repair Brand *"}
-            </Label>
+            <Label htmlFor="ind-displayName">Your Name / Repair Brand *</Label>
             <Input
-              id="displayName"
+              id="ind-displayName"
               name="displayName"
               type="text"
-              placeholder={onboardingType === "SHOP" ? "e.g. Apex Phone Repair Center" : "e.g. Alex Tech Services"}
+              placeholder="e.g. Alex Tech Services or Alex Repairs"
               disabled={isPending}
               required
             />
@@ -153,13 +151,13 @@ export function RegisterForm({ initialInvite }: { initialInvite?: string }) {
           </div>
 
           <div className="space-y-2">
-            <Label htmlFor="email">Work Email *</Label>
+            <Label htmlFor="ind-email">Email Address *</Label>
             <Input
-              id="email"
+              id="ind-email"
               name="email"
               type="email"
               autoComplete="email"
-              placeholder={onboardingType === "SHOP" ? "owner@apexrepairs.com" : "alex@mobiletech.com"}
+              placeholder="alex@mobiletech.com"
               disabled={isPending}
               required
             />
@@ -170,9 +168,9 @@ export function RegisterForm({ initialInvite }: { initialInvite?: string }) {
 
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <div className="space-y-2">
-              <Label htmlFor="password">Password *</Label>
+              <Label htmlFor="ind-password">Password *</Label>
               <PasswordInput
-                id="password"
+                id="ind-password"
                 name="password"
                 autoComplete="new-password"
                 placeholder="At least 8 characters"
@@ -185,9 +183,9 @@ export function RegisterForm({ initialInvite }: { initialInvite?: string }) {
             </div>
 
             <div className="space-y-2">
-              <Label htmlFor="confirmPassword">Confirm Password *</Label>
+              <Label htmlFor="ind-confirmPassword">Confirm Password *</Label>
               <PasswordInput
-                id="confirmPassword"
+                id="ind-confirmPassword"
                 name="confirmPassword"
                 autoComplete="new-password"
                 placeholder="Repeat password"
@@ -200,7 +198,6 @@ export function RegisterForm({ initialInvite }: { initialInvite?: string }) {
             </div>
           </div>
 
-          {/* Supported Devices Chips */}
           <div className="space-y-2 pt-1">
             <Label className="text-xs text-muted-foreground">Supported Devices (Optional)</Label>
             <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
@@ -226,10 +223,8 @@ export function RegisterForm({ initialInvite }: { initialInvite?: string }) {
             {isRegisterPending ? (
               <span className="flex items-center justify-center gap-2">
                 <LoadingSpinner size="sm" />
-                Setting up your account...
+                Setting up Independent Provider...
               </span>
-            ) : onboardingType === "SHOP" ? (
-              "Create Shop Owner Account"
             ) : (
               "Create Independent Account"
             )}
@@ -237,48 +232,167 @@ export function RegisterForm({ initialInvite }: { initialInvite?: string }) {
         </form>
       )}
 
-      {/* Path 3: Shop Staff Invitation Acceptance (LD-01) */}
-      {onboardingType === "STAFF" && (
-        <form action={staffFormAction} className="space-y-4">
-          <div className="rounded-xl border border-border/80 bg-muted/40 p-4 space-y-1">
-            <h4 className="text-sm font-semibold text-foreground">Join an Existing Repair Shop</h4>
-            <p className="text-xs text-muted-foreground leading-relaxed">
-              Tracknologia requires an Owner-authorized invitation to join a shop. If you received an invite link or token, enter it below.
-            </p>
-          </div>
+      {/* Path 2: Repair Shop Owner Registration */}
+      {onboardingType === "SHOP" && (
+        <form action={registerFormAction} className="space-y-4">
+          <input type="hidden" name="providerType" value="SHOP" />
 
-          {staffState?.error && (
+          {registerState?.error && !registerState.fieldErrors && (
             <div className="rounded-xl border border-destructive/20 bg-destructive/10 p-3 text-xs text-destructive font-medium">
-              {staffState.error}
+              {registerState.error}
+            </div>
+          )}
+
+          {registerState?.success && (
+            <div className="rounded-xl border border-primary/20 bg-primary/10 p-3 text-xs text-primary font-medium">
+              {registerState.success}
             </div>
           )}
 
           <div className="space-y-2">
-            <Label htmlFor="staff-token">Invitation Token / Code *</Label>
+            <Label htmlFor="shop-displayName">Shop / Business Name *</Label>
             <Input
-              id="staff-token"
-              name="token"
-              defaultValue={initialInvite ?? ""}
-              placeholder="Paste invite code from your Shop Owner"
+              id="shop-displayName"
+              name="displayName"
+              type="text"
+              placeholder="e.g. Apex Phone Repair Center"
               disabled={isPending}
               required
             />
-            <p className="text-[11px] text-muted-foreground">
-              Don&apos;t have an invite? Ask your Shop Owner to generate an invitation for you.
-            </p>
+            {registerState?.fieldErrors?.displayName && (
+              <p className="text-xs text-destructive">{registerState.fieldErrors.displayName}</p>
+            )}
+          </div>
+
+          <div className="space-y-2">
+            <Label htmlFor="shop-email">Work Email *</Label>
+            <Input
+              id="shop-email"
+              name="email"
+              type="email"
+              autoComplete="email"
+              placeholder="owner@apexrepairs.com"
+              disabled={isPending}
+              required
+            />
+            {registerState?.fieldErrors?.email && (
+              <p className="text-xs text-destructive">{registerState.fieldErrors.email}</p>
+            )}
+          </div>
+
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+            <div className="space-y-2">
+              <Label htmlFor="shop-password">Password *</Label>
+              <PasswordInput
+                id="shop-password"
+                name="password"
+                autoComplete="new-password"
+                placeholder="At least 8 characters"
+                disabled={isPending}
+                required
+              />
+              {registerState?.fieldErrors?.password && (
+                <p className="text-xs text-destructive">{registerState.fieldErrors.password}</p>
+              )}
+            </div>
+
+            <div className="space-y-2">
+              <Label htmlFor="shop-confirmPassword">Confirm Password *</Label>
+              <PasswordInput
+                id="shop-confirmPassword"
+                name="confirmPassword"
+                autoComplete="new-password"
+                placeholder="Repeat password"
+                disabled={isPending}
+                required
+              />
+              {registerState?.fieldErrors?.confirmPassword && (
+                <p className="text-xs text-destructive">{registerState.fieldErrors.confirmPassword}</p>
+              )}
+            </div>
+          </div>
+
+          <div className="space-y-2 pt-1">
+            <Label className="text-xs text-muted-foreground">Supported Devices (Optional)</Label>
+            <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
+              {DEVICE_OPTIONS.map((device) => (
+                <label
+                  key={device}
+                  className="flex items-center gap-2 rounded-xl border border-border/70 p-2 text-xs font-medium text-muted-foreground hover:bg-muted/40 cursor-pointer"
+                >
+                  <input
+                    type="checkbox"
+                    name="supportedDevices"
+                    value={device}
+                    className="rounded border-border accent-primary"
+                    disabled={isPending}
+                  />
+                  <span>{device}</span>
+                </label>
+              ))}
+            </div>
           </div>
 
           <Button type="submit" className="w-full" disabled={isPending}>
-            {isStaffPending ? (
+            {isRegisterPending ? (
               <span className="flex items-center justify-center gap-2">
                 <LoadingSpinner size="sm" />
-                Verifying invite...
+                Setting up Repair Shop...
               </span>
             ) : (
-              "Accept Invite & Join Shop"
+              "Create Shop Owner Account"
             )}
           </Button>
         </form>
+      )}
+
+      {/* Path 3: Shop Staff Invitation Flow (LD-01) */}
+      {onboardingType === "STAFF" && (
+        <div className="space-y-4">
+          <div className="rounded-2xl border border-border/80 bg-muted/40 p-4 space-y-2">
+            <div className="flex items-center gap-2">
+              <span className="text-base">ℹ️</span>
+              <h4 className="text-sm font-semibold text-foreground">How Staff Onboarding Works</h4>
+            </div>
+            <p className="text-xs text-muted-foreground leading-relaxed">
+              Tracknologia protects shop security by requiring an <strong>Owner-authorized invitation link</strong> to join an existing shop. Shop staff cannot self-join without an invitation.
+            </p>
+          </div>
+
+          <form action={staffFormAction} className="space-y-4">
+            {staffState?.error && (
+              <div className="rounded-xl border border-destructive/20 bg-destructive/10 p-3 text-xs text-destructive font-medium">
+                {staffState.error}
+              </div>
+            )}
+
+            <div className="space-y-2">
+              <Label htmlFor="staff-token">Invitation Token / Code</Label>
+              <Input
+                id="staff-token"
+                name="token"
+                defaultValue={initialInvite ?? ""}
+                placeholder="Paste the invitation token from your Shop Owner"
+                disabled={isPending}
+                required
+              />
+              <p className="text-[11px] text-muted-foreground">
+                If you already received an invite link, open that link directly to join your shop.
+              </p>
+            </div>
+
+            <Button type="submit" className="w-full" disabled={isPending}>
+              {isStaffPending ? (
+                <span className="flex items-center justify-center gap-2">
+                  <LoadingSpinner size="sm" />
+                  Verifying invite...
+                </span>
+              ) : (
+                "Accept Invite & Join Shop"
+              )}
+            </Button>
+          </form>
+        </div>
       )}
     </div>
   );
