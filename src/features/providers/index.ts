@@ -2,11 +2,13 @@
 export {
   createProviderWithOwner,
   acceptStaffInvitation,
+  getInvitationDetailsByToken,
   createStaffInvitation,
   listStaffInvitations,
   listTeamMembers,
   revokeStaffInvitation,
   getProviderById,
+  type InvitationShopDetails,
 } from "./persistence";
 
 export {

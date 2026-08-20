@@ -8,6 +8,18 @@ import type {
   TeamMember,
 } from "./types";
 
+export interface InvitationShopDetails {
+  invitationId: string;
+  email: string;
+  role: "STAFF";
+  providerId: string;
+  shopName: string;
+  publicAddress?: string | null;
+  serviceArea?: string | null;
+  contactEmail?: string | null;
+  contactPhone?: string | null;
+}
+
 export async function createProviderWithOwner(
   supabase: SupabaseClient,
   params: CreateProviderInput,
@@ -71,6 +83,36 @@ export async function acceptStaffInvitation(
     providerId: result.provider_id,
     membershipId: result.membership_id,
     role: result.role,
+  };
+}
+
+export async function getInvitationDetailsByToken(
+  supabase: SupabaseClient,
+  tokenHash: string,
+): Promise<InvitationShopDetails | null> {
+  const { data, error } = await supabase.rpc("get_invitation_details", {
+    p_token_hash: tokenHash,
+  });
+
+  if (error || !data) {
+    return null;
+  }
+
+  const result = Array.isArray(data) ? data[0] : data;
+  if (!result || !result.provider_id) {
+    return null;
+  }
+
+  return {
+    invitationId: result.invitation_id,
+    email: result.email,
+    role: result.role,
+    providerId: result.provider_id,
+    shopName: result.shop_name,
+    publicAddress: result.public_address,
+    serviceArea: result.service_area,
+    contactEmail: result.contact_email,
+    contactPhone: result.contact_phone,
   };
 }
 

@@ -11,6 +11,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { LoadingSpinner } from "@/components/ui/loading-spinner";
 import { cn } from "@/lib/utils";
+import type { InvitationShopDetails } from "@/features/providers";
 
 const DEVICE_OPTIONS = [
   "Smartphones",
@@ -26,6 +27,7 @@ interface OnboardingClientProps {
   initialProviderType?: "SHOP" | "INDEPENDENT";
   initialDisplayName?: string;
   initialEmail?: string;
+  shopDetails?: InvitationShopDetails | null;
 }
 
 export function OnboardingClient({
@@ -33,9 +35,10 @@ export function OnboardingClient({
   initialProviderType,
   initialDisplayName,
   initialEmail,
+  shopDetails,
 }: OnboardingClientProps) {
-  // If the user registered as a specific provider type or has an invite token, lock to that sole flow
-  const lockedType = defaultInviteToken ? "STAFF" : initialProviderType;
+  // If the user registered as a specific provider type or has an invite token/shopDetails, lock to that sole flow
+  const lockedType = defaultInviteToken || shopDetails ? "STAFF" : initialProviderType;
   const [selectedType, setSelectedType] = useState<"INDEPENDENT" | "SHOP" | "STAFF">(
     lockedType ?? "INDEPENDENT",
   );
@@ -313,14 +316,31 @@ export function OnboardingClient({
       {/* 3. Shop Staff Invitation Acceptance Sole Flow */}
       {currentFlow === "STAFF" && (
         <form action={staffAction} className="space-y-4">
-          <div className="rounded-2xl border border-primary/20 bg-primary/5 p-4 space-y-1">
+          <input type="hidden" name="token" value={defaultInviteToken ?? ""} />
+
+          {/* Shop Connection Card */}
+          <div className="rounded-2xl border border-primary/20 bg-primary/5 p-4 space-y-2">
             <div className="flex items-center gap-2">
-              <span className="text-base">👥</span>
-              <h4 className="text-sm font-semibold text-foreground">Join Repair Shop Team</h4>
+              <span className="text-xl">🏬</span>
+              <div>
+                <h4 className="text-sm font-semibold text-foreground">
+                  {shopDetails?.shopName || "Repair Shop Invitation"}
+                </h4>
+                <p className="text-xs text-muted-foreground">
+                  Role: <span className="font-semibold text-primary">Staff Technician</span>
+                </p>
+              </div>
             </div>
-            <p className="text-xs text-muted-foreground leading-relaxed">
-              Confirm your shop invitation code to link your account and access the repair workshop dashboard.
-            </p>
+            {(shopDetails?.publicAddress || shopDetails?.serviceArea) && (
+              <p className="text-xs text-muted-foreground pt-1">
+                📍 {[shopDetails.publicAddress, shopDetails.serviceArea].filter(Boolean).join(" • ")}
+              </p>
+            )}
+            {shopDetails?.contactEmail && (
+              <p className="text-[11px] text-muted-foreground">
+                ✉️ Shop Contact: {shopDetails.contactEmail}
+              </p>
+            )}
           </div>
 
           {staffState?.error && (
@@ -329,31 +349,55 @@ export function OnboardingClient({
             </div>
           )}
 
+          {/* If token was not prefilled, show input */}
+          {!defaultInviteToken && (
+            <div className="space-y-2">
+              <Label htmlFor="invite-token">Invitation Token / Code *</Label>
+              <Input
+                id="invite-token"
+                name="token"
+                placeholder="Paste invitation token here"
+                disabled={isPending}
+                required
+              />
+            </div>
+          )}
+
+          {/* Staff Personal Profile Details */}
           <div className="space-y-2">
-            <Label htmlFor="invite-token">Invitation Token / Code *</Label>
+            <Label htmlFor="staff-fullName">Your Full Name *</Label>
             <Input
-              id="invite-token"
-              name="token"
-              defaultValue={defaultInviteToken ?? ""}
-              placeholder="Paste invitation token here"
+              id="staff-fullName"
+              name="fullName"
+              defaultValue={initialDisplayName ?? ""}
+              placeholder="e.g. Alex Martinez"
               disabled={isPending}
               required
             />
-            <p className="text-[11px] text-muted-foreground">
-              {defaultInviteToken
-                ? "Your invitation code was prefilled from your registration."
-                : "Staff join via an invitation code provided by the Shop Owner."}
-            </p>
+            {staffState?.fieldErrors?.fullName && (
+              <p className="text-xs text-destructive">{staffState.fieldErrors.fullName}</p>
+            )}
+          </div>
+
+          <div className="space-y-2">
+            <Label htmlFor="staff-contactPhone">Contact Phone (Optional)</Label>
+            <Input
+              id="staff-contactPhone"
+              name="contactPhone"
+              type="tel"
+              placeholder="+63 912 345 6789"
+              disabled={isPending}
+            />
           </div>
 
           <Button type="submit" className="w-full" disabled={isPending}>
             {staffPending ? (
               <span className="flex items-center gap-2">
                 <LoadingSpinner size="sm" />
-                Connecting to shop...
+                Joining shop team...
               </span>
             ) : (
-              "Confirm & Enter Shop Dashboard"
+              "Complete Profile & Enter Shop Dashboard"
             )}
           </Button>
         </form>

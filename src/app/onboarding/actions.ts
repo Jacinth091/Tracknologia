@@ -104,18 +104,37 @@ export async function acceptStaffInviteAction(
 ): Promise<OnboardingActionState> {
   const supabase = await createClient();
   const token = formData.get("token")?.toString()?.trim();
+  const fullName = formData.get("fullName")?.toString()?.trim();
+  const contactPhone = formData.get("contactPhone")?.toString()?.trim();
 
   if (!token) {
     return {
-      error: "Please enter your invitation code or token",
+      error: "Missing invitation code. Please provide a valid shop invite code.",
+    };
+  }
+
+  if (!fullName || fullName.length < 2) {
+    return {
+      fieldErrors: {
+        fullName: "Please enter your full name (at least 2 characters)",
+      },
     };
   }
 
   try {
+    // 1. Atomically consume staff invitation and create membership
     await acceptStaffInvitation(supabase, token);
+
+    // 2. Update staff user metadata with their full name & phone
+    await supabase.auth.updateUser({
+      data: {
+        display_name: fullName,
+        contact_phone: contactPhone || undefined,
+      },
+    });
   } catch (err: unknown) {
     return {
-      error: err instanceof Error ? err.message : "Invalid, expired, or revoked invitation",
+      error: err instanceof Error ? err.message : "Invalid, expired, or already accepted invitation",
     };
   }
 

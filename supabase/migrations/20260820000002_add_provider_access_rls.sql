@@ -237,8 +237,52 @@ BEGIN
 END;
 $$;
 
+-- 8. Safe RPC: Resolve Invitation & Shop Details (For Staff Onboarding UI)
+CREATE OR REPLACE FUNCTION public.get_invitation_details(
+  p_token_hash TEXT
+)
+RETURNS TABLE (
+  invitation_id UUID,
+  email TEXT,
+  role public.membership_role,
+  provider_id UUID,
+  shop_name TEXT,
+  public_address TEXT,
+  service_area TEXT,
+  contact_email TEXT,
+  contact_phone TEXT
+)
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path = public, pg_temp
+AS $$
+BEGIN
+  RETURN QUERY
+  SELECT 
+    pi.id AS invitation_id,
+    pi.email,
+    pi.role,
+    p.id AS provider_id,
+    p.display_name AS shop_name,
+    p.public_address,
+    p.service_area,
+    p.contact_email,
+    p.contact_phone
+  FROM public.provider_invitations pi
+  JOIN public.providers p ON p.id = pi.provider_id
+  WHERE pi.token_hash = p_token_hash
+    AND pi.accepted_at IS NULL
+    AND pi.revoked_at IS NULL
+    AND pi.expires_at > now()
+  LIMIT 1;
+END;
+$$;
+
 REVOKE ALL ON FUNCTION public.create_provider_with_owner(TEXT, public.provider_type) FROM PUBLIC;
 GRANT EXECUTE ON FUNCTION public.create_provider_with_owner(TEXT, public.provider_type) TO authenticated;
 
 REVOKE ALL ON FUNCTION public.accept_staff_invitation(TEXT) FROM PUBLIC;
 GRANT EXECUTE ON FUNCTION public.accept_staff_invitation(TEXT) TO authenticated;
+
+REVOKE ALL ON FUNCTION public.get_invitation_details(TEXT) FROM PUBLIC;
+GRANT EXECUTE ON FUNCTION public.get_invitation_details(TEXT) TO authenticated, anon;
