@@ -102,10 +102,10 @@ export function OnboardingClient({
           <div className="rounded-2xl border border-border/80 bg-muted/30 p-4 space-y-1">
             <div className="flex items-center gap-2">
               <span className="text-base">🛠️</span>
-              <h3 className="text-sm font-semibold text-foreground">Independent Repairer Setup</h3>
+              <h3 className="text-sm font-semibold text-foreground">Independent Repairer Profile</h3>
             </div>
             <p className="text-xs text-muted-foreground">
-              Confirm your repair brand and coverage area to start managing repairs. No physical shop address required.
+              Confirm your brand name, contact info, and service coverage. No physical storefront address required.
             </p>
           </div>
 
@@ -204,10 +204,10 @@ export function OnboardingClient({
           <div className="rounded-2xl border border-border/80 bg-muted/30 p-4 space-y-1">
             <div className="flex items-center gap-2">
               <span className="text-base">🏬</span>
-              <h3 className="text-sm font-semibold text-foreground">Repair Shop Setup</h3>
+              <h3 className="text-sm font-semibold text-foreground">Repair Shop Profile</h3>
             </div>
             <p className="text-xs text-muted-foreground">
-              Confirm your shop information and storefront address to start managing your repair shop.
+              Configure your shop information and public storefront location to start managing repairs and staff.
             </p>
           </div>
 
@@ -233,7 +233,7 @@ export function OnboardingClient({
           </div>
 
           <div className="space-y-2">
-            <Label htmlFor="shop-address">Public Shop Address (Optional)</Label>
+            <Label htmlFor="shop-address">Public Storefront Address (Optional)</Label>
             <Input
               id="shop-address"
               name="publicAddress"
@@ -313,13 +313,13 @@ export function OnboardingClient({
       {/* 3. Shop Staff Invitation Acceptance Sole Flow */}
       {currentFlow === "STAFF" && (
         <form action={staffAction} className="space-y-4">
-          <div className="rounded-2xl border border-border/80 bg-muted/40 p-4 space-y-1">
+          <div className="rounded-2xl border border-primary/20 bg-primary/5 p-4 space-y-1">
             <div className="flex items-center gap-2">
               <span className="text-base">👥</span>
-              <h4 className="text-sm font-semibold text-foreground">Join Repair Shop</h4>
+              <h4 className="text-sm font-semibold text-foreground">Join Repair Shop Team</h4>
             </div>
             <p className="text-xs text-muted-foreground leading-relaxed">
-              Enter the invitation code provided by your Shop Owner to complete joining the shop.
+              Confirm your shop invitation code to link your account and access the repair workshop dashboard.
             </p>
           </div>
 
@@ -340,7 +340,9 @@ export function OnboardingClient({
               required
             />
             <p className="text-[11px] text-muted-foreground">
-              Staff cannot self-join without an Owner invitation. If you don&apos;t have a code, ask your shop owner.
+              {defaultInviteToken
+                ? "Your invitation code was prefilled from your registration."
+                : "Staff join via an invitation code provided by the Shop Owner."}
             </p>
           </div>
 
@@ -348,10 +350,10 @@ export function OnboardingClient({
             {staffPending ? (
               <span className="flex items-center gap-2">
                 <LoadingSpinner size="sm" />
-                Validating invitation...
+                Connecting to shop...
               </span>
             ) : (
-              "Accept Invitation & Join Shop"
+              "Confirm & Enter Shop Dashboard"
             )}
           </Button>
         </form>

@@ -26,6 +26,14 @@ export default async function OnboardingPage({
   }
 
   const { invite } = await searchParams;
+
+  const userMetadata = user.userMetadata ?? {};
+  const intent = userMetadata.intent as "INDEPENDENT" | "SHOP" | "STAFF" | undefined;
+  const providerType =
+    (userMetadata.provider_type as "INDEPENDENT" | "SHOP" | undefined) ??
+    (intent === "SHOP" ? "SHOP" : intent === "INDEPENDENT" ? "INDEPENDENT" : undefined);
+  const inviteToken = (userMetadata.invite_token as string | undefined) ?? invite;
+  const initialDisplayName = (userMetadata.display_name as string | undefined) ?? undefined;
   const initialEmail = user.email || undefined;
 
   return (
@@ -33,15 +41,29 @@ export default async function OnboardingPage({
       <Card className="w-full max-w-xl shadow-md">
         <CardHeader className="text-center space-y-1">
           <CardTitle className="text-xl sm:text-2xl font-bold tracking-tight">
-            Provider Setup & Onboarding
+            {providerType === "SHOP"
+              ? "Set Up Your Repair Shop"
+              : providerType === "INDEPENDENT"
+                ? "Set Up Your Independent Profile"
+                : intent === "STAFF" || inviteToken
+                  ? "Join Repair Shop"
+                  : "Provider Setup & Onboarding"}
           </CardTitle>
           <CardDescription>
-            Choose your operating model to set up your profile or join as shop staff
+            {providerType === "SHOP"
+              ? "Configure your shop details and storefront location to get started"
+              : providerType === "INDEPENDENT"
+                ? "Configure your repair brand and service area to get started"
+                : intent === "STAFF" || inviteToken
+                  ? "Complete your staff profile to connect to your repair shop"
+                  : "Choose your operating model to set up your profile or join as shop staff"}
           </CardDescription>
         </CardHeader>
         <CardContent>
           <OnboardingClient
-            defaultInviteToken={invite}
+            defaultInviteToken={inviteToken}
+            initialProviderType={providerType}
+            initialDisplayName={initialDisplayName}
             initialEmail={initialEmail}
           />
         </CardContent>
