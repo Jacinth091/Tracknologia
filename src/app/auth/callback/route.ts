@@ -1,11 +1,10 @@
 import { createClient } from "@/lib/supabase/server";
-import { onboardProviderOwner } from "@/features/auth";
 import { NextResponse } from "next/server";
 
 export async function GET(request: Request) {
   const { searchParams, origin } = new URL(request.url);
   const code = searchParams.get("code");
-  const next = searchParams.get("next") ?? "/confirmed";
+  const next = searchParams.get("next") ?? "/dashboard";
 
   if (code) {
     const supabase = await createClient();
@@ -16,7 +15,10 @@ export async function GET(request: Request) {
       const providerType = data.user.user_metadata?.provider_type;
       if (displayName && (providerType === "SHOP" || providerType === "INDEPENDENT")) {
         try {
-          await onboardProviderOwner({ displayName, providerType });
+          await supabase.rpc("create_provider_with_owner", {
+            p_display_name: displayName,
+            p_provider_type: providerType,
+          });
         } catch {
           // If already onboarded, continue seamlessly
         }

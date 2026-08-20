@@ -18,6 +18,7 @@ export async function getUser(client?: SupabaseClient): Promise<AuthenticatedUse
   return {
     id: user.id,
     email: user.email ?? null,
+    userMetadata: user.user_metadata,
   };
 }
 

@@ -17,13 +17,29 @@ const DEVICE_OPTIONS = [
   "Laptops & PCs",
   "Tablets",
   "Gaming Consoles",
-  "Audio & Accessories",
-  "Wearables",
+  "Audio & Wearables",
+  "Other Electronics",
 ];
 
-export function OnboardingClient({ defaultInviteToken }: { defaultInviteToken?: string }) {
+interface OnboardingClientProps {
+  defaultInviteToken?: string;
+  initialProviderType?: "SHOP" | "INDEPENDENT";
+  initialDisplayName?: string;
+  initialEmail?: string;
+}
+
+export function OnboardingClient({
+  defaultInviteToken,
+  initialProviderType,
+  initialDisplayName,
+  initialEmail,
+}: OnboardingClientProps) {
   const [activeTab, setActiveTab] = useState<"INDEPENDENT" | "SHOP" | "STAFF">(
-    defaultInviteToken ? "STAFF" : "INDEPENDENT",
+    defaultInviteToken
+      ? "STAFF"
+      : initialProviderType === "SHOP"
+        ? "SHOP"
+        : "INDEPENDENT",
   );
 
   const [indState, indAction, indPending] = useActionState(onboardIndependentAction, null);
@@ -43,7 +59,7 @@ export function OnboardingClient({ defaultInviteToken }: { defaultInviteToken?: 
           className={cn(
             "rounded-xl py-2.5 px-3 text-xs font-semibold transition-all cursor-pointer",
             activeTab === "INDEPENDENT"
-              ? "bg-background text-foreground shadow-xs"
+              ? "bg-background text-foreground shadow-xs ring-1 ring-border/50"
               : "text-muted-foreground hover:text-foreground",
           )}
         >
@@ -57,7 +73,7 @@ export function OnboardingClient({ defaultInviteToken }: { defaultInviteToken?: 
           className={cn(
             "rounded-xl py-2.5 px-3 text-xs font-semibold transition-all cursor-pointer",
             activeTab === "SHOP"
-              ? "bg-background text-foreground shadow-xs"
+              ? "bg-background text-foreground shadow-xs ring-1 ring-border/50"
               : "text-muted-foreground hover:text-foreground",
           )}
         >
@@ -71,7 +87,7 @@ export function OnboardingClient({ defaultInviteToken }: { defaultInviteToken?: 
           className={cn(
             "rounded-xl py-2.5 px-3 text-xs font-semibold transition-all cursor-pointer",
             activeTab === "STAFF"
-              ? "bg-background text-foreground shadow-xs"
+              ? "bg-background text-foreground shadow-xs ring-1 ring-border/50"
               : "text-muted-foreground hover:text-foreground",
           )}
         >
@@ -100,6 +116,7 @@ export function OnboardingClient({ defaultInviteToken }: { defaultInviteToken?: 
             <Input
               id="ind-name"
               name="displayName"
+              defaultValue={initialDisplayName ?? ""}
               placeholder="e.g. Alex Tech Services"
               disabled={isPending}
               required
@@ -111,6 +128,17 @@ export function OnboardingClient({ defaultInviteToken }: { defaultInviteToken?: 
 
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <div className="space-y-2">
+              <Label htmlFor="ind-email">Contact Email</Label>
+              <Input
+                id="ind-email"
+                name="contactEmail"
+                type="email"
+                defaultValue={initialEmail ?? ""}
+                placeholder="alex@mobiletech.com"
+                disabled={isPending}
+              />
+            </div>
+            <div className="space-y-2">
               <Label htmlFor="ind-phone">Contact Phone</Label>
               <Input
                 id="ind-phone"
@@ -120,19 +148,20 @@ export function OnboardingClient({ defaultInviteToken }: { defaultInviteToken?: 
                 disabled={isPending}
               />
             </div>
-            <div className="space-y-2">
-              <Label htmlFor="ind-area">Service Area / Coverage</Label>
-              <Input
-                id="ind-area"
-                name="serviceArea"
-                placeholder="e.g. Cebu City, Mandaue"
-                disabled={isPending}
-              />
-            </div>
           </div>
 
           <div className="space-y-2">
-            <Label>Supported Devices</Label>
+            <Label htmlFor="ind-area">Service Area / Coverage</Label>
+            <Input
+              id="ind-area"
+              name="serviceArea"
+              placeholder="e.g. Cebu City, Mandaue, Home Service"
+              disabled={isPending}
+            />
+          </div>
+
+          <div className="space-y-2">
+            <Label className="text-xs text-muted-foreground">Supported Devices (Optional)</Label>
             <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
               {DEVICE_OPTIONS.map((device) => (
                 <label
@@ -171,7 +200,7 @@ export function OnboardingClient({ defaultInviteToken }: { defaultInviteToken?: 
           <div className="rounded-xl border border-border/80 bg-muted/30 p-4">
             <h3 className="text-sm font-semibold text-foreground">Repair Shop Profile</h3>
             <p className="text-xs text-muted-foreground mt-0.5">
-              For storefront repair centers and multi-tech workshops.
+              For storefront repair centers, workshops, and multi-technician teams.
             </p>
           </div>
 
@@ -186,6 +215,7 @@ export function OnboardingClient({ defaultInviteToken }: { defaultInviteToken?: 
             <Input
               id="shop-name"
               name="displayName"
+              defaultValue={initialDisplayName ?? ""}
               placeholder="e.g. Apex Electronics Repair Center"
               disabled={isPending}
               required
@@ -200,12 +230,23 @@ export function OnboardingClient({ defaultInviteToken }: { defaultInviteToken?: 
             <Input
               id="shop-address"
               name="publicAddress"
-              placeholder="e.g. 123 Main St, Suite 4B, Metro City"
+              placeholder="e.g. Unit 102, Tech Plaza, Downtown"
               disabled={isPending}
             />
           </div>
 
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+            <div className="space-y-2">
+              <Label htmlFor="shop-email">Shop Email</Label>
+              <Input
+                id="shop-email"
+                name="contactEmail"
+                type="email"
+                defaultValue={initialEmail ?? ""}
+                placeholder="owner@apexrepairs.com"
+                disabled={isPending}
+              />
+            </div>
             <div className="space-y-2">
               <Label htmlFor="shop-phone">Shop Phone</Label>
               <Input
@@ -216,19 +257,20 @@ export function OnboardingClient({ defaultInviteToken }: { defaultInviteToken?: 
                 disabled={isPending}
               />
             </div>
-            <div className="space-y-2">
-              <Label htmlFor="shop-area">Service Area / Region</Label>
-              <Input
-                id="shop-area"
-                name="serviceArea"
-                placeholder="e.g. Greater Cebu Area"
-                disabled={isPending}
-              />
-            </div>
           </div>
 
           <div className="space-y-2">
-            <Label>Supported Devices</Label>
+            <Label htmlFor="shop-area">Service Area / Region</Label>
+            <Input
+              id="shop-area"
+              name="serviceArea"
+              placeholder="e.g. Greater Cebu Area"
+              disabled={isPending}
+            />
+          </div>
+
+          <div className="space-y-2">
+            <Label className="text-xs text-muted-foreground">Supported Devices (Optional)</Label>
             <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
               {DEVICE_OPTIONS.map((device) => (
                 <label
@@ -264,10 +306,10 @@ export function OnboardingClient({ defaultInviteToken }: { defaultInviteToken?: 
       {/* 3. Shop Staff Invitation Acceptance */}
       {activeTab === "STAFF" && (
         <form action={staffAction} className="space-y-4">
-          <div className="rounded-xl border border-border/80 bg-muted/30 p-4">
-            <h3 className="text-sm font-semibold text-foreground">Join as Shop Staff</h3>
-            <p className="text-xs text-muted-foreground mt-0.5">
-              To join an existing repair shop, enter the invitation code or token provided by your Shop Owner.
+          <div className="rounded-xl border border-border/80 bg-muted/40 p-4 space-y-1">
+            <h4 className="text-sm font-semibold text-foreground">Join an Existing Repair Shop</h4>
+            <p className="text-xs text-muted-foreground leading-relaxed">
+              Tracknologia requires an Owner-authorized invitation to join a shop. If you received an invite link or token, enter it below.
             </p>
           </div>
 

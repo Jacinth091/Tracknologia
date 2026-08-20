@@ -4,6 +4,11 @@ export type ProviderType = "SHOP" | "INDEPENDENT";
 export interface AuthenticatedUser {
   id: string;
   email: string | null;
+  userMetadata?: {
+    display_name?: string;
+    provider_type?: ProviderType;
+    [key: string]: unknown;
+  };
 }
 
 export interface ProviderMembership {
