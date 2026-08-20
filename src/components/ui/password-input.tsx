@@ -62,9 +62,8 @@ function PasswordInput({
       <button
         type="button"
         onClick={() => setShowPassword((prev) => !prev)}
-        className="absolute right-2 z-20 flex h-7 w-7 cursor-pointer items-center justify-center rounded-lg text-muted-foreground hover:text-foreground hover:bg-muted/70 active:scale-95 focus-visible:outline-none transition-all"
+        className="absolute right-2 z-20 flex h-7 w-7 cursor-pointer items-center justify-center rounded-lg text-muted-foreground hover:text-foreground hover:bg-muted/70 active:scale-95 focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none transition-all"
         aria-label={showPassword ? "Hide password" : "Show password"}
-        tabIndex={-1}
       >
         {showPassword ? <EyeOffIcon /> : <EyeIcon />}
       </button>
