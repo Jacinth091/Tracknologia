@@ -36,6 +36,9 @@ export interface TeamMember {
   membershipId: string;
   userId: string;
   role: MembershipRole;
+  displayName: string;
+  email: string | null;
+  contactPhone?: string | null;
   createdAt: string;
 }
 

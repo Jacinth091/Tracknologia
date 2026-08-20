@@ -53,7 +53,7 @@ export function TeamClient({ isOwner, isShop, members, invitations }: TeamClient
           <CardHeader>
             <CardTitle className="text-lg font-semibold">Invite a Staff Technician</CardTitle>
             <CardDescription>
-              Generate an invitation link for technicians to join your repair shop
+              Generate an invitation link or email an invitation to technicians to join your repair shop
             </CardDescription>
           </CardHeader>
           <CardContent className="space-y-4">
@@ -189,18 +189,28 @@ export function TeamClient({ isOwner, isShop, members, invitations }: TeamClient
         <CardContent>
           <div className="divide-y divide-border/60">
             {members.map((member) => (
-              <div key={member.membershipId} className="py-3 flex items-center justify-between">
-                <div className="space-y-0.5">
-                  <p className="text-sm font-medium text-foreground">
-                    User: {member.userId.slice(0, 8)}...
-                  </p>
-                  <p className="text-xs text-muted-foreground">
-                    Joined on {new Date(member.createdAt).toLocaleDateString()}
-                  </p>
+              <div key={member.membershipId} className="py-3.5 flex items-center justify-between gap-4">
+                <div className="flex items-center gap-3">
+                  <div className="h-9 w-9 rounded-full bg-primary/10 text-primary flex items-center justify-center font-semibold text-sm">
+                    {member.displayName.charAt(0).toUpperCase()}
+                  </div>
+                  <div className="space-y-0.5">
+                    <p className="text-sm font-semibold text-foreground">
+                      {member.displayName}
+                    </p>
+                    <p className="text-xs text-muted-foreground flex items-center gap-2 flex-wrap">
+                      {member.email && <span>{member.email}</span>}
+                      {member.email && member.contactPhone && <span>•</span>}
+                      {member.contactPhone && <span>{member.contactPhone}</span>}
+                      <span>•</span>
+                      <span>Joined {new Date(member.createdAt).toLocaleDateString()}</span>
+                    </p>
+                  </div>
                 </div>
+
                 <span
                   className={cn(
-                    "inline-flex items-center rounded-md px-2.5 py-0.5 text-xs font-semibold",
+                    "inline-flex items-center rounded-md px-2.5 py-0.5 text-xs font-semibold shrink-0",
                     member.role === "OWNER"
                       ? "bg-primary/10 text-primary"
                       : "bg-muted text-muted-foreground",

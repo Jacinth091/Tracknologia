@@ -278,6 +278,54 @@ BEGIN
 END;
 $$;
 
+-- 9. Safe RPC: Resolve Provider Team Members with User Profiles
+CREATE OR REPLACE FUNCTION public.get_provider_team_members(
+  p_provider_id UUID
+)
+RETURNS TABLE (
+  membership_id UUID,
+  user_id UUID,
+  role public.membership_role,
+  display_name TEXT,
+  email TEXT,
+  contact_phone TEXT,
+  created_at TIMESTAMPTZ
+)
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path = public, auth, pg_temp
+AS $$
+BEGIN
+  -- Caller must be an authenticated member of this provider
+  IF NOT EXISTS (
+    SELECT 1 FROM public.provider_memberships pm
+    WHERE pm.provider_id = p_provider_id AND pm.user_id = auth.uid()
+  ) THEN
+    RAISE EXCEPTION 'Unauthorized: Not a member of this provider';
+  END IF;
+
+  RETURN QUERY
+  SELECT 
+    pm.id AS membership_id,
+    pm.user_id,
+    pm.role,
+    COALESCE(
+      NULLIF(trim(u.raw_user_meta_data->>'display_name'), ''),
+      NULLIF(trim(u.email), ''),
+      'Staff Member'
+    ) AS display_name,
+    u.email::TEXT,
+    (u.raw_user_meta_data->>'contact_phone')::TEXT AS contact_phone,
+    pm.created_at
+  FROM public.provider_memberships pm
+  JOIN auth.users u ON u.id = pm.user_id
+  WHERE pm.provider_id = p_provider_id
+  ORDER BY 
+    CASE WHEN pm.role = 'OWNER' THEN 0 ELSE 1 END,
+    pm.created_at ASC;
+END;
+$$;
+
 REVOKE ALL ON FUNCTION public.create_provider_with_owner(TEXT, public.provider_type) FROM PUBLIC;
 GRANT EXECUTE ON FUNCTION public.create_provider_with_owner(TEXT, public.provider_type) TO authenticated;
 
@@ -286,3 +334,6 @@ GRANT EXECUTE ON FUNCTION public.accept_staff_invitation(TEXT) TO authenticated;
 
 REVOKE ALL ON FUNCTION public.get_invitation_details(TEXT) FROM PUBLIC;
 GRANT EXECUTE ON FUNCTION public.get_invitation_details(TEXT) TO authenticated, anon;
+
+REVOKE ALL ON FUNCTION public.get_provider_team_members(UUID) FROM PUBLIC;
+GRANT EXECUTE ON FUNCTION public.get_provider_team_members(UUID) TO authenticated;

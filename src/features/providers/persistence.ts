@@ -196,20 +196,44 @@ export async function listTeamMembers(
   supabase: SupabaseClient,
   providerId: string,
 ): Promise<TeamMember[]> {
-  const { data, error } = await supabase
-    .from("provider_memberships")
-    .select("id, provider_id, user_id, role, created_at")
-    .eq("provider_id", providerId)
-    .order("created_at", { ascending: true });
+  const { data, error } = await supabase.rpc("get_provider_team_members", {
+    p_provider_id: providerId,
+  });
 
-  if (error) {
-    throw new Error(`Failed to list team members: ${error.message}`);
+  if (error || !data) {
+    // Fallback query if RPC is not yet pushed
+    const fallback = await supabase
+      .from("provider_memberships")
+      .select("id, provider_id, user_id, role, created_at")
+      .eq("provider_id", providerId)
+      .order("created_at", { ascending: true });
+
+    return (fallback.data || []).map((row) => ({
+      membershipId: row.id,
+      userId: row.user_id,
+      role: row.role,
+      displayName: row.role === "OWNER" ? "Shop Owner" : "Staff Technician",
+      email: null,
+      contactPhone: null,
+      createdAt: row.created_at,
+    }));
   }
 
-  return (data || []).map((row) => ({
-    membershipId: row.id,
+  return (data || []).map((row: {
+    membership_id: string;
+    user_id: string;
+    role: "OWNER" | "STAFF";
+    display_name: string;
+    email: string | null;
+    contact_phone: string | null;
+    created_at: string;
+  }) => ({
+    membershipId: row.membership_id,
     userId: row.user_id,
     role: row.role,
+    displayName: row.display_name,
+    email: row.email,
+    contactPhone: row.contact_phone,
     createdAt: row.created_at,
   }));
 }
