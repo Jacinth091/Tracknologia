@@ -14,13 +14,28 @@ GRANT UPDATE ON public.providers TO authenticated;
 GRANT SELECT ON public.provider_memberships TO authenticated;
 GRANT SELECT, INSERT, UPDATE ON public.provider_invitations TO authenticated;
 
+-- Helper function: Returns provider IDs that the current authenticated user is a member of (Non-recursive SECURITY DEFINER)
+CREATE OR REPLACE FUNCTION public.get_auth_user_provider_ids()
+RETURNS SETOF UUID
+LANGUAGE sql
+STABLE
+SECURITY DEFINER
+SET search_path = public, pg_temp
+AS $$
+  SELECT provider_id FROM public.provider_memberships WHERE user_id = auth.uid();
+$$;
+
+GRANT EXECUTE ON FUNCTION public.get_auth_user_provider_ids() TO authenticated;
+
 -- 3. RLS Policies on provider_memberships
--- Users can only read their own memberships (Non-recursive)
-CREATE POLICY "Users can view own memberships"
+-- Members of a provider can view all memberships within their provider
+CREATE POLICY "Members can view provider memberships"
   ON public.provider_memberships
   FOR SELECT
   TO authenticated
-  USING (user_id = auth.uid());
+  USING (
+    provider_id IN (SELECT public.get_auth_user_provider_ids())
+  );
 
 -- NOTE: Direct client INSERT/UPDATE/DELETE on provider_memberships is STRICTLY PROHIBITED.
 -- All membership creations occur via atomic SECURITY DEFINER functions (Owner onboarding / Staff invitation acceptance).
@@ -32,10 +47,7 @@ CREATE POLICY "Provider members can view their provider"
   FOR SELECT
   TO authenticated
   USING (
-    id IN (
-      SELECT provider_id FROM public.provider_memberships
-      WHERE user_id = auth.uid()
-    )
+    id IN (SELECT public.get_auth_user_provider_ids())
   );
 
 -- Public can view active providers for intake

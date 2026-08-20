@@ -183,43 +183,50 @@ export function TeamClient({ isOwner, isShop, members, invitations }: TeamClient
       {/* 3. Active Team Members */}
       <Card>
         <CardHeader>
-          <CardTitle className="text-lg font-semibold">Team Members</CardTitle>
-          <CardDescription>Active staff and technicians belonging to this shop</CardDescription>
+          <CardTitle className="text-lg font-semibold">Team Members ({members.length})</CardTitle>
+          <CardDescription>Active staff and technicians belonging to this repair shop</CardDescription>
         </CardHeader>
         <CardContent>
           <div className="divide-y divide-border/60">
-            {members.map((member) => (
-              <div key={member.membershipId} className="py-3.5 flex items-center justify-between gap-4">
-                <div className="flex items-center gap-3">
-                  <div className="h-9 w-9 rounded-full bg-primary/10 text-primary flex items-center justify-center font-semibold text-sm">
-                    {member.displayName.charAt(0).toUpperCase()}
-                  </div>
-                  <div className="space-y-0.5">
-                    <p className="text-sm font-semibold text-foreground">
-                      {member.displayName}
-                    </p>
-                    <p className="text-xs text-muted-foreground flex items-center gap-2 flex-wrap">
-                      {member.email && <span>{member.email}</span>}
-                      {member.email && member.contactPhone && <span>•</span>}
-                      {member.contactPhone && <span>{member.contactPhone}</span>}
-                      <span>•</span>
-                      <span>Joined {new Date(member.createdAt).toLocaleDateString()}</span>
-                    </p>
-                  </div>
-                </div>
+            {members.map((member) => {
+              const displayName = member.displayName || member.email || "Team Member";
+              const initials = displayName.charAt(0).toUpperCase();
 
-                <span
-                  className={cn(
-                    "inline-flex items-center rounded-md px-2.5 py-0.5 text-xs font-semibold shrink-0",
-                    member.role === "OWNER"
-                      ? "bg-primary/10 text-primary"
-                      : "bg-muted text-muted-foreground",
-                  )}
-                >
-                  {member.role === "OWNER" ? "Shop Owner" : "Staff Technician"}
-                </span>
-              </div>
-            ))}
+              return (
+                <div key={member.membershipId} className="py-3.5 flex items-center justify-between gap-4">
+                  <div className="flex items-center gap-3">
+                    <div className="h-9 w-9 rounded-full bg-primary/10 text-primary flex items-center justify-center font-semibold text-sm">
+                      {initials}
+                    </div>
+                    <div className="space-y-0.5">
+                      <div className="flex items-center gap-2">
+                        <span className="text-sm font-semibold text-foreground">
+                          {displayName}
+                        </span>
+                      </div>
+                      <div className="text-xs text-muted-foreground flex items-center gap-2 flex-wrap">
+                        {member.email && <span>{member.email}</span>}
+                        {member.email && member.contactPhone && <span>•</span>}
+                        {member.contactPhone && <span>{member.contactPhone}</span>}
+                        {(member.email || member.contactPhone) && <span>•</span>}
+                        <span>Joined {new Date(member.createdAt).toLocaleDateString()}</span>
+                      </div>
+                    </div>
+                  </div>
+
+                  <span
+                    className={cn(
+                      "inline-flex items-center rounded-md px-2.5 py-0.5 text-xs font-semibold shrink-0",
+                      member.role === "OWNER"
+                        ? "bg-primary/10 text-primary font-medium"
+                        : "bg-muted text-muted-foreground font-medium",
+                    )}
+                  >
+                    {member.role === "OWNER" ? "Shop Owner" : "Staff Technician"}
+                  </span>
+                </div>
+              );
+            })}
           </div>
         </CardContent>
       </Card>
