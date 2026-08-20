@@ -32,6 +32,13 @@ export interface ProviderInvitation {
   revokedAt?: string | null;
 }
 
+export interface TeamMember {
+  membershipId: string;
+  userId: string;
+  role: MembershipRole;
+  createdAt: string;
+}
+
 export interface CreateProviderInput {
   displayName: string;
   providerType: ProviderType;

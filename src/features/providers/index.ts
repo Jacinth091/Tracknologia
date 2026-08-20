@@ -2,6 +2,10 @@
 export {
   createProviderWithOwner,
   acceptStaffInvitation,
+  createStaffInvitation,
+  listStaffInvitations,
+  listTeamMembers,
+  revokeStaffInvitation,
   getProviderById,
 } from "./persistence";
 
@@ -19,5 +23,6 @@ export type {
   ProviderInvitation,
   ProviderType,
   MembershipRole,
+  TeamMember,
   CreateProviderInput,
 } from "./types";

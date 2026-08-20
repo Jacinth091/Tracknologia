@@ -44,6 +44,14 @@ export default async function DashboardLayout({
               >
                 Dashboard
               </Link>
+              {context.providerType === "SHOP" && (
+                <Link
+                  href="/dashboard/team"
+                  className="text-muted-foreground font-medium transition-colors hover:text-foreground"
+                >
+                  Team & Staff
+                </Link>
+              )}
             </nav>
           </div>
 
