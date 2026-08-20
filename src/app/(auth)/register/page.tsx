@@ -4,21 +4,27 @@ import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle }
 import { RegisterForm } from "../_components/register-form";
 
 export const metadata: Metadata = {
-  title: "Create Account — Tracknologia",
-  description: "Create your Tracknologia account to get started",
+  title: "Get Started — Tracknologia",
+  description: "Create your Tracknologia account as an Independent repairer, Shop Owner, or Shop Staff",
 };
 
-export default function RegisterPage() {
+export default async function RegisterPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ invite?: string }>;
+}) {
+  const { invite } = await searchParams;
+
   return (
     <Card className="w-full shadow-md">
       <CardHeader className="text-center space-y-1 pb-4">
-        <CardTitle className="text-2xl font-bold tracking-tight">Create Account</CardTitle>
+        <CardTitle className="text-2xl font-bold tracking-tight">Get Started with Tracknologia</CardTitle>
         <CardDescription className="text-sm">
-          Sign up with your email to get started with Tracknologia
+          Select what you are signing up as to create your account
         </CardDescription>
       </CardHeader>
       <CardContent>
-        <RegisterForm />
+        <RegisterForm initialInvite={invite} />
       </CardContent>
       <CardFooter className="justify-center border-t border-border/50 pt-4 text-xs text-muted-foreground">
         Already have an account?{" "}

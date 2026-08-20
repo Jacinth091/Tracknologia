@@ -368,22 +368,42 @@ describe("Auth & Onboarding — Validation Schemas", () => {
     expect(shortPassword.success).toBe(false);
   });
 
-  it("validates provider registration inputs", () => {
-    const valid = registerSchema.safeParse({
+  it("validates provider registration inputs for all intents", () => {
+    const validIndependent = registerSchema.safeParse({
+      intent: "INDEPENDENT",
       email: "owner@example.com",
       password: "securepassword123",
       confirmPassword: "securepassword123",
     });
-    expect(valid.success).toBe(true);
+    expect(validIndependent.success).toBe(true);
 
-    const invalidEmail = registerSchema.safeParse({
-      email: "not-an-email",
+    const validShop = registerSchema.safeParse({
+      intent: "SHOP",
+      email: "owner@shop.com",
       password: "securepassword123",
       confirmPassword: "securepassword123",
     });
-    expect(invalidEmail.success).toBe(false);
+    expect(validShop.success).toBe(true);
+
+    const validStaff = registerSchema.safeParse({
+      intent: "STAFF",
+      inviteToken: "valid-invite-token-123",
+      email: "staff@shop.com",
+      password: "securepassword123",
+      confirmPassword: "securepassword123",
+    });
+    expect(validStaff.success).toBe(true);
+
+    const invalidStaffMissingToken = registerSchema.safeParse({
+      intent: "STAFF",
+      email: "staff@shop.com",
+      password: "securepassword123",
+      confirmPassword: "securepassword123",
+    });
+    expect(invalidStaffMissingToken.success).toBe(false);
 
     const mismatch = registerSchema.safeParse({
+      intent: "INDEPENDENT",
       email: "owner@example.com",
       password: "securepassword123",
       confirmPassword: "differentpassword",

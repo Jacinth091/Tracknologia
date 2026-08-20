@@ -10,17 +10,15 @@ export async function GET(request: Request) {
     const supabase = await createClient();
     const { data, error } = await supabase.auth.exchangeCodeForSession(code);
     if (!error && data.user) {
-      // If user registered with provider owner metadata, ensure atomic onboarding is finalized
-      const displayName = data.user.user_metadata?.display_name;
-      const providerType = data.user.user_metadata?.provider_type;
-      if (displayName && (providerType === "SHOP" || providerType === "INDEPENDENT")) {
+      const inviteToken = data.user.user_metadata?.invite_token;
+      // If user registered with a staff invite token, accept it automatically
+      if (inviteToken) {
         try {
-          await supabase.rpc("create_provider_with_owner", {
-            p_display_name: displayName,
-            p_provider_type: providerType,
+          await supabase.rpc("accept_staff_invitation", {
+            p_token_hash: inviteToken,
           });
         } catch {
-          // If already onboarded, continue seamlessly
+          // If token fails or expired, user will be redirected to onboarding to view/fix it
         }
       }
 

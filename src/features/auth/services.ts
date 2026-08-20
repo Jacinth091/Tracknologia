@@ -26,11 +26,25 @@ export async function registerProviderAccount(params: RegisterInput & { emailRed
     password: params.password,
     options: {
       emailRedirectTo: params.emailRedirectTo,
+      data: {
+        intent: params.intent,
+        provider_type: params.intent === "SHOP" || params.intent === "INDEPENDENT" ? params.intent : undefined,
+        invite_token: params.intent === "STAFF" ? params.inviteToken : undefined,
+      },
     },
   });
 
   if (error) {
     throw new Error(error.message);
+  }
+
+  // If session is active immediately and user is staff with invite token, try accepting invite
+  if (data.session && data.user && params.intent === "STAFF" && params.inviteToken) {
+    try {
+      await consumeStaffInvitation(supabase, params.inviteToken);
+    } catch {
+      // If error occurs, can be re-attempted on onboarding
+    }
   }
 
   return data;
