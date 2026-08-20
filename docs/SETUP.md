@@ -51,8 +51,9 @@ Copy-Item .env.example .env.local
 Required values:
 
 ```env
-NEXT_PUBLIC_SUPABASE_URL=
-NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY=
+NEXT_PUBLIC_SUPABASE_URL=https://<project-ref>.supabase.co
+NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY=<anon-or-publishable-key>
+NEXT_PUBLIC_APP_URL=http://localhost:3000
 ```
 
 `.env.local` must be ignored by Git.
@@ -103,7 +104,7 @@ Add a development dependency:
 docker compose run --rm web npm install -D <package>
 ```
 
-Commit both `package.json` and `package-lock.json` when dependencies change.
+Commit both `package.json` and `pnpm-lock.yaml` when dependencies change.
 
 ## Quality commands
 
@@ -114,38 +115,40 @@ docker compose run --rm web npx playwright test
 docker compose run --rm web npm run build
 ```
 
-## Rebuild the container
+## Supabase & Database Migrations
 
-Rebuild after changes to the Dockerfile or when the dependency environment becomes inconsistent:
-
-```bash
-docker compose build --no-cache
-docker compose up
-```
-
-Do not routinely use `--no-cache`; normal Docker caching is desirable.
-
-## Supabase setup
-
-Each development environment needs access to the Tracknologia development Supabase project.
+Each development environment connects to the Tracknologia Supabase project.
 
 The application uses:
 
 - Supabase Auth;
 - PostgreSQL;
-- RLS policies;
+- Least-privilege RLS policies;
 - `@supabase/supabase-js`;
 - `@supabase/ssr`.
 
+### Applying Migrations
+
+1. Link to the development project (one time):
+   ```bash
+   npx supabase link --project-ref <project-ref>
+   ```
+2. Push migrations:
+   ```bash
+   npx supabase db push
+   ```
+
 Do not place service-role/secret keys in public browser environment variables.
+
+Never commit `supabase/.temp/` CLI state.
 
 ## Native Node fallback
 
 Docker is canonical. If a developer temporarily needs to run the application directly on the host, use the Node major version documented by the repository and run:
 
 ```bash
-npm ci
-npm run dev
+pnpm install
+pnpm dev
 ```
 
 A problem that occurs only outside the Docker environment is not sufficient evidence that the repository's canonical setup is broken.

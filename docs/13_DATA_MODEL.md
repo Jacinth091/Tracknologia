@@ -12,11 +12,12 @@ Rule:
 
 1. `providers`
 2. `provider_memberships`
-3. `provider_service_modes`
-4. `repair_requests`
-5. `repairs`
-6. `repair_status_events`
-7. `repair_updates`
+3. `provider_invitations`
+4. `provider_service_modes`
+5. `repair_requests`
+6. `repairs`
+7. `repair_status_events`
+8. `repair_updates`
 
 Supabase manages `auth.users` separately.
 
@@ -31,7 +32,7 @@ display_name          text
 slug                  text UNIQUE
 description           text nullable
 profile_image_url     text nullable
-contact_phone         text
+contact_phone         text nullable
 contact_email         text nullable
 public_address        text nullable
 service_area          text nullable
@@ -58,6 +59,24 @@ UNIQUE(provider_id, user_id)
 ```
 
 This table links Supabase identity to Tracknologia Provider authority.
+
+## provider_invitations
+
+```text
+id                    uuid PK
+provider_id           uuid FK -> providers.id
+email                 text
+role                  membership_role (STAFF)
+token_hash            text UNIQUE
+invited_by_user_id    uuid FK -> auth.users.id
+created_at            timestamptz
+expires_at            timestamptz
+accepted_at           timestamptz nullable
+accepted_by_user_id   uuid FK -> auth.users.id nullable
+revoked_at            timestamptz nullable
+```
+
+Governs Owner-authorized, secure, single-use Staff onboarding (LD-01).
 
 ## provider_service_modes
 
@@ -117,7 +136,7 @@ repair_request_id      uuid UNIQUE nullable
 origin                 CUSTOMER_REQUEST | PROVIDER_CREATED
 
 ticket_number          text
-tracking_code           text UNIQUE
+tracking_code          text UNIQUE
 
 customer_name          text
 customer_phone         text
@@ -125,10 +144,10 @@ customer_email         text nullable
 
 device_type            text
 brand                  text nullable
-model                   text nullable
-serial_number           text nullable
-color_variant           text nullable
-device_specs            text nullable
+model                  text nullable
+serial_number          text nullable
+color_variant          text nullable
+device_specs           text nullable
 physical_condition     text nullable
 accessories_received   text nullable
 
@@ -200,6 +219,7 @@ Normalize Device only if reusable device history becomes a validated requirement
 
 - unique `providers.slug`
 - unique `(provider_id, user_id)` membership
+- unique `provider_invitations.token_hash`
 - primary/unique `(provider_id, mode)` service mode
 - unique `repair_requests.reference_code`
 - index `repair_requests(provider_id, status, submitted_at)`

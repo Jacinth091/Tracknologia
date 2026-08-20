@@ -360,7 +360,9 @@ Any new table must have a present product requirement.
 
 ---
 
-## 12. Database Changes Must Be Intentional
+## 12. Database Changes & Supabase Migrations
+
+Tracknologia uses PostgreSQL managed through Supabase.
 
 When changing the database:
 
@@ -368,13 +370,44 @@ When changing the database:
 - add appropriate foreign keys;
 - add uniqueness constraints for domain invariants;
 - consider nullability carefully;
-- consider RLS implications;
+- consider RLS implications (avoid recursive subqueries on the same table);
 - update schema documentation;
 - update tests affected by the change.
 
-Do not modify a shared database manually and leave the repository unaware of the change.
+Do not modify a shared or remote database manually and leave the repository unaware of the change. All schema, table, enum, trigger, and RLS changes must be committed as versioned SQL migration files.
 
-When migration infrastructure is present, database changes must be committed as migrations.
+### Migration Workflow & Structure
+
+1. **Location**: All migrations live in `supabase/migrations/` using timestamped naming:
+   ```text
+   supabase/migrations/YYYYMMDDHHMMSS_description.sql
+   ```
+2. **Applying Migrations**:
+   - Link project once:
+     ```bash
+     npx supabase link --project-ref <your-project-ref>
+     ```
+   - Push new migrations to remote database:
+     ```bash
+     npx supabase db push
+     ```
+   - Local Docker development (alternative):
+     ```bash
+     npx supabase start
+     ```
+3. **Environment Configuration (`.env.local`)**:
+   ```env
+   NEXT_PUBLIC_SUPABASE_URL=https://<project-ref>.supabase.co
+   NEXT_PUBLIC_SUPABASE_ANON_KEY=<your-anon-or-publishable-key>
+   ```
+4. **Trigger & RLS Writing Rules**:
+   - `SECURITY DEFINER` trigger functions on `auth.users` must explicitly set:
+     ```sql
+     SET search_path = public, pg_temp;
+     ```
+   - Always grant table and schema permissions to `authenticated`, `service_role`, and `anon` where appropriate.
+   - Avoid self-referencing subqueries inside RLS policies on the same relation to prevent `infinite recursion detected` errors.
+
 
 ---
 

@@ -1,6 +1,6 @@
 # 26 — Initial Database Schema Draft
 
-This is an implementation-oriented first migration sketch, not a final production SQL file.
+This is an implementation-oriented schema reference reflecting Lead Decisions LD-01, LD-02, and LD-03.
 
 ## Enum concepts
 
@@ -22,6 +22,7 @@ Supabase managed:
 Tracknologia core:
   providers
   provider_memberships
+  provider_invitations
   provider_service_modes
   repair_requests
   repairs
@@ -37,26 +38,30 @@ Optional validation telemetry:
 ```text
 auth.users
     │
-    └──< provider_memberships >── providers
-                                  │
-                                  ├──< provider_service_modes
-                                  ├──< repair_requests
-                                  │       │
-                                  │       └── 0..1 accepted source
-                                  │                │
-                                  └──< repairs <───┘
-                                          │
-                                          ├──< repair_status_events
-                                          └──< repair_updates
+    ├──< provider_memberships >── providers
+    │                             │
+    ├──< provider_invitations <───┤ (Staff invitations)
+    │                             │
+    │                             ├──< provider_service_modes
+    │                             ├──< repair_requests
+    │                             │       │
+    │                             │       └── 0..1 accepted source
+    │                             │                │
+    │                             └──< repairs <───┘
+    │                                     │
+    │                                     ├──< repair_status_events
+    │                                     └──< repair_updates
 ```
 
 ## Key database invariants
 
-### Provider membership
+### Provider membership & Staff invitations (LD-01)
 
-`UNIQUE(provider_id, user_id)`.
-
-A Shop may have exactly one membership in normal MVP use; that owner can also be the technician performing Repairs.
+- `UNIQUE(provider_id, user_id)` on `provider_memberships`.
+- `UNIQUE(token_hash)` on `provider_invitations`.
+- Direct client `INSERT` on `provider_memberships` is forbidden to prevent unauthorized self-assignment.
+- Independent Repairer & Shop Owner onboarding use atomic `create_provider_with_owner` procedure.
+- Shop Staff onboarding uses atomic `accept_staff_invitation` procedure.
 
 ### Provider Service Modes
 
@@ -92,8 +97,6 @@ For MVP, `providers.supported_devices` may be a text array because device-catego
 
 Likewise, `public_address` and `service_area` remain columns because the current MVP does not manage multiple branches or geospatial routing.
 
-If provider discovery/location becomes validated later, those fields can be normalized/geocoded then.
-
 ## No separate technician table
 
 Provider Users are represented through membership. Technician assignment is not an MVP workflow.
@@ -118,4 +121,4 @@ Provider-owned tables check current `auth.uid()` membership.
 
 Child rows (`repair_status_events`, `repair_updates`) derive authorization through `repairs.provider_id`.
 
-Public Repair Request insertion and public Tracking lookup must use intentionally limited policies/server interfaces rather than broadly opening tables to anonymous reads.
+Public Repair Request insertion and public Tracking lookup use intentionally limited policies and restricted server interfaces.

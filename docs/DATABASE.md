@@ -1,14 +1,17 @@
-# Database Design
+# Database Design & Migration Rules
 
-Tracknologia uses PostgreSQL through Supabase.
+Tracknologia uses PostgreSQL managed through Supabase.
 
 The MVP intentionally favors a small schema with sufficiently rich rows rather than premature normalization.
 
-## Core application tables
+---
+
+## Core Application Tables
 
 ```text
 providers
 provider_memberships
+provider_invitations
 provider_service_modes
 repair_requests
 repairs
@@ -20,143 +23,126 @@ Authentication identities live in Supabase-managed `auth.users`.
 
 A `tracking_events` table may be added for pilot analytics when required.
 
+---
+
 ## Relationships
 
 ```text
 auth.users
-    |
-    v
-provider_memberships
-    |
-    v
-providers
-   |             |
-   v             v
-repair_requests  repairs
-                    |
-          +---------+----------+
-          |                    |
-          v                    v
-repair_status_events     repair_updates
+    │
+    ├──< provider_memberships >── providers
+    │                             │
+    ├──< provider_invitations <───┤ (Staff invitations)
+    │                             │
+    │                             ├──< provider_service_modes
+    │                             ├──< repair_requests
+    │                             │       │
+    │                             │       └── 0..1 accepted source
+    │                             │                │
+    │                             └──< repairs <───┘
+    │                                     │
+    │                                     ├──< repair_status_events
+    │                                     └──< repair_updates
 ```
 
-## Provider
+---
 
-`providers` represents both shops and independent repairers.
+## Table Definitions
 
-Important columns include:
+### 1. `providers`
+Represents both Repair Shops and Independent Repairers.
+- `id` (uuid, PK)
+- `provider_type` (`SHOP` | `INDEPENDENT`)
+- `display_name` (text)
+- `slug` (text, UNIQUE)
+- `description`, `profile_image_url`, `contact_phone`, `contact_email`
+- `public_address` (nullable for Independent Repairers)
+- `service_area` (nullable)
+- `supported_devices` (text array)
+- `accepting_requests` (boolean, default true)
+- `created_at`, `updated_at` (timestamptz)
 
+### 2. `provider_memberships`
+Connects `auth.users` to Providers.
+- `id` (uuid, PK)
+- `provider_id` (uuid, FK $\to$ `providers.id`)
+- `user_id` (uuid, FK $\to$ `auth.users.id`)
+- `role` (`OWNER` | `STAFF`)
+- `created_at` (timestamptz)
+- `CONSTRAINT unique_provider_user UNIQUE(provider_id, user_id)`
+
+### 3. `provider_invitations`
+Governs secure, Owner-authorized Staff onboarding (LD-01).
+- `id` (uuid, PK)
+- `provider_id` (uuid, FK $\to$ `providers.id`)
+- `email` (text)
+- `role` (`STAFF`)
+- `token_hash` (text, UNIQUE)
+- `invited_by_user_id` (uuid, FK $\to$ `auth.users.id`)
+- `created_at`, `expires_at` (7 days default), `accepted_at`, `accepted_by_user_id`, `revoked_at`
+
+### 4. `provider_service_modes`
+Repeating relation of supported modes (`DROP_OFF`, `MEETUP`, `HOME_SERVICE`, `OTHER`).
+- `PRIMARY KEY(provider_id, mode)`
+
+### 5. `repair_requests`
+Customer-submitted intake awaiting Provider decision (`SUBMITTED`, `ACCEPTED`, `DECLINED`). Not an authoritative Repair.
+
+### 6. `repairs`
+The authoritative repair record containing customer and device snapshots.
+- `repair_request_id` is nullable and unique so one Repair Request can create at most one Repair.
+- Lifecycle: `IN_PROGRESS`, `WAITING_FOR_PARTS`, `AWAITING_APPROVAL`, `READY`, `COMPLETED`.
+
+### 7. `repair_status_events` & `repair_updates`
+- `repair_status_events`: Audit log of lifecycle transitions.
+- `repair_updates`: Customer-visible progress messages independent of status changes.
+
+---
+
+## Supabase Migration Rules & Lifecycle
+
+These rules govern all database changes and are derived from `docs/Tracknologia_Supabase_Migration_Rules.md`.
+
+### 1. Core Migration Rule
+> **A committed migration represents an intentional database transition, not a debugging diary.**
+
+- **Experimental Phase**: During active feature development with disposable development databases, migrations may be corrected, squashed, or replaced.
+- **Accepted Phase**: Once reviewed and approved by the Technical Lead as part of an accepted shared baseline, migrations become **immutable**. All subsequent modifications must be authored as new forward migrations.
+
+### 2. Location & Naming
+All migration files reside in `supabase/migrations/` using timestamped descriptive filenames:
 ```text
-id
-type                 SHOP | INDEPENDENT
-display_name
-slug
-description
-profile_image_url
-contact_phone
-contact_email
-public_address         nullable
-service_area           nullable
-supported_devices      nullable collection/array
-accepting_requests
-created_at
-updated_at
+supabase/migrations/YYYYMMDDHHMMSS_action_target.sql
+```
+*Good*: `20260820000001_create_provider_identity.sql`  
+*Avoid*: `fix.sql`, `temp_workaround.sql`, `fix_rls_again.sql`
+
+### 3. Fresh-Database Reproducibility
+Every migration chain must apply cleanly from an empty database to full schema, RLS, and functions without manual interventions or dashboard-only patches:
+```bash
+npx supabase db push
 ```
 
-A shop can have one authenticated member who is both owner and working technician. Do not create a separate Technician record solely because a Provider is a shop.
+### 4. Row Level Security & Least Privilege
+- **Mandatory RLS**: Enabled on all provider-owned tables (`providers`, `provider_memberships`, `provider_invitations`, `repairs`, etc.).
+- **Prohibited Client Self-Assignment**: Direct client `INSERT` on `provider_memberships` is strictly forbidden.
+- **Atomic SECURITY DEFINER Procedures**:
+  - `create_provider_with_owner(display_name, provider_type)`: Transactionally provisions new Provider and links caller as `OWNER`.
+  - `accept_staff_invitation(token_hash)`: Transactionally validates invite, creates `STAFF` membership, and marks token accepted.
+- All `SECURITY DEFINER` functions must explicitly set:
+  ```sql
+  SET search_path = public, pg_temp;
+  ```
 
-## Membership
+### 5. Supabase CLI & State Hygiene
+- `supabase/.temp/` is environment-specific CLI state and must **never** be committed (`.gitignore` enforced).
+- No uncaptured manual changes made via the Supabase Dashboard.
 
-`provider_memberships` connects `auth.users` to Providers.
+---
 
-Initial roles:
-
-```text
-OWNER
-STAFF
-```
-
-A unique `(provider_id, user_id)` constraint prevents duplicate membership.
-
-## Service modes
-
-A Provider can support multiple:
-
-```text
-DROP_OFF
-MEETUP
-HOME_SERVICE
-OTHER
-```
-
-This is genuinely repeating Provider data and therefore remains a separate table.
-
-## Repair Request
-
-A `repair_request` is customer-submitted intake awaiting Provider decision. It belongs to exactly one Provider and has one of:
-
-```text
-SUBMITTED
-ACCEPTED
-DECLINED
-```
-
-It is not yet an authoritative Repair.
-
-## Repair
-
-`repairs` is the authoritative repair record and contains the customer/device snapshot for the accepted job.
-
-Important groups of columns:
-
-- Provider and origin
-- optional source Repair Request
-- ticket number and tracking code
-- customer contact snapshot
-- device snapshot
-- physical condition/accessories
-- reported problem
-- initial observation/diagnosis/internal notes
-- selected service mode
-- current status
-- audit timestamps/user ids
-
-`repair_request_id` is nullable and unique so one Repair Request can create at most one Repair.
-
-## Repair status
-
-```text
-IN_PROGRESS
-WAITING_FOR_PARTS
-AWAITING_APPROVAL
-READY
-COMPLETED
-```
-
-`IN_PROGRESS` is assigned when the Repair is created. The waiting statuses are optional Provider-selected states. `COMPLETED` is normally terminal.
-
-## Status history vs customer update
-
-`repair_status_events` records lifecycle transitions.
-
-`repair_updates` records customer-visible progress messages that do not necessarily change the lifecycle status.
-
-Do not merge these concepts.
-
-## Deliberately deferred tables
+## Deliberately Deferred Tables
 
 Do not add without a validated requirement:
+- `customers`, `devices`, `technicians`, `branches`, `inventory`, `parts`, `payments`, `invoices`, `appointments`, `ratings/reviews`.
 
-- customers
-- devices
-- technicians
-- branches
-- inventory
-- parts
-- payments
-- invoices
-- appointments
-- ratings/reviews
-- provider-location hierarchies
-
-For the MVP, customer and device information are snapshots attached to a Repair/Repair Request.
+Customer and device details remain point-in-time snapshots attached to a Repair or Repair Request.
