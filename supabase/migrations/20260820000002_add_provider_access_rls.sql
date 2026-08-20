@@ -122,11 +122,11 @@ BEGIN
   END IF;
 
   -- User cannot already have an active provider membership
-  IF EXISTS (SELECT 1 FROM public.provider_memberships WHERE user_id = v_user_id) THEN
+  IF EXISTS (SELECT 1 FROM public.provider_memberships pm WHERE pm.user_id = v_user_id) THEN
     RAISE EXCEPTION 'User already has an active provider membership';
   END IF;
 
-  SELECT email INTO v_user_email FROM auth.users WHERE id = v_user_id;
+  SELECT u.email INTO v_user_email FROM auth.users u WHERE u.id = v_user_id;
 
   -- Generate unique slug
   v_base_slug := lower(regexp_replace(COALESCE(NULLIF(trim(p_display_name), ''), 'provider'), '[^a-zA-Z0-9]+', '-', 'g'));
@@ -136,7 +136,7 @@ BEGIN
   END IF;
 
   v_slug := v_base_slug;
-  WHILE EXISTS (SELECT 1 FROM public.providers WHERE slug = v_slug) LOOP
+  WHILE EXISTS (SELECT 1 FROM public.providers p WHERE p.slug = v_slug) LOOP
     v_counter := v_counter + 1;
     v_slug := v_base_slug || '-' || v_counter;
   END LOOP;
@@ -195,13 +195,13 @@ BEGIN
   END IF;
 
   -- Look up valid, active, non-expired, unconsumed invitation
-  SELECT id, provider_invitations.provider_id, provider_invitations.role
+  SELECT pi.id, pi.provider_id, pi.role
   INTO v_invitation_id, v_provider_id, v_invite_role
-  FROM public.provider_invitations
-  WHERE token_hash = p_token_hash
-    AND accepted_at IS NULL
-    AND revoked_at IS NULL
-    AND expires_at > now()
+  FROM public.provider_invitations pi
+  WHERE pi.token_hash = p_token_hash
+    AND pi.accepted_at IS NULL
+    AND pi.revoked_at IS NULL
+    AND pi.expires_at > now()
   FOR UPDATE;
 
   IF v_invitation_id IS NULL THEN
@@ -210,8 +210,8 @@ BEGIN
 
   -- Verify user does not already belong to this provider
   IF EXISTS (
-    SELECT 1 FROM public.provider_memberships
-    WHERE provider_id = v_provider_id AND user_id = v_user_id
+    SELECT 1 FROM public.provider_memberships pm
+    WHERE pm.provider_id = v_provider_id AND pm.user_id = v_user_id
   ) THEN
     RAISE EXCEPTION 'User is already a member of this provider';
   END IF;
