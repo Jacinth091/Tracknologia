@@ -35,6 +35,33 @@ export async function registerProviderAccount(params: RegisterInput & { emailRed
   });
 
   if (error) {
+    // If Supabase hits its built-in email rate limit during development, try signing in directly if account already exists
+    if (error.message.includes("rate limit") || error.status === 429) {
+      try {
+        const signInResult = await supabase.auth.signInWithPassword({
+          email: params.email,
+          password: params.password,
+        });
+
+        if (signInResult.data?.session && signInResult.data?.user) {
+          if (params.intent === "STAFF" && params.inviteToken) {
+            try {
+              await consumeStaffInvitation(supabase, params.inviteToken);
+            } catch {
+              // continue
+            }
+          }
+          return signInResult.data;
+        }
+      } catch {
+        // fall through to error throw
+      }
+
+      throw new Error(
+        "Supabase email rate limit exceeded. Please disable 'Confirm email' in your Supabase Dashboard under Authentication -> Email, or connect Resend Custom SMTP.",
+      );
+    }
+
     throw new Error(error.message);
   }
 
