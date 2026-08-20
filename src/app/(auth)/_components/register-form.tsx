@@ -1,7 +1,7 @@
 "use client";
 
 import { useActionState, useState } from "react";
-import { registerAction } from "@/features/auth/actions";
+import { registerAction } from "../actions";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { PasswordInput } from "@/components/ui/password-input";
@@ -15,7 +15,7 @@ export function RegisterForm() {
 
   return (
     <div className="relative">
-      {/* Loading Overlay Placeholder */}
+      {/* Loading Overlay */}
       {isPending && (
         <div className="absolute inset-0 z-20 flex flex-col items-center justify-center rounded-2xl bg-background/60 backdrop-blur-[1px] transition-all">
           <div className="flex items-center gap-2 rounded-xl bg-card border border-border/80 px-4 py-2 shadow-md">
@@ -28,7 +28,7 @@ export function RegisterForm() {
       )}
 
       <form action={formAction} className="space-y-4">
-        {state?.error && (
+        {state?.error && !state.fieldErrors && (
           <div className="rounded-xl border border-destructive/20 bg-destructive/10 p-3 text-sm text-destructive font-medium">
             {state.error}
           </div>
@@ -40,17 +40,23 @@ export function RegisterForm() {
           </div>
         )}
 
-        {/* Provider Type Selection */}
+        {/* Accessible Provider Type Selection */}
         <div className="space-y-2">
-          <Label>Provider Type</Label>
+          <Label id="provider-type-label">Provider Type</Label>
           <input type="hidden" name="providerType" value={providerType} />
-          <div className="grid grid-cols-2 gap-2">
+          <div
+            role="radiogroup"
+            aria-labelledby="provider-type-label"
+            className="grid grid-cols-2 gap-2"
+          >
             <button
               type="button"
+              role="radio"
+              aria-checked={providerType === "SHOP"}
               disabled={isPending}
               onClick={() => setProviderType("SHOP")}
               className={cn(
-                "flex flex-col items-start rounded-xl border p-3 text-left transition-all",
+                "flex flex-col items-start rounded-xl border p-3 text-left transition-all cursor-pointer",
                 providerType === "SHOP"
                   ? "border-primary bg-primary/5 text-foreground ring-2 ring-primary/20"
                   : "border-border bg-background text-muted-foreground hover:bg-muted/50",
@@ -58,16 +64,18 @@ export function RegisterForm() {
             >
               <span className="text-sm font-semibold text-foreground">Repair Shop</span>
               <span className="text-xs text-muted-foreground mt-0.5">
-                Physical store or workshop
+                Storefront or workshop
               </span>
             </button>
 
             <button
               type="button"
+              role="radio"
+              aria-checked={providerType === "INDEPENDENT"}
               disabled={isPending}
               onClick={() => setProviderType("INDEPENDENT")}
               className={cn(
-                "flex flex-col items-start rounded-xl border p-3 text-left transition-all",
+                "flex flex-col items-start rounded-xl border p-3 text-left transition-all cursor-pointer",
                 providerType === "INDEPENDENT"
                   ? "border-primary bg-primary/5 text-foreground ring-2 ring-primary/20"
                   : "border-border bg-background text-muted-foreground hover:bg-muted/50",
@@ -75,7 +83,7 @@ export function RegisterForm() {
             >
               <span className="text-sm font-semibold text-foreground">Independent</span>
               <span className="text-xs text-muted-foreground mt-0.5">
-                Freelancer / mobile tech
+                Freelancer / mobile repairer
               </span>
             </button>
           </div>
@@ -83,7 +91,7 @@ export function RegisterForm() {
 
         <div className="space-y-2">
           <Label htmlFor="displayName">
-            {providerType === "SHOP" ? "Shop / Business Name" : "Your Name / Tech Brand"}
+            {providerType === "SHOP" ? "Shop / Business Name" : "Your Name / Brand"}
           </Label>
           <Input
             id="displayName"
@@ -93,6 +101,9 @@ export function RegisterForm() {
             disabled={isPending}
             required
           />
+          {state?.fieldErrors?.displayName && (
+            <p className="text-xs text-destructive">{state.fieldErrors.displayName}</p>
+          )}
         </div>
 
         <div className="space-y-2">
@@ -106,6 +117,9 @@ export function RegisterForm() {
             disabled={isPending}
             required
           />
+          {state?.fieldErrors?.email && (
+            <p className="text-xs text-destructive">{state.fieldErrors.email}</p>
+          )}
         </div>
 
         <div className="space-y-2">
@@ -118,6 +132,9 @@ export function RegisterForm() {
             disabled={isPending}
             required
           />
+          {state?.fieldErrors?.password && (
+            <p className="text-xs text-destructive">{state.fieldErrors.password}</p>
+          )}
         </div>
 
         <div className="space-y-2">
@@ -130,6 +147,9 @@ export function RegisterForm() {
             disabled={isPending}
             required
           />
+          {state?.fieldErrors?.confirmPassword && (
+            <p className="text-xs text-destructive">{state.fieldErrors.confirmPassword}</p>
+          )}
         </div>
 
         <Button type="submit" className="w-full" disabled={isPending}>

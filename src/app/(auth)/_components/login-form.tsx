@@ -2,7 +2,7 @@
 
 import { useActionState } from "react";
 import Link from "next/link";
-import { loginAction } from "@/features/auth/actions";
+import { loginAction } from "../actions";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { PasswordInput } from "@/components/ui/password-input";
@@ -27,7 +27,7 @@ export function LoginForm() {
       )}
 
       <form action={formAction} className="space-y-4">
-        {state?.error && (
+        {state?.error && !state.fieldErrors && (
           <div className="rounded-xl border border-destructive/20 bg-destructive/10 p-3 text-sm text-destructive font-medium">
             {state.error}
           </div>
@@ -44,6 +44,9 @@ export function LoginForm() {
             disabled={isPending}
             required
           />
+          {state?.fieldErrors?.email && (
+            <p className="text-xs text-destructive">{state.fieldErrors.email}</p>
+          )}
         </div>
 
         <div className="space-y-2">
@@ -64,6 +67,9 @@ export function LoginForm() {
             disabled={isPending}
             required
           />
+          {state?.fieldErrors?.password && (
+            <p className="text-xs text-destructive">{state.fieldErrors.password}</p>
+          )}
         </div>
 
         <Button type="submit" className="w-full" disabled={isPending}>

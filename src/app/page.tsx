@@ -16,12 +16,6 @@ export default function Home() {
           </Link>
           <div className="flex items-center gap-3">
             <Link
-              href="/track"
-              className={cn(buttonVariants({ variant: "ghost" }))}
-            >
-              Track Repair
-            </Link>
-            <Link
               href="/login"
               className={cn(buttonVariants({ variant: "outline" }))}
             >

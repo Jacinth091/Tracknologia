@@ -1,7 +1,7 @@
 "use client";
 
 import { useActionState } from "react";
-import { updatePasswordAction } from "@/features/auth/actions";
+import { updatePasswordAction } from "../actions";
 import { Button } from "@/components/ui/button";
 import { PasswordInput } from "@/components/ui/password-input";
 import { Label } from "@/components/ui/label";
@@ -12,7 +12,7 @@ export function ResetPasswordForm() {
 
   return (
     <div className="relative">
-      {/* Loading Overlay Placeholder */}
+      {/* Loading Overlay */}
       {isPending && (
         <div className="absolute inset-0 z-20 flex flex-col items-center justify-center rounded-2xl bg-background/60 backdrop-blur-[1px] transition-all">
           <div className="flex items-center gap-2 rounded-xl bg-card border border-border/80 px-4 py-2 shadow-md">

@@ -20,14 +20,19 @@ export default function RegisterPage() {
       <CardContent>
         <RegisterForm />
       </CardContent>
-      <CardFooter className="justify-center border-t border-border/50 pt-4 text-xs text-muted-foreground">
-        Already have an account?{" "}
-        <Link
-          href="/login"
-          className="ml-1 font-medium text-foreground underline-offset-4 hover:underline"
-        >
-          Sign in
-        </Link>
+      <CardFooter className="flex-col gap-2 justify-center border-t border-border/50 pt-4 text-xs text-muted-foreground text-center">
+        <p>
+          Already have an account?{" "}
+          <Link
+            href="/login"
+            className="font-medium text-foreground underline-offset-4 hover:underline"
+          >
+            Sign in
+          </Link>
+        </p>
+        <p className="text-[11px] text-muted-foreground/80">
+          Joining as Shop Staff? Use the invitation link sent by your Shop Owner.
+        </p>
       </CardFooter>
     </Card>
   );

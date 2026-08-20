@@ -1,4 +1,5 @@
-import { getProviderContext, signOutAction } from "@/features/auth";
+import { getUser, getProviderContext } from "@/features/auth";
+import { signOutAction } from "@/app/(auth)/actions";
 import Link from "next/link";
 import { Button } from "@/components/ui/button";
 import { redirect } from "next/navigation";
@@ -8,15 +9,19 @@ export default async function DashboardLayout({
 }: {
   children: React.ReactNode;
 }) {
-  const context = await getProviderContext();
-
-  if (!context) {
+  const user = await getUser();
+  if (!user) {
     redirect("/login");
+  }
+
+  const context = await getProviderContext();
+  if (!context) {
+    redirect("/onboarding");
   }
 
   const roleDisplay =
     context.providerType === "INDEPENDENT"
-      ? "Independent Technician"
+      ? "Independent Repairer"
       : context.role === "OWNER"
         ? "Shop Owner"
         : "Staff";
@@ -32,35 +37,17 @@ export default async function DashboardLayout({
                 Tracknologia
               </span>
             </Link>
-            <nav className="hidden md:flex items-center gap-4 text-sm font-medium">
+            <nav className="flex items-center gap-4 text-sm font-medium">
               <Link
                 href="/dashboard"
-                className="text-foreground transition-colors hover:text-primary"
+                className="text-foreground font-medium transition-colors hover:text-primary"
               >
-                Overview
-              </Link>
-              <Link
-                href="/dashboard/repairs"
-                className="text-muted-foreground transition-colors hover:text-foreground"
-              >
-                Repairs
-              </Link>
-              <Link
-                href="/dashboard/requests"
-                className="text-muted-foreground transition-colors hover:text-foreground"
-              >
-                Requests
-              </Link>
-              <Link
-                href="/dashboard/settings"
-                className="text-muted-foreground transition-colors hover:text-foreground"
-              >
-                Settings
+                Dashboard
               </Link>
             </nav>
           </div>
 
-          <div className="flex items-center gap-3">
+          <div className="flex items-center gap-4">
             <div className="hidden sm:flex flex-col items-end text-xs">
               <span className="font-medium text-foreground">{context.providerName}</span>
               <span className="text-muted-foreground text-[11px]">
