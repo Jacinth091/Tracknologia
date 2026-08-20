@@ -26,7 +26,12 @@ export interface ProviderContext {
 export class AuthError extends Error {
   constructor(
     message: string,
-    public readonly code: "UNAUTHENTICATED" | "NO_MEMBERSHIP" | "UNAUTHORIZED_ROLE" | "INVALID_CREDENTIALS",
+    public readonly code:
+      | "UNAUTHENTICATED"
+      | "NO_MEMBERSHIP"
+      | "AMBIGUOUS_PROVIDER_CONTEXT"
+      | "UNAUTHORIZED_ROLE"
+      | "INVALID_CREDENTIALS",
   ) {
     super(message);
     this.name = "AuthError";

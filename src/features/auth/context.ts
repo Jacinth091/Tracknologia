@@ -1,7 +1,7 @@
 import "server-only";
 import { createClient } from "@/lib/supabase/server";
 import type { SupabaseClient } from "@supabase/supabase-js";
-import { ensureMembershipForUser } from "./persistence";
+import { findMembershipByUserId } from "./persistence";
 import { AuthError, type AuthenticatedUser, type ProviderContext, type ProviderRole } from "./types";
 
 export async function getUser(client?: SupabaseClient): Promise<AuthenticatedUser | null> {
@@ -31,42 +31,16 @@ export async function requireUser(client?: SupabaseClient): Promise<Authenticate
 
 export async function getProviderContext(client?: SupabaseClient): Promise<ProviderContext | null> {
   const supabase = client ?? (await createClient());
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
+  const user = await getUser(supabase);
 
   if (!user) {
     return null;
   }
 
-  try {
-    const membership = await ensureMembershipForUser(supabase, user);
-    return {
-      userId: user.id,
-      providerId: membership.providerId,
-      providerName: membership.providerName,
-      providerType: membership.providerType,
-      role: membership.role,
-      email: user.email ?? null,
-    };
-  } catch (err) {
-    console.error("[getProviderContext] Error ensuring provider membership:", err);
+  const membership = await findMembershipByUserId(supabase, user.id);
+  if (!membership) {
     return null;
   }
-}
-
-export async function requireProviderContext(client?: SupabaseClient): Promise<ProviderContext> {
-  const supabase = client ?? (await createClient());
-  const {
-    data: { user },
-    error,
-  } = await supabase.auth.getUser();
-
-  if (error || !user) {
-    throw new AuthError("Authentication required", "UNAUTHENTICATED");
-  }
-
-  const membership = await ensureMembershipForUser(supabase, user);
 
   return {
     userId: user.id,
@@ -74,7 +48,30 @@ export async function requireProviderContext(client?: SupabaseClient): Promise<P
     providerName: membership.providerName,
     providerType: membership.providerType,
     role: membership.role,
-    email: user.email ?? null,
+    email: user.email,
+  };
+}
+
+/**
+ * Resolves the trusted ProviderContext for the authenticated user.
+ * FAILS CLOSED: Throws AuthError('NO_MEMBERSHIP') if the user has no active Provider membership.
+ */
+export async function requireProviderContext(client?: SupabaseClient): Promise<ProviderContext> {
+  const supabase = client ?? (await createClient());
+  const user = await requireUser(supabase);
+
+  const membership = await findMembershipByUserId(supabase, user.id);
+  if (!membership) {
+    throw new AuthError("No provider membership found for user", "NO_MEMBERSHIP");
+  }
+
+  return {
+    userId: user.id,
+    providerId: membership.providerId,
+    providerName: membership.providerName,
+    providerType: membership.providerType,
+    role: membership.role,
+    email: user.email,
   };
 }
 
