@@ -369,27 +369,21 @@ describe("Auth & Onboarding — Validation Schemas", () => {
   });
 
   it("validates provider registration inputs", () => {
-    const validShop = registerSchema.safeParse({
-      providerType: "SHOP",
-      displayName: "Apex Repair Center",
+    const valid = registerSchema.safeParse({
       email: "owner@example.com",
       password: "securepassword123",
       confirmPassword: "securepassword123",
     });
-    expect(validShop.success).toBe(true);
+    expect(valid.success).toBe(true);
 
-    const validIndependent = registerSchema.safeParse({
-      providerType: "INDEPENDENT",
-      displayName: "Alex Mobile Tech",
-      email: "alex@example.com",
+    const invalidEmail = registerSchema.safeParse({
+      email: "not-an-email",
       password: "securepassword123",
       confirmPassword: "securepassword123",
     });
-    expect(validIndependent.success).toBe(true);
+    expect(invalidEmail.success).toBe(false);
 
     const mismatch = registerSchema.safeParse({
-      providerType: "SHOP",
-      displayName: "Apex Repair Center",
       email: "owner@example.com",
       password: "securepassword123",
       confirmPassword: "differentpassword",

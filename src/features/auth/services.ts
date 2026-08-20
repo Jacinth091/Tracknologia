@@ -26,27 +26,11 @@ export async function registerProviderAccount(params: RegisterInput & { emailRed
     password: params.password,
     options: {
       emailRedirectTo: params.emailRedirectTo,
-      data: {
-        display_name: params.displayName,
-        provider_type: params.providerType,
-      },
     },
   });
 
   if (error) {
     throw new Error(error.message);
-  }
-
-  // If user session is active immediately (e.g. email confirmation disabled), provision provider owner atomically
-  if (data.session && data.user) {
-    try {
-      await registerProviderOwner(supabase, {
-        displayName: params.displayName,
-        providerType: params.providerType,
-      });
-    } catch {
-      // If already onboarded, continue
-    }
   }
 
   return data;
