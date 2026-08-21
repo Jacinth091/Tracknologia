@@ -4,7 +4,7 @@
 
 ## Description
 
-The Providers feature represents the **repair business identity and operating configuration** in Tracknologia.
+The Providers feature represents the **repair business identity, staff invitations, person profiles, and operating configuration** in Tracknologia.
 
 A Provider is either:
 
@@ -15,17 +15,20 @@ Both are first-class Provider types that use the same core Repair system.
 
 ## Primary goal
 
-Give Tracknologia a provider-centric business identity that works equally well for a traditional Repair Shop and an Independent Repairer without forcing either into the other's operating model.
+Give Tracknologia a provider-centric business identity that works equally well for a traditional Repair Shop and an Independent Repairer without forcing either into the other's operating model, while governing secure Staff onboarding.
 
 ## Feature goals
 
 - Create and maintain Provider business/profile information.
+- Atomic onboarding for Independent Repairers and Shop Owners.
+- Secure, Owner-authorized invitation flow for Shop Staff (`provider_invitations`) using one-way SHA-256 token hashing.
 - Preserve `SHOP` and `INDEPENDENT` as equal supported Provider types.
 - Support one-person shops as naturally as multi-user shops.
+- Separate canonical person profiles (`provider_user_profiles`) from authorization memberships (`provider_memberships`).
 - Allow Independent Repairers to operate without publishing a private home address.
 - Store Service Area and supported device categories without premature location/device normalization.
 - Configure multiple supported Service Modes.
-- Provide a public Provider profile by slug for provider-specific customer Request pages.
+- Provide a public Provider profile projection (`public_provider_profiles`) by slug or ID for provider-specific customer Request pages.
 - Control whether the Provider is currently accepting customer Repair Requests.
 
 ## Non-goals
@@ -43,16 +46,17 @@ The MVP Providers feature does not include:
 
 ## Main actors
 
-- **Provider User** — manages Provider configuration.
+- **Provider Owner** — creates Provider, manages configuration, and invites Shop Staff.
+- **Shop Staff** — joins an existing Shop via an Owner-authorized invitation.
 - **Customer** — may view limited public Provider identity/configuration on a Provider-specific Request page.
 
 ## Owned data
 
 ### `providers`
 
-Key information includes:
+Business profile information:
 
-- Provider type;
+- Provider type (`SHOP` | `INDEPENDENT`);
 - display name;
 - slug;
 - description/profile image;
@@ -63,108 +67,87 @@ Key information includes:
 - `accepting_requests`;
 - timestamps.
 
-### `provider_service_modes`
+### `provider_user_profiles`
 
-Repeating relation of supported modes:
+Canonical person-level display profile for authenticated users:
 
-```text
-DROP_OFF
-MEETUP
-HOME_SERVICE
-OTHER
-```
+- `user_id` (PK, FK $\to$ `auth.users.id`);
+- `display_name`;
+- `contact_phone`;
+- `avatar_url`;
+- timestamps.
 
-`OTHER` may include Provider-defined details.
+### `provider_memberships`
 
-## Conceptual Interface
+Associates an authenticated user with a Provider as `OWNER` or `STAFF` (authorization link only).
+
+### `provider_invitations`
+
+Owner-authorized, expiring, single-use invitations for Shop Staff onboarding:
+
+- `id`
+- `provider_id`
+- `email`
+- `role` (`STAFF`)
+- `token_hash` (SHA-256 digest of raw token)
+- `invited_by_user_id`
+- `created_at`
+- `expires_at`
+- `accepted_at`
+- `accepted_by_user_id`
+- `revoked_at`
+
+### `public_provider_profiles` (View)
+
+Restricted public projection containing only public-safe fields.
+
+## Public Interface (`src/features/providers/index.ts`)
 
 ```ts
-createProvider(input): Provider
-getProvider(providerId): Provider
-getPublicProviderBySlug(slug): PublicProviderProfile
-updateProviderProfile(context, input): Provider
-setServiceModes(context, modes): ProviderServiceMode[]
+// Commands
+createProvider(input: CreateProviderInput): Promise<{ providerId: string; membershipId: string; slug: string }>
+createStaffInvitation(input: { email: string }): Promise<CreateStaffInvitationResult>
+acceptStaffInvitation(input: AcceptStaffInvitationInput): Promise<{ providerId: string; membershipId: string; role: "STAFF" }>
+revokeStaffInvitation(invitationId: string): Promise<void>
+
+// Queries
+getProvider(providerId: string): Promise<Provider | null>
+getPublicProvider(slugOrId: string): Promise<PublicProviderProfile | null>
+getInvitationForOnboarding(rawToken: string): Promise<InvitationShopDetails | null>
+listTeamMembers(providerId: string): Promise<TeamMember[]>
+listPendingStaffInvitations(providerId: string): Promise<ProviderInvitation[]>
+getProviderUserProfile(userId: string): Promise<ProviderUserProfile | null>
 ```
 
-Public and private Provider views should not expose the same fields by accident.
+## Core workflows
 
-## Core workflow — Provider configuration
+### 1. Independent Repairer / Shop Owner Onboarding (LD-01)
 
 ```text
-Provider User
-   ↓ Auth / ProviderContext
-Open Settings
-   ↓
-Edit Provider profile
-   ↓
-Validate business/profile fields
-   ↓
-Update Provider-owned configuration
+Authenticated User
+       ↓
+createProvider({ displayName, providerType, ownerDisplayName, ownerContactPhone, ... })
+       ↓ (atomic database transaction)
+INSERT providers + INSERT provider_user_profiles + INSERT provider_memberships (role: OWNER)
 ```
 
-## Core workflow — Service Modes
+### 2. Shop Staff Onboarding (LD-01)
 
 ```text
-Provider Settings
-    ↓
-Select one or more supported modes
-    ↓
-DROP_OFF / MEETUP / HOME_SERVICE / OTHER
-    ↓
-Persist supported modes
-    ↓
-Public Repair Request page can present those modes
+Shop Owner creates Staff invitation (generates raw token, persists SHA-256 digest in token_hash)
+       ↓
+Staff receives raw token via invite link
+       ↓
+Staff creates Supabase identity / logs in
+       ↓
+getInvitationForOnboarding(rawToken) displays shop details
+       ↓
+acceptStaffInvitation({ token, displayName, contactPhone })
+       ↓ (atomic database transaction)
+Validate token_hash, not expired, not revoked, not accepted, verify SHOP provider, verify no active membership
+       ↓
+INSERT provider_user_profiles + INSERT provider_memberships (role: STAFF) + UPDATE provider_invitations
 ```
-
-A supported mode describes what the Provider offers. A particular Repair Request/Repair may select only one preferred/selected mode.
-
-## Routes and UI
-
-Protected configuration:
-
-```text
-/dashboard/settings
-```
-
-Potential Provider UI sections:
-
-- profile identity;
-- Provider type;
-- contact information;
-- Service Area;
-- optional public address;
-- supported device categories;
-- supported Service Modes;
-- accepting Requests toggle.
-
-Public Provider identity appears primarily on:
-
-```text
-/p/[providerSlug]/request
-```
-
-## Relationships with other features
-
-### Auth
-
-Protected Provider writes require trusted `ProviderContext`.
-
-### Repair Requests
-
-Repair Requests depends on Providers to determine:
-
-- target Provider by slug;
-- whether the Provider accepts Requests;
-- public Provider identity;
-- supported Service Modes.
-
-### Repairs
-
-Every Repair belongs to exactly one Provider. Repair ownership must be derived from trusted Provider context on protected operations.
-
-### Tracking
-
-Public Tracking may display Provider display name and intentionally public profile information.
 
 ## Important invariants
 
@@ -172,61 +155,21 @@ Public Tracking may display Provider display name and intentionally public profi
 2. Provider type does not change the core Repair lifecycle.
 3. A Shop may have one owner-user only.
 4. Independent Repairers are not required to publish a residential address.
-5. A Provider may support multiple Service Modes.
-6. Public Provider information must be intentionally selected, not a raw database row.
-7. Provider slugs are unique.
-
-## Important scenarios
-
-### Independent Repairer
-
-```text
-Type: INDEPENDENT
-Public address: null
-Service Area: Cebu City
-Modes: MEETUP, HOME_SERVICE
-```
-
-Valid configuration.
-
-### One-person Shop
-
-```text
-Type: SHOP
-Public address: shop location
-Memberships: owner only
-```
-
-Also valid. No Staff/Technician requirement exists.
-
-## Validation expectations
-
-- slug format and uniqueness;
-- Provider type enum;
-- contact fields;
-- supported Service Mode enum values;
-- reasonable Service Area/public-address lengths;
-- public fields sanitized/validated before rendering.
-
-## Security expectations
-
-- only authorized Provider Users may modify their Provider;
-- Provider A cannot update Provider B;
-- public Provider lookup exposes only public-safe fields;
-- RLS should enforce Provider ownership where applicable.
+5. Staff invitations are valid only for `SHOP` providers.
+6. A user cannot have multiple active provider memberships in MVP.
+7. Public Provider information is strictly projected via `public_provider_profiles`.
+8. Raw invitation tokens are never stored in the database; only SHA-256 digests are persisted.
+9. Provider slugs are unique.
 
 ## Testing expectations
 
 Test:
 
-- create/update Provider;
-- public lookup by valid/invalid slug;
-- independent with null public address;
-- shop with one owner only;
-- multiple Service Modes;
-- `accepting_requests = false` behavior;
-- cross-Provider update denial.
-
-## Definition of done
-
-The feature is healthy when both Shops and Independent Repairers can accurately represent how they operate, and other features can consume that configuration without embedding shop-specific assumptions.
+- atomic Independent provider + owner creation with person profile;
+- atomic Shop provider + owner creation with person profile;
+- valid Staff invitation creates exactly one `STAFF` membership atomically;
+- expired, revoked, or consumed invitations are rejected;
+- Staff cannot join a Provider without a valid invitation;
+- Staff invitations cannot be created or accepted for `INDEPENDENT` providers;
+- public lookup by slug returns only public-safe fields;
+- cross-Provider isolation and RLS enforcement.

@@ -5,11 +5,11 @@
 Tracknologia does not rely on Next.js alone for security. Use layered enforcement:
 
 ```text
-Next.js request/server surface
+Next.js request/server surface (src/app)
         ↓
 Supabase Auth (identity/session)
         ↓
-Tracknologia authorization (Provider membership/business rules)
+Tracknologia authorization (Provider membership/business rules in src/features/auth/)
         ↓
 PostgreSQL Row Level Security
         ↓
@@ -29,21 +29,45 @@ Tracknologia does not implement password hashing or custom JWT authentication.
 Authentication only proves who the user is. Tracknologia must still determine:
 
 - which Provider the user may act for;
-- membership role;
+- membership role (`OWNER` | `STAFF`);
 - whether the Provider owns a Repair/Request;
 - whether the requested business operation is allowed.
 
-Centralize this through `src/features/auth/` rather than repeating ad hoc checks in pages.
+Centralize this through `src/features/auth/` rather than repeating ad hoc checks in pages. Authorization must **fail closed** (`NO_MEMBERSHIP`, `AMBIGUOUS_PROVIDER_CONTEXT`) and never mutate business state during read lookups.
 
 ## Row Level Security
 
 Enable RLS on Provider-owned application tables exposed through Supabase.
 
-Core invariant:
+Core invariants:
 
-> A user belonging to Provider A cannot read or mutate Provider B's Provider data, Repair Requests, Repairs, status history, or updates.
+> A user belonging to Provider A cannot read or mutate Provider B's Provider data, Repair Requests, Repairs, status history, updates, or invitations.
+
+> Direct client INSERT/UPDATE/DELETE on `provider_memberships` is strictly prohibited. Memberships must only be created via authorized atomic `SECURITY DEFINER` procedures (Owner onboarding / Staff invitation acceptance).
 
 Application authorization remains required even with RLS. RLS is defense in depth, not a replacement for domain checks.
+
+## Staff Invitation Security (LD-01)
+
+Every Staff invitation is:
+
+- created only by an authorized Provider `OWNER` of a `SHOP` provider;
+- bound to exactly one Provider;
+- single-use;
+- expiring (7-day default);
+- revocable by an OWNER;
+- stored by one-way cryptographic digest (`token_hash = sha256(raw_token)`), never raw token;
+- never exposed as a reusable credential in pending invitation lists;
+- consumed atomically with `STAFF` membership and person profile creation via `accept_staff_invitation` RPC;
+- database-enforced against users who already have an active Provider membership while multi-membership is unsupported.
+
+## Public Provider Projections
+
+Anonymous and unauthenticated visitors cannot access raw `providers` table rows. Public access is strictly projected through `public_provider_profiles` which explicitly selects only safe public columns (`id`, `display_name`, `slug`, `description`, `profile_image_url`, `public_address`, `service_area`, `supported_devices`, `accepting_requests`, `created_at`). Internal contact numbers, billing emails, and private metadata are never exposed anonymously.
+
+## Redirect Path Hardening
+
+All auth and onboarding redirect target parameters (`redirectTo`, `next`) are validated using `getSafeInternalRedirectUrl()`. Protocol-relative URLs (`//evil.com`), external URLs (`https://...`), and non-HTTP schemes are strictly rejected in favor of safe internal relative paths (e.g. `/dashboard`).
 
 ## Server Actions and Route Handlers
 
@@ -67,13 +91,16 @@ Do not put the full Tracknologia authorization model in Proxy.
 
 ## Server-only code
 
-Use `server-only` for sensitive persistence/auth implementation modules where useful to prevent accidental client imports.
+Use `server-only` for sensitive persistence/auth implementation modules where useful to prevent accidental client imports:
 
-Examples:
-
-- `features/repairs/persistence.ts`
-- `features/auth/authorization.ts`
-- `lib/supabase/server.ts`
+- `src/features/repairs/persistence.ts`
+- `src/features/providers/persistence.ts`
+- `src/features/providers/commands.ts`
+- `src/features/providers/queries.ts`
+- `src/features/auth/context.ts`
+- `src/features/auth/persistence.ts`
+- `src/features/auth/services.ts`
+- `src/lib/supabase/server.ts`
 
 ## Input validation
 
@@ -84,6 +111,7 @@ Use Zod on the server for:
 - Repair acceptance verification;
 - status transitions;
 - Provider profile changes;
+- Staff invitation creation and acceptance;
 - Tracking Code lookup shape/limits.
 
 Browser validation is UX only.
@@ -104,20 +132,6 @@ Never expose:
 
 Apply rate limiting to public lookup before real public exposure.
 
-## Public Repair Requests
-
-The provider-specific Request form is unauthenticated and therefore an abuse surface.
-
-Require:
-
-- server-side validation;
-- input/body size limits;
-- request throttling/rate limiting;
-- safe text rendering;
-- no automatic authoritative Repair creation.
-
-CAPTCHA/bot protection can be added only if abuse warrants it.
-
 ## Secrets
 
 Never expose Supabase secret/service-role credentials to the browser or prefix them with `NEXT_PUBLIC_`.
@@ -126,22 +140,18 @@ Browser-safe public/publishable configuration is distinct from privileged server
 
 `.env.local` is never committed. Commit only `.env.example` with names/placeholders.
 
-## Security headers
-
-Production hardening should include appropriate:
-
-- Content-Security-Policy;
-- Strict-Transport-Security;
-- X-Content-Type-Options;
-- Referrer-Policy;
-- Permissions-Policy.
-
 ## Required security tests
 
-- Provider A cannot read Provider B Repair.
-- Provider A cannot mutate Provider B Repair.
+- Provider A cannot read Provider B Repair or Provider data.
+- Provider A cannot mutate Provider B Repair or Provider data.
 - Provider A cannot accept Provider B Request.
+- User B cannot self-assign membership to Provider A (tenant takeover prevention).
+- Expired, revoked, or consumed staff invitations cannot be accepted.
+- Staff invitations cannot be created or accepted for `INDEPENDENT` providers.
+- An existing provider member cannot accept an invitation to join a second provider.
+- Raw invitation tokens are never returned by pending listing APIs or stored in plain text.
 - unauthenticated user cannot access Provider-owned operations.
+- unauthenticated user can only query `public_provider_profiles` and not private provider columns.
 - valid Tracking Code returns only public projection.
 - invalid Tracking Code reveals minimal information.
 - Internal Notes never enter public output.

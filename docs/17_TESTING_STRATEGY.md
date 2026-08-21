@@ -4,7 +4,9 @@
 
 The feature Module interface is the primary business test surface. Test domain behavior through the same interfaces called by Next.js adapters.
 
-## Feature/module tests
+## Unit and module tests
+
+Unit tests cover deterministic helpers and domain rules without a live database. Module tests exercise feature interfaces and their business behavior. These tests are fast and run as part of `pnpm test:run`.
 
 ### Auth / Provider Access
 
@@ -17,10 +19,13 @@ The feature Module interface is the primary business test surface. Test domain b
 ### Providers
 
 - create/update `SHOP` and `INDEPENDENT` profiles;
+- separate person profiles from authorization memberships;
 - public address is optional where allowed;
 - supported Service Modes are persisted correctly;
 - `OTHER` mode details can be recorded;
-- accepting Requests can be enabled/disabled.
+- accepting Requests can be enabled/disabled;
+- staff invitation creation, one-way SHA-256 token hashing, single-use acceptance, and revocation;
+- public provider lookup by slug or ID queries `public_provider_profiles` projection only.
 
 ### Repair Requests
 
@@ -49,19 +54,34 @@ The feature Module interface is the primary business test surface. Test domain b
 - invalid code reveals no internal details;
 - raw Repair/private fields cannot leak into output.
 
-## Database / RLS integration tests
+## Contract tests
+
+Contract tests verify security-sensitive boundaries and stable feature contracts without requiring a live PostgreSQL instance. They complement unit and module tests by checking rules such as token hashing, public/private projection shape, and Provider invariants. They run as part of `pnpm test:run`.
+
+## Real PostgreSQL / RLS integration tests
+
+These tests run against the local Supabase PostgreSQL stack, not mocks or in-memory substitutes. They verify database constraints, transactions, permissions, and Row Level Security behavior that unit, module, and contract tests cannot prove.
+
+Run `supabase db reset` before the suite when working locally, then run `pnpm test:db`.
 
 Run against real PostgreSQL/Supabase-compatible behavior for:
 
 - membership uniqueness;
+- person profile (`provider_user_profiles`) separation;
 - Service Mode uniqueness;
 - Request Reference uniqueness;
 - Tracking Code uniqueness;
 - `repair_request_id` one-to-one constraint;
-- Request acceptance transaction;
-- status-change transaction;
-- Provider RLS isolation;
+- Staff invitation single-use, non-expired, and non-revoked constraints;
+- Staff invitation restricted strictly to `SHOP` providers in database transaction;
+- User cannot acquire a second active provider membership in MVP;
+- Atomic provider + initial owner + person profile creation;
+- Atomic staff invitation acceptance + person profile + membership creation;
+- Provider RLS isolation (hostile cross-tenant queries denied);
+- Public projection RLS (anonymous cannot query private columns of `providers`);
 - child Status Event/Update access isolation.
+
+Any security-sensitive database change, including schema, RLS, policy, constraint, trigger, or RPC changes, requires the real PostgreSQL / RLS integration suite before completion.
 
 ## End-to-end tests with Playwright
 
@@ -102,15 +122,20 @@ Independent Provider with Meetup/Home Service operates complete request/repair f
 
 Provider A attempts direct URL/action access to Provider B Request and Repair and is denied by application rules and RLS.
 
-## Docker consistency checks
+## Required local and CI commands
 
-CI and developers should run the same core commands available inside the container:
+CI and developers should run the same core commands:
 
 ```text
-npm run lint
-npm run typecheck
-npm test
-npm run build
+pnpm format:check
+pnpm lint
+pnpm typecheck
+pnpm test:run
+pnpm test:db
+pnpm build
+supabase db reset
 ```
 
-Keep `package-lock.json` committed to ensure dependency resolution consistency.
+`pnpm test:db` targets `tests/integration/db.test.ts` and must run against a real local Supabase instance. `pnpm db:reset` is the package-script equivalent of `supabase db reset`.
+
+Keep `pnpm-lock.yaml` committed to ensure dependency resolution consistency.
