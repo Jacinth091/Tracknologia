@@ -52,19 +52,24 @@ export async function inviteStaffAction(
   }
 }
 
-export async function revokeStaffAction(formData: FormData) {
+export async function revokeStaffAction(
+  formData: FormData,
+): Promise<{ error?: string; success?: string }> {
   const supabase = await createClient();
   const invitationId = formData.get("invitationId") as string;
 
   if (!invitationId) {
-    return;
+    return { error: "Invitation ID is required" };
   }
 
   try {
     await revokeStaffInvitation(invitationId, supabase);
     revalidatePath("/dashboard/team");
-  } catch {
-    // Squelch revoke error
+    return { success: "Invitation revoked" };
+  } catch (error) {
+    return {
+      error: error instanceof Error ? error.message : "Failed to revoke invitation",
+    };
   }
 }
 

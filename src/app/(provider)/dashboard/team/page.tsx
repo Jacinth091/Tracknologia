@@ -1,12 +1,12 @@
 import type { Metadata } from "next";
 import { requireProviderContext } from "@/features/auth";
-import { listStaffInvitations, listTeamMembers } from "@/features/providers";
+import { listPendingStaffInvitations, listTeamMembers } from "@/features/providers";
 import { createClient } from "@/lib/supabase/server";
 import { TeamClient } from "./_components/team-client";
 
 export const metadata: Metadata = {
   title: "Team & Staff — Tracknologia",
-  description: "Manage repair shop technicians and staff invitations",
+  description: "Manage repair shop staff members and invitations",
 };
 
 export default async function TeamPage() {
@@ -17,8 +17,8 @@ export default async function TeamPage() {
   const isShop = context.providerType === "SHOP";
 
   const [members, invitations] = await Promise.all([
-    listTeamMembers(supabase, context.providerId),
-    isOwner && isShop ? listStaffInvitations(supabase, context.providerId) : Promise.resolve([]),
+    listTeamMembers(context.providerId, supabase),
+    isOwner && isShop ? listPendingStaffInvitations(context.providerId, supabase) : Promise.resolve([]),
   ]);
 
   return (
@@ -28,7 +28,7 @@ export default async function TeamPage() {
           Team & Staff Management
         </h1>
         <p className="text-sm text-muted-foreground mt-1">
-          Manage technicians, staff invitations, and workshop access for {context.providerName}
+          Manage staff members, invitations, and workshop access for {context.providerName}
         </p>
       </div>
 
@@ -41,3 +41,4 @@ export default async function TeamPage() {
     </div>
   );
 }
+
