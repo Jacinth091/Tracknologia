@@ -6,17 +6,9 @@ vi.mock("server-only", () => ({}));
 import { hashInvitationToken } from "@/features/providers/persistence";
 
 /**
- * Integration / Contract Test Suite for PostgreSQL Row Level Security (RLS),
- * Schema Constraints, Atomic Transactions, and Authorization Invariants.
- *
- * Verifies the durable security requirements specified in AUTH-R19 through AUTH-R29:
- * 1. Provider Isolation & RLS
- * 2. Anonymous vs Authenticated Projection
- * 3. Token Security & Hashing
- * 4. Invariants (SHOP-only staff, no second membership)
- * 5. Atomicity of transactions
+ * Pure Contract Test Suite for Provider Security Rules, Token Storage, and Invariants.
  */
-describe("PostgreSQL Schema, Constraints & RLS Security Invariants", () => {
+describe("Provider Security & Invariant Contract Rules", () => {
   describe("1. Token Storage & Verification Security (AUTH-R21)", () => {
     it("never stores raw tokens; SHA-256 digest is deterministic and one-way", () => {
       const rawToken1 = "inv_1a2b3c4d5e6f7g8h9i0j";
@@ -64,8 +56,6 @@ describe("PostgreSQL Schema, Constraints & RLS Security Invariants", () => {
         updated_at: "2026-08-20T00:00:00Z",
       };
 
-      // Define expected projection fields matching the view definition:
-      // SELECT id, provider_type, display_name, slug, description, profile_image_url, public_address, service_area, supported_devices, accepting_requests, created_at
       const publicProjectionKeys = [
         "id",
         "provider_type",
@@ -132,65 +122,6 @@ describe("PostgreSQL Schema, Constraints & RLS Security Invariants", () => {
       );
       expect(checkCanAcceptInvitation("user-fresh")).toBe(true);
     });
-
-    it("enforces invitation lifecycle validity checks (unexpired, not revoked, unconsumed)", () => {
-      const now = new Date();
-      const pastDate = new Date(now.getTime() - 1000 * 60 * 60);
-      const futureDate = new Date(now.getTime() + 1000 * 60 * 60 * 24);
-
-      function checkInvitationState(invitation: {
-        accepted_at: string | null;
-        revoked_at: string | null;
-        expires_at: Date;
-      }) {
-        if (invitation.accepted_at !== null) {
-          throw new Error("Invalid, expired, or revoked invitation: already accepted");
-        }
-        if (invitation.revoked_at !== null) {
-          throw new Error("Invalid, expired, or revoked invitation: revoked");
-        }
-        if (invitation.expires_at <= now) {
-          throw new Error("Invalid, expired, or revoked invitation: expired");
-        }
-        return true;
-      }
-
-      // Valid invitation
-      expect(
-        checkInvitationState({
-          accepted_at: null,
-          revoked_at: null,
-          expires_at: futureDate,
-        }),
-      ).toBe(true);
-
-      // Expired invitation
-      expect(() =>
-        checkInvitationState({
-          accepted_at: null,
-          revoked_at: null,
-          expires_at: pastDate,
-        }),
-      ).toThrowError(/expired/);
-
-      // Revoked invitation
-      expect(() =>
-        checkInvitationState({
-          accepted_at: null,
-          revoked_at: "2026-08-20T00:00:00Z",
-          expires_at: futureDate,
-        }),
-      ).toThrowError(/revoked/);
-
-      // Already accepted invitation
-      expect(() =>
-        checkInvitationState({
-          accepted_at: "2026-08-20T00:00:00Z",
-          revoked_at: null,
-          expires_at: futureDate,
-        }),
-      ).toThrowError(/already accepted/);
-    });
   });
 
   describe("4. Person Profile Data Separation (AUTH-R19)", () => {
@@ -212,12 +143,10 @@ describe("PostgreSQL Schema, Constraints & RLS Security Invariants", () => {
         updated_at: "2026-08-20T00:00:00Z",
       };
 
-      // provider_memberships contains NO display_name or contact_phone
       expect(membership).not.toHaveProperty("display_name");
       expect(membership).not.toHaveProperty("contact_phone");
       expect(membership).not.toHaveProperty("contact_email");
 
-      // provider_user_profiles holds person profile data
       expect(userProfile).toHaveProperty("display_name", "Maria Santos");
       expect(userProfile).toHaveProperty("contact_phone", "+63 912 345 6789");
     });

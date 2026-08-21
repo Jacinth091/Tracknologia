@@ -398,7 +398,7 @@ Do not modify a shared or remote database manually and leave the repository unaw
 3. **Environment Configuration (`.env.local`)**:
    ```env
    NEXT_PUBLIC_SUPABASE_URL=https://<project-ref>.supabase.co
-   NEXT_PUBLIC_SUPABASE_ANON_KEY=<your-anon-or-publishable-key>
+   NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY=<your-publishable-key>
    ```
 4. **Trigger & RLS Writing Rules**:
    - `SECURITY DEFINER` trigger functions on `auth.users` must explicitly set:
