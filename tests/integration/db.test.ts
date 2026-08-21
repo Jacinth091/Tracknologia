@@ -64,7 +64,13 @@ async function createProviderAs(
 async function createInvitationAs(
   client: SupabaseClient,
   email = uniqueEmail("staff"),
-): Promise<{ invitationId: string; email: string; tokenHash: string }> {
+): Promise<{
+  invitationId: string;
+  email: string;
+  tokenHash: string;
+  createdAt: string;
+  expiresAt: string;
+}> {
   const tokenHash = hashInvitationToken(`inv_${randomUUID()}_${randomUUID()}`);
   const { data, error } = await client.rpc("create_staff_invitation", {
     p_email: email,
@@ -84,6 +90,8 @@ async function createInvitationAs(
     invitationId: row.invitation_id,
     email: row.email,
     tokenHash,
+    createdAt: row.created_at,
+    expiresAt: row.expires_at,
   };
 }
 
@@ -266,10 +274,17 @@ describe("PostgreSQL Real Database, RPCs & RLS Integration Suite (AUTH-R28)", ()
       createdProviderIds.push(shop.providerId, independent.providerId);
 
       const invite = await createInvitationAs(shopAuth.client);
+      expect(invite.createdAt).toEqual(expect.any(String));
+      expect(invite.expiresAt).toEqual(expect.any(String));
+      expect(Number.isNaN(Date.parse(invite.createdAt))).toBe(false);
+      expect(Number.isNaN(Date.parse(invite.expiresAt))).toBe(false);
+
       const row = assertSupabaseSuccess(
         await adminClient
           .from("provider_invitations")
-          .select("provider_id, email, role, token_hash")
+          .select(
+            "provider_id, email, role, token_hash, created_at, expires_at",
+          )
           .eq("id", invite.invitationId)
           .single(),
         "read created invitation fixture",
@@ -279,6 +294,8 @@ describe("PostgreSQL Real Database, RPCs & RLS Integration Suite (AUTH-R28)", ()
         email: invite.email,
         role: "STAFF",
         token_hash: invite.tokenHash,
+        created_at: invite.createdAt,
+        expires_at: invite.expiresAt,
       });
       expect(row.data?.token_hash).toMatch(/^[a-f0-9]{64}$/);
 
