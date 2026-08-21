@@ -21,8 +21,10 @@ Supabase managed:
 
 Tracknologia core:
   providers
+  provider_user_profiles
   provider_memberships
   provider_invitations
+  public_provider_profiles (view)
   provider_service_modes
   repair_requests
   repairs
