@@ -4,7 +4,7 @@
 
 ## Description
 
-The Providers feature represents the **repair business identity, staff invitations, and operating configuration** in Tracknologia.
+The Providers feature represents the **repair business identity, staff invitations, person profiles, and operating configuration** in Tracknologia.
 
 A Provider is either:
 
@@ -21,13 +21,14 @@ Give Tracknologia a provider-centric business identity that works equally well f
 
 - Create and maintain Provider business/profile information.
 - Atomic onboarding for Independent Repairers and Shop Owners.
-- Secure, Owner-authorized invitation flow for Shop Staff (`provider_invitations`).
+- Secure, Owner-authorized invitation flow for Shop Staff (`provider_invitations`) using one-way SHA-256 token hashing.
 - Preserve `SHOP` and `INDEPENDENT` as equal supported Provider types.
 - Support one-person shops as naturally as multi-user shops.
+- Separate canonical person profiles (`provider_user_profiles`) from authorization memberships (`provider_memberships`).
 - Allow Independent Repairers to operate without publishing a private home address.
 - Store Service Area and supported device categories without premature location/device normalization.
 - Configure multiple supported Service Modes.
-- Provide a public Provider profile by slug for provider-specific customer Request pages.
+- Provide a public Provider profile projection (`public_provider_profiles`) by slug or ID for provider-specific customer Request pages.
 - Control whether the Provider is currently accepting customer Repair Requests.
 
 ## Non-goals
@@ -53,8 +54,7 @@ The MVP Providers feature does not include:
 
 ### `providers`
 
-Key information includes:
-
+Business profile information:
 - Provider type (`SHOP` | `INDEPENDENT`);
 - display name;
 - slug;
@@ -66,50 +66,54 @@ Key information includes:
 - `accepting_requests`;
 - timestamps.
 
+### `provider_user_profiles`
+
+Canonical person-level display profile for authenticated users:
+- `user_id` (PK, FK $\to$ `auth.users.id`);
+- `display_name`;
+- `contact_phone`;
+- `avatar_url`;
+- timestamps.
+
 ### `provider_memberships`
 
-Associates an authenticated user with a Provider as `OWNER` or `STAFF`.
+Associates an authenticated user with a Provider as `OWNER` or `STAFF` (authorization link only).
 
 ### `provider_invitations`
 
-Owner-authorized, expiring, single-use, token-hashed invitations for Shop Staff onboarding:
+Owner-authorized, expiring, single-use invitations for Shop Staff onboarding:
+- `id`
+- `provider_id`
+- `email`
+- `role` (`STAFF`)
+- `token_hash` (SHA-256 digest of raw token)
+- `invited_by_user_id`
+- `created_at`
+- `expires_at`
+- `accepted_at`
+- `accepted_by_user_id`
+- `revoked_at`
 
-```text
-id
-provider_id
-email
-role (STAFF)
-token_hash
-invited_by_user_id
-created_at
-expires_at
-accepted_at
-accepted_by_user_id
-revoked_at
-```
+### `public_provider_profiles` (View)
 
-### `provider_service_modes`
-
-Repeating relation of supported modes:
-
-```text
-DROP_OFF
-MEETUP
-HOME_SERVICE
-OTHER
-```
+Restricted public projection containing only public-safe fields.
 
 ## Public Interface (`src/features/providers/index.ts`)
 
 ```ts
-createProviderWithOwner(params: CreateProviderInput): Promise<{ providerId: string; membershipId: string; slug: string }>
-acceptStaffInvitation(tokenHash: string): Promise<{ providerId: string; membershipId: string; role: "STAFF" }>
-getProviderById(providerId: string): Promise<Provider | null>
-getPublicProviderBySlug(slug: string): Promise<PublicProviderProfile | null>
-updateProviderProfile(context: ProviderContext, input: UpdateProviderInput): Promise<Provider>
-createStaffInvitation(context: ProviderContext, email: string): Promise<ProviderInvitation>
-revokeStaffInvitation(context: ProviderContext, invitationId: string): Promise<void>
-setServiceModes(context: ProviderContext, modes: ProviderServiceMode[]): Promise<ProviderServiceMode[]>
+// Commands
+createProvider(input: CreateProviderInput): Promise<{ providerId: string; membershipId: string; slug: string }>
+createStaffInvitation(input: { email: string }): Promise<CreateStaffInvitationResult>
+acceptStaffInvitation(input: AcceptStaffInvitationInput): Promise<{ providerId: string; membershipId: string; role: "STAFF" }>
+revokeStaffInvitation(invitationId: string): Promise<void>
+
+// Queries
+getProvider(providerId: string): Promise<Provider | null>
+getPublicProvider(slugOrId: string): Promise<PublicProviderProfile | null>
+getInvitationForOnboarding(rawToken: string): Promise<InvitationShopDetails | null>
+listTeamMembers(providerId: string): Promise<TeamMember[]>
+listPendingStaffInvitations(providerId: string): Promise<ProviderInvitation[]>
+getProviderUserProfile(userId: string): Promise<ProviderUserProfile | null>
 ```
 
 ## Core workflows
@@ -118,24 +122,26 @@ setServiceModes(context: ProviderContext, modes: ProviderServiceMode[]): Promise
 ```text
 Authenticated User
        ↓
-createProviderWithOwner({ displayName, providerType })
+createProvider({ displayName, providerType, ownerDisplayName, ownerContactPhone, ... })
        ↓ (atomic database transaction)
-INSERT providers + INSERT provider_memberships (role: OWNER)
+INSERT providers + INSERT provider_user_profiles + INSERT provider_memberships (role: OWNER)
 ```
 
 ### 2. Shop Staff Onboarding (LD-01)
 ```text
-Shop Owner creates Staff invitation (persists token_hash)
+Shop Owner creates Staff invitation (generates raw token, persists SHA-256 digest in token_hash)
        ↓
-Staff clicks email invite link with token
+Staff receives raw token via invite link
        ↓
-Staff registers or signs in
+Staff creates Supabase identity / logs in
        ↓
-acceptStaffInvitation(tokenHash)
+getInvitationForOnboarding(rawToken) displays shop details
+       ↓
+acceptStaffInvitation({ token, displayName, contactPhone })
        ↓ (atomic database transaction)
-Validate token_hash, not expired, not revoked, not accepted
+Validate token_hash, not expired, not revoked, not accepted, verify SHOP provider, verify no active membership
        ↓
-INSERT provider_memberships (role: STAFF) + UPDATE accepted_at = now()
+INSERT provider_user_profiles + INSERT provider_memberships (role: STAFF) + UPDATE provider_invitations
 ```
 
 ## Important invariants
@@ -144,17 +150,21 @@ INSERT provider_memberships (role: STAFF) + UPDATE accepted_at = now()
 2. Provider type does not change the core Repair lifecycle.
 3. A Shop may have one owner-user only.
 4. Independent Repairers are not required to publish a residential address.
-5. Shop Staff cannot search for, discover, or self-join a Provider without an Owner invitation.
-6. Public Provider information must be intentionally selected, not a raw database row.
-7. Provider slugs are unique.
+5. Staff invitations are valid only for `SHOP` providers.
+6. A user cannot have multiple active provider memberships in MVP.
+7. Public Provider information is strictly projected via `public_provider_profiles`.
+8. Raw invitation tokens are never stored in the database; only SHA-256 digests are persisted.
+9. Provider slugs are unique.
 
 ## Testing expectations
 
 Test:
-- atomic Independent provider + owner creation;
-- atomic Shop provider + owner creation;
+- atomic Independent provider + owner creation with person profile;
+- atomic Shop provider + owner creation with person profile;
 - valid Staff invitation creates exactly one `STAFF` membership atomically;
 - expired, revoked, or consumed invitations are rejected;
 - Staff cannot join a Provider without a valid invitation;
+- Staff invitations cannot be created or accepted for `INDEPENDENT` providers;
 - public lookup by slug returns only public-safe fields;
-- cross-Provider update denial.
+- cross-Provider isolation and RLS enforcement.
+

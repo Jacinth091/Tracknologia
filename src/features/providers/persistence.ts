@@ -1,23 +1,23 @@
 import "server-only";
+import { createHash } from "crypto";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import type {
   CreateProviderInput,
+  InvitationShopDetails,
   Provider,
   ProviderInvitation,
   ProviderType,
+  ProviderUserProfile,
+  PublicProviderProfile,
   TeamMember,
 } from "./types";
 
-export interface InvitationShopDetails {
-  invitationId: string;
-  email: string;
-  role: "STAFF";
-  providerId: string;
-  shopName: string;
-  publicAddress?: string | null;
-  serviceArea?: string | null;
-  contactEmail?: string | null;
-  contactPhone?: string | null;
+/**
+ * Generates a SHA-256 cryptographic digest of a raw token.
+ * Only the digest is stored in the database; raw tokens are never persisted.
+ */
+export function hashInvitationToken(rawToken: string): string {
+  return createHash("sha256").update(rawToken.trim()).digest("hex");
 }
 
 export async function createProviderWithOwner(
@@ -27,6 +27,13 @@ export async function createProviderWithOwner(
   const { data, error } = await supabase.rpc("create_provider_with_owner", {
     p_display_name: params.displayName,
     p_provider_type: params.providerType,
+    p_owner_display_name: params.ownerDisplayName || null,
+    p_owner_contact_phone: params.ownerContactPhone || null,
+    p_contact_email: params.contactEmail || null,
+    p_contact_phone: params.contactPhone || null,
+    p_public_address: params.publicAddress || null,
+    p_service_area: params.serviceArea || null,
+    p_supported_devices: params.supportedDevices && params.supportedDevices.length > 0 ? params.supportedDevices : [],
   });
 
   if (error) {
@@ -36,23 +43,6 @@ export async function createProviderWithOwner(
   const result = Array.isArray(data) ? data[0] : data;
   if (!result || !result.provider_id) {
     throw new Error("Provider creation returned empty result");
-  }
-
-  // Update additional metadata columns if provided
-  const updatePayload: Record<string, unknown> = {};
-  if (params.contactEmail) updatePayload.contact_email = params.contactEmail;
-  if (params.contactPhone) updatePayload.contact_phone = params.contactPhone;
-  if (params.publicAddress) updatePayload.public_address = params.publicAddress;
-  if (params.serviceArea) updatePayload.service_area = params.serviceArea;
-  if (params.supportedDevices && params.supportedDevices.length > 0) {
-    updatePayload.supported_devices = params.supportedDevices;
-  }
-
-  if (Object.keys(updatePayload).length > 0) {
-    await supabase
-      .from("providers")
-      .update(updatePayload)
-      .eq("id", result.provider_id);
   }
 
   return {
@@ -65,12 +55,12 @@ export async function createProviderWithOwner(
 export async function acceptStaffInvitation(
   supabase: SupabaseClient,
   tokenHash: string,
-  displayName?: string,
+  displayName: string,
   contactPhone?: string,
 ): Promise<{ providerId: string; membershipId: string; role: "STAFF" }> {
   const { data, error } = await supabase.rpc("accept_staff_invitation", {
     p_token_hash: tokenHash,
-    p_display_name: displayName || null,
+    p_display_name: displayName,
     p_contact_phone: contactPhone || null,
   });
 
@@ -90,7 +80,7 @@ export async function acceptStaffInvitation(
   };
 }
 
-export async function getInvitationDetailsByToken(
+export async function getInvitationDetailsByTokenHash(
   supabase: SupabaseClient,
   tokenHash: string,
 ): Promise<InvitationShopDetails | null> {
@@ -120,26 +110,28 @@ export async function getInvitationDetailsByToken(
   };
 }
 
-export async function createStaffInvitation(
+export async function insertStaffInvitationRecord(
   supabase: SupabaseClient,
-  providerId: string,
-  invitedByUserId: string,
-  email: string,
-): Promise<{ invitation: ProviderInvitation; token: string }> {
-  const token = `inv_${crypto.randomUUID().replace(/-/g, "")}`;
+  params: {
+    providerId: string;
+    invitedByUserId: string;
+    email: string;
+    tokenHash: string;
+  },
+): Promise<ProviderInvitation> {
   const expiresAt = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString();
 
   const { data, error } = await supabase
     .from("provider_invitations")
     .insert({
-      provider_id: providerId,
-      invited_by_user_id: invitedByUserId,
-      email: email.toLowerCase().trim(),
-      token_hash: token,
+      provider_id: params.providerId,
+      invited_by_user_id: params.invitedByUserId,
+      email: params.email.toLowerCase().trim(),
+      token_hash: params.tokenHash,
       role: "STAFF",
       expires_at: expiresAt,
     })
-    .select("*")
+    .select("id, provider_id, email, role, invited_by_user_id, created_at, expires_at, accepted_at, accepted_by_user_id, revoked_at")
     .single();
 
   if (error) {
@@ -147,20 +139,16 @@ export async function createStaffInvitation(
   }
 
   return {
-    token,
-    invitation: {
-      id: data.id,
-      providerId: data.provider_id,
-      email: data.email,
-      role: data.role,
-      tokenHash: data.token_hash,
-      invitedByUserId: data.invited_by_user_id,
-      createdAt: data.created_at,
-      expiresAt: data.expires_at,
-      acceptedAt: data.accepted_at,
-      acceptedByUserId: data.accepted_by_user_id,
-      revokedAt: data.revoked_at,
-    },
+    id: data.id,
+    providerId: data.provider_id,
+    email: data.email,
+    role: data.role,
+    invitedByUserId: data.invited_by_user_id,
+    createdAt: data.created_at,
+    expiresAt: data.expires_at,
+    acceptedAt: data.accepted_at,
+    acceptedByUserId: data.accepted_by_user_id,
+    revokedAt: data.revoked_at,
   };
 }
 
@@ -170,7 +158,7 @@ export async function listStaffInvitations(
 ): Promise<ProviderInvitation[]> {
   const { data, error } = await supabase
     .from("provider_invitations")
-    .select("*")
+    .select("id, provider_id, email, role, invited_by_user_id, created_at, expires_at, accepted_at, accepted_by_user_id, revoked_at")
     .eq("provider_id", providerId)
     .is("revoked_at", null)
     .is("accepted_at", null)
@@ -186,7 +174,6 @@ export async function listStaffInvitations(
     providerId: row.provider_id,
     email: row.email,
     role: row.role,
-    tokenHash: row.token_hash,
     invitedByUserId: row.invited_by_user_id,
     createdAt: row.created_at,
     expiresAt: row.expires_at,
@@ -200,26 +187,44 @@ export async function listTeamMembers(
   supabase: SupabaseClient,
   providerId: string,
 ): Promise<TeamMember[]> {
-  const { data, error } = await supabase
+  const { data: memberships, error: memError } = await supabase
     .from("provider_memberships")
-    .select("id, provider_id, user_id, role, display_name, contact_email, contact_phone, created_at")
+    .select("id, provider_id, user_id, role, created_at")
     .eq("provider_id", providerId)
     .order("created_at", { ascending: true });
 
-  if (error) {
-    console.error("[listTeamMembers error]:", error);
-    throw new Error(`Failed to list team members: ${error.message}`);
+  if (memError) {
+    throw new Error(`Failed to list team memberships: ${memError.message}`);
   }
 
-  return (data || []).map((row) => ({
-    membershipId: row.id,
-    userId: row.user_id,
-    role: row.role,
-    displayName: row.display_name || row.contact_email || (row.role === "OWNER" ? "Shop Owner" : "Staff Technician"),
-    email: row.contact_email,
-    contactPhone: row.contact_phone,
-    createdAt: row.created_at,
-  }));
+  if (!memberships || memberships.length === 0) {
+    return [];
+  }
+
+  const userIds = memberships.map((m) => m.user_id);
+
+  // Query canonical person profiles from provider_user_profiles
+  const { data: profiles } = await supabase
+    .from("provider_user_profiles")
+    .select("user_id, display_name, contact_phone")
+    .in("user_id", userIds);
+
+  const profileMap = new Map(
+    (profiles || []).map((p) => [p.user_id, p]),
+  );
+
+  return memberships.map((row) => {
+    const profile = profileMap.get(row.user_id);
+    return {
+      membershipId: row.id,
+      userId: row.user_id,
+      role: row.role,
+      displayName: profile?.display_name || (row.role === "OWNER" ? "Shop Owner" : "Staff Member"),
+      email: null,
+      contactPhone: profile?.contact_phone || null,
+      createdAt: row.created_at,
+    };
+  });
 }
 
 export async function revokeStaffInvitation(
@@ -273,3 +278,70 @@ export async function getProviderById(
     updatedAt: data.updated_at,
   };
 }
+
+export async function getPublicProviderProfile(
+  supabase: SupabaseClient,
+  slugOrId: string,
+): Promise<PublicProviderProfile | null> {
+  const isUuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(slugOrId);
+
+  let query = supabase.from("public_provider_profiles").select("*");
+  if (isUuid) {
+    query = query.eq("id", slugOrId);
+  } else {
+    query = query.eq("slug", slugOrId);
+  }
+
+  const { data, error } = await query.maybeSingle();
+
+  if (error) {
+    throw new Error(`Failed to fetch public provider: ${error.message}`);
+  }
+
+  if (!data) {
+    return null;
+  }
+
+  return {
+    id: data.id,
+    providerType: data.provider_type as ProviderType,
+    displayName: data.display_name,
+    slug: data.slug,
+    description: data.description,
+    profileImageUrl: data.profile_image_url,
+    publicAddress: data.public_address,
+    serviceArea: data.service_area,
+    supportedDevices: data.supported_devices ?? [],
+    acceptingRequests: data.accepting_requests,
+    createdAt: data.created_at,
+  };
+}
+
+export async function getProviderUserProfile(
+  supabase: SupabaseClient,
+  userId: string,
+): Promise<ProviderUserProfile | null> {
+  const { data, error } = await supabase
+    .from("provider_user_profiles")
+    .select("user_id, display_name, contact_phone, avatar_url, created_at, updated_at")
+    .eq("user_id", userId)
+    .maybeSingle();
+
+  if (error) {
+    throw new Error(`Failed to fetch user profile: ${error.message}`);
+  }
+
+  if (!data) {
+    return null;
+  }
+
+  return {
+    userId: data.user_id,
+    displayName: data.display_name,
+    contactPhone: data.contact_phone,
+    avatarUrl: data.avatar_url,
+    createdAt: data.created_at,
+    updatedAt: data.updated_at,
+  };
+}
+
