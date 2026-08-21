@@ -17,10 +17,13 @@ The feature Module interface is the primary business test surface. Test domain b
 ### Providers
 
 - create/update `SHOP` and `INDEPENDENT` profiles;
+- separate person profiles from authorization memberships;
 - public address is optional where allowed;
 - supported Service Modes are persisted correctly;
 - `OTHER` mode details can be recorded;
-- accepting Requests can be enabled/disabled.
+- accepting Requests can be enabled/disabled;
+- staff invitation creation, one-way SHA-256 token hashing, single-use acceptance, and revocation;
+- public provider lookup by slug or ID queries `public_provider_profiles` projection only.
 
 ### Repair Requests
 
@@ -54,14 +57,20 @@ The feature Module interface is the primary business test surface. Test domain b
 Run against real PostgreSQL/Supabase-compatible behavior for:
 
 - membership uniqueness;
+- person profile (`provider_user_profiles`) separation;
 - Service Mode uniqueness;
 - Request Reference uniqueness;
 - Tracking Code uniqueness;
 - `repair_request_id` one-to-one constraint;
-- Request acceptance transaction;
-- status-change transaction;
-- Provider RLS isolation;
+- Staff invitation single-use, non-expired, and non-revoked constraints;
+- Staff invitation restricted strictly to `SHOP` providers in database transaction;
+- User cannot acquire a second active provider membership in MVP;
+- Atomic provider + initial owner + person profile creation;
+- Atomic staff invitation acceptance + person profile + membership creation;
+- Provider RLS isolation (hostile cross-tenant queries denied);
+- Public projection RLS (anonymous cannot query private columns of `providers`);
 - child Status Event/Update access isolation.
+
 
 ## End-to-end tests with Playwright
 

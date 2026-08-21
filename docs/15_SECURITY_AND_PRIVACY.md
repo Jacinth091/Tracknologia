@@ -51,13 +51,23 @@ Application authorization remains required even with RLS. RLS is defense in dept
 
 Every Staff invitation is:
 
-- created only by an authorized Provider `OWNER`;
+- created only by an authorized Provider `OWNER` of a `SHOP` provider;
 - bound to exactly one Provider;
 - single-use;
 - expiring (7-day default);
 - revocable by an OWNER;
-- stored by token hash, never raw token;
-- consumed atomically with `STAFF` membership creation via `accept_staff_invitation` RPC.
+- stored by one-way cryptographic digest (`token_hash = sha256(raw_token)`), never raw token;
+- never exposed as a reusable credential in pending invitation lists;
+- consumed atomically with `STAFF` membership and person profile creation via `accept_staff_invitation` RPC;
+- database-enforced against users who already have an active Provider membership while multi-membership is unsupported.
+
+## Public Provider Projections
+
+Anonymous and unauthenticated visitors cannot access raw `providers` table rows. Public access is strictly projected through `public_provider_profiles` which explicitly selects only safe public columns (`id`, `display_name`, `slug`, `description`, `profile_image_url`, `public_address`, `service_area`, `supported_devices`, `accepting_requests`, `created_at`). Internal contact numbers, billing emails, and private metadata are never exposed anonymously.
+
+## Redirect Path Hardening
+
+All auth and onboarding redirect target parameters (`redirectTo`, `next`) are validated using `getSafeInternalRedirectUrl()`. Protocol-relative URLs (`//evil.com`), external URLs (`https://...`), and non-HTTP schemes are strictly rejected in favor of safe internal relative paths (e.g. `/dashboard`).
 
 ## Server Actions and Route Handlers
 
@@ -84,8 +94,12 @@ Do not put the full Tracknologia authorization model in Proxy.
 Use `server-only` for sensitive persistence/auth implementation modules where useful to prevent accidental client imports:
 
 - `src/features/repairs/persistence.ts`
+- `src/features/providers/persistence.ts`
+- `src/features/providers/commands.ts`
+- `src/features/providers/queries.ts`
 - `src/features/auth/context.ts`
 - `src/features/auth/persistence.ts`
+- `src/features/auth/services.ts`
 - `src/lib/supabase/server.ts`
 
 ## Input validation
@@ -97,6 +111,7 @@ Use Zod on the server for:
 - Repair acceptance verification;
 - status transitions;
 - Provider profile changes;
+- Staff invitation creation and acceptance;
 - Tracking Code lookup shape/limits.
 
 Browser validation is UX only.
@@ -127,14 +142,19 @@ Browser-safe public/publishable configuration is distinct from privileged server
 
 ## Required security tests
 
-- Provider A cannot read Provider B Repair.
-- Provider A cannot mutate Provider B Repair.
+- Provider A cannot read Provider B Repair or Provider data.
+- Provider A cannot mutate Provider B Repair or Provider data.
 - Provider A cannot accept Provider B Request.
 - User B cannot self-assign membership to Provider A (tenant takeover prevention).
 - Expired, revoked, or consumed staff invitations cannot be accepted.
+- Staff invitations cannot be created or accepted for `INDEPENDENT` providers.
+- An existing provider member cannot accept an invitation to join a second provider.
+- Raw invitation tokens are never returned by pending listing APIs or stored in plain text.
 - unauthenticated user cannot access Provider-owned operations.
+- unauthenticated user can only query `public_provider_profiles` and not private provider columns.
 - valid Tracking Code returns only public projection.
 - invalid Tracking Code reveals minimal information.
 - Internal Notes never enter public output.
 - repeated Request acceptance cannot create duplicate Repairs.
 - status transitions cannot bypass allowed business rules.
+

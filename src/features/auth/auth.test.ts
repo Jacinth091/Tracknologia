@@ -11,16 +11,7 @@ import {
   requireProviderRole,
 } from "./context";
 import { loginSchema, registerSchema, forgotPasswordSchema } from "./schemas";
-import {
-  findMembershipByUserId,
-  registerProviderOwner,
-  consumeStaffInvitation,
-} from "./persistence";
-import {
-  createIndependentProviderSchema,
-  createShopProviderSchema,
-  staffInvitationSchema,
-} from "../providers/schemas";
+import { findMembershipByUserId } from "./persistence";
 import type { SupabaseClient } from "@supabase/supabase-js";
 
 function createMockSupabase(options: {
@@ -47,8 +38,6 @@ function createMockSupabase(options: {
       provider_type: "SHOP" | "INDEPENDENT";
     };
   } | null;
-  rpcData?: unknown;
-  rpcError?: Error | null;
 }) {
   const defaultProviders = {
     display_name: "Apex Electronics",
@@ -85,28 +74,6 @@ function createMockSupabase(options: {
           }),
         }),
       };
-    }),
-    rpc: vi.fn().mockImplementation((fn: string) => {
-      if (options.rpcError) {
-        return Promise.resolve({ data: null, error: options.rpcError });
-      }
-      if (fn === "create_provider_with_owner") {
-        return Promise.resolve({
-          data: options.rpcData ?? [
-            { provider_id: "prov-new-123", membership_id: "mem-new-123", slug: "apex-repairs" },
-          ],
-          error: null,
-        });
-      }
-      if (fn === "accept_staff_invitation") {
-        return Promise.resolve({
-          data: options.rpcData ?? [
-            { provider_id: "prov-existing-123", membership_id: "mem-staff-123", role: "STAFF" },
-          ],
-          error: null,
-        });
-      }
-      return Promise.resolve({ data: null, error: null });
     }),
   } as unknown as SupabaseClient;
 }
@@ -302,52 +269,15 @@ describe("Auth Module — Context & Authorization", () => {
   });
 });
 
-describe("Auth Module — Persistence & Atomic RPCs", () => {
+describe("Auth Module — Persistence Membership Queries", () => {
   it("findMembershipByUserId returns null when no rows exist", async () => {
     const mockClient = createMockSupabase({ membership: null });
     const result = await findMembershipByUserId(mockClient, "user-empty");
     expect(result).toBeNull();
   });
-
-  it("registerProviderOwner calls create_provider_with_owner RPC atomically", async () => {
-    const mockClient = createMockSupabase({
-      rpcData: [{ provider_id: "prov-123", membership_id: "mem-123", slug: "apex-repair" }],
-    });
-
-    const result = await registerProviderOwner(mockClient, {
-      displayName: "Apex Repair",
-      providerType: "SHOP",
-    });
-
-    expect(result).toEqual({
-      providerId: "prov-123",
-      membershipId: "mem-123",
-      slug: "apex-repair",
-    });
-    expect(mockClient.rpc).toHaveBeenCalledWith("create_provider_with_owner", {
-      p_display_name: "Apex Repair",
-      p_provider_type: "SHOP",
-    });
-  });
-
-  it("consumeStaffInvitation calls accept_staff_invitation RPC atomically", async () => {
-    const mockClient = createMockSupabase({
-      rpcData: [{ provider_id: "prov-abc", membership_id: "mem-xyz", role: "STAFF" }],
-    });
-
-    const result = await consumeStaffInvitation(mockClient, "valid-token-hash");
-    expect(result).toEqual({
-      providerId: "prov-abc",
-      membershipId: "mem-xyz",
-      role: "STAFF",
-    });
-    expect(mockClient.rpc).toHaveBeenCalledWith("accept_staff_invitation", {
-      p_token_hash: "valid-token-hash",
-    });
-  });
 });
 
-describe("Auth & Onboarding — Validation Schemas", () => {
+describe("Auth — Validation Schemas", () => {
   it("validates login inputs correctly", () => {
     const valid = loginSchema.safeParse({
       email: "test@example.com",
@@ -411,46 +341,9 @@ describe("Auth & Onboarding — Validation Schemas", () => {
     expect(mismatch.success).toBe(false);
   });
 
-  it("validates Independent onboarding inputs", () => {
-    expect(
-      createIndependentProviderSchema.safeParse({
-        displayName: "Alex Tech Services",
-        serviceArea: "Metro Cebu",
-        supportedDevices: ["Smartphones", "Tablets"],
-      }).success,
-    ).toBe(true);
-
-    expect(
-      createIndependentProviderSchema.safeParse({
-        displayName: "",
-      }).success,
-    ).toBe(false);
-  });
-
-  it("validates Shop onboarding inputs", () => {
-    expect(
-      createShopProviderSchema.safeParse({
-        displayName: "Apex Electronics",
-        publicAddress: "123 Tech Lane",
-        serviceArea: "Cebu City",
-        supportedDevices: ["Laptops & PCs"],
-      }).success,
-    ).toBe(true);
-
-    expect(
-      createShopProviderSchema.safeParse({
-        displayName: "",
-      }).success,
-    ).toBe(false);
-  });
-
-  it("validates Staff invitation inputs", () => {
-    expect(staffInvitationSchema.safeParse({ email: "tech@shop.com" }).success).toBe(true);
-    expect(staffInvitationSchema.safeParse({ email: "invalid-email" }).success).toBe(false);
-  });
-
   it("validates forgot password inputs", () => {
     expect(forgotPasswordSchema.safeParse({ email: "valid@email.com" }).success).toBe(true);
     expect(forgotPasswordSchema.safeParse({ email: "invalid-email" }).success).toBe(false);
   });
 });
+
