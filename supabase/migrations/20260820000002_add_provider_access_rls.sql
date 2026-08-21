@@ -200,7 +200,7 @@ BEGIN
     RAISE EXCEPTION 'Staff invitations are only valid for Repair Shops';
   END IF;
 
-  INSERT INTO public.provider_invitations (
+  INSERT INTO public.provider_invitations AS pi (
     provider_id,
     email,
     role,
@@ -216,9 +216,9 @@ BEGIN
     COALESCE(p_expires_at, now() + interval '7 days')
   )
   RETURNING
-    public.provider_invitations.id,
-    public.provider_invitations.created_at,
-    public.provider_invitations.expires_at
+    pi.id,
+    pi.created_at,
+    pi.expires_at
   INTO v_invitation_id, v_created_at, v_expires_at;
 
   RETURN QUERY SELECT v_invitation_id, v_provider_id, v_clean_email, 'STAFF'::public.membership_role, v_created_at, v_expires_at;
