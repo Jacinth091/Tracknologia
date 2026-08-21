@@ -30,15 +30,21 @@ Keep commits coherent. Avoid combining unrelated formatting, refactors and featu
 Before opening a PR:
 
 ```bash
-docker compose run --rm web npm run lint
-docker compose run --rm web npm test
-docker compose run --rm web npm run build
+pnpm format:check
+pnpm lint
+pnpm typecheck
+pnpm test:run
+pnpm build
+pnpm db:reset
+pnpm test:db
 ```
+
+`pnpm db:reset` and `pnpm test:db` require local Supabase to be running and configured. The database suite runs against real PostgreSQL/Supabase behavior; security-sensitive database changes, including schema, RLS, policies, constraints, triggers, or RPCs, require the real DB suite before completion. See [`docs/17_TESTING_STRATEGY.md`](docs/17_TESTING_STRATEGY.md) for the full testing strategy.
 
 Run Playwright for user-flow changes:
 
 ```bash
-docker compose run --rm web npx playwright test
+pnpm exec playwright test
 ```
 
 ## Pull request description
