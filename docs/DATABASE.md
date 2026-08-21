@@ -6,12 +6,14 @@ The MVP intentionally favors a small schema with sufficiently rich rows rather t
 
 ---
 
-## Core Application Tables
+## Core Application Tables & Projections
 
 ```text
 providers
+provider_user_profiles
 provider_memberships
 provider_invitations
+public_provider_profiles (view)
 provider_service_modes
 repair_requests
 repairs
@@ -29,6 +31,8 @@ A `tracking_events` table may be added for pilot analytics when required.
 
 ```text
 auth.users
+    │
+    ├──< provider_user_profiles (1:1 canonical person profile)
     │
     ├──< provider_memberships >── providers
     │                             │
@@ -50,7 +54,7 @@ auth.users
 ## Table Definitions
 
 ### 1. `providers`
-Represents both Repair Shops and Independent Repairers.
+Represents both Repair Shops and Independent Repairers. Direct table access is restricted to authenticated members; anonymous access uses `public_provider_profiles`.
 - `id` (uuid, PK)
 - `provider_type` (`SHOP` | `INDEPENDENT`)
 - `display_name` (text)
@@ -62,38 +66,50 @@ Represents both Repair Shops and Independent Repairers.
 - `accepting_requests` (boolean, default true)
 - `created_at`, `updated_at` (timestamptz)
 
-### 2. `provider_memberships`
-Connects `auth.users` to Providers.
+### 2. `provider_user_profiles`
+Canonical person profile for authenticated provider users (OWNER and STAFF).
+- `user_id` (uuid, PK, FK $\to$ `auth.users.id`)
+- `display_name` (text, required)
+- `contact_phone` (text, nullable)
+- `avatar_url` (text, nullable)
+- `created_at`, `updated_at` (timestamptz)
+
+### 3. `provider_memberships`
+Connects `auth.users` to Providers (pure authorization relationship link only).
 - `id` (uuid, PK)
 - `provider_id` (uuid, FK $\to$ `providers.id`)
 - `user_id` (uuid, FK $\to$ `auth.users.id`)
-- `role` (`OWNER` | `STAFF`)
+- `role` (`OWNER` | `STAFF`, explicit required)
 - `created_at` (timestamptz)
 - `CONSTRAINT unique_provider_user UNIQUE(provider_id, user_id)`
 
-### 3. `provider_invitations`
+### 4. `provider_invitations`
 Governs secure, Owner-authorized Staff onboarding (LD-01).
 - `id` (uuid, PK)
 - `provider_id` (uuid, FK $\to$ `providers.id`)
 - `email` (text)
 - `role` (`STAFF`)
-- `token_hash` (text, UNIQUE)
+- `token_hash` (text, UNIQUE) — stores one-way SHA-256 cryptographic digest of raw token.
 - `invited_by_user_id` (uuid, FK $\to$ `auth.users.id`)
 - `created_at`, `expires_at` (7 days default), `accepted_at`, `accepted_by_user_id`, `revoked_at`
 
-### 4. `provider_service_modes`
+### 5. `public_provider_profiles` (View)
+Public projection exposing only public-safe fields for active providers accepting requests.
+- `id`, `provider_type`, `display_name`, `slug`, `description`, `profile_image_url`, `public_address`, `service_area`, `supported_devices`, `accepting_requests`, `created_at`
+
+### 6. `provider_service_modes`
 Repeating relation of supported modes (`DROP_OFF`, `MEETUP`, `HOME_SERVICE`, `OTHER`).
 - `PRIMARY KEY(provider_id, mode)`
 
-### 5. `repair_requests`
+### 7. `repair_requests`
 Customer-submitted intake awaiting Provider decision (`SUBMITTED`, `ACCEPTED`, `DECLINED`). Not an authoritative Repair.
 
-### 6. `repairs`
+### 8. `repairs`
 The authoritative repair record containing customer and device snapshots.
 - `repair_request_id` is nullable and unique so one Repair Request can create at most one Repair.
 - Lifecycle: `IN_PROGRESS`, `WAITING_FOR_PARTS`, `AWAITING_APPROVAL`, `READY`, `COMPLETED`.
 
-### 7. `repair_status_events` & `repair_updates`
+### 9. `repair_status_events` & `repair_updates`
 - `repair_status_events`: Audit log of lifecycle transitions.
 - `repair_updates`: Customer-visible progress messages independent of status changes.
 
@@ -124,11 +140,11 @@ npx supabase db push
 ```
 
 ### 4. Row Level Security & Least Privilege
-- **Mandatory RLS**: Enabled on all provider-owned tables (`providers`, `provider_memberships`, `provider_invitations`, `repairs`, etc.).
+- **Mandatory RLS**: Enabled on all provider-owned tables (`providers`, `provider_user_profiles`, `provider_memberships`, `provider_invitations`, `repairs`, etc.).
 - **Prohibited Client Self-Assignment**: Direct client `INSERT` on `provider_memberships` is strictly forbidden.
 - **Atomic SECURITY DEFINER Procedures**:
-  - `create_provider_with_owner(display_name, provider_type)`: Transactionally provisions new Provider and links caller as `OWNER`.
-  - `accept_staff_invitation(token_hash)`: Transactionally validates invite, creates `STAFF` membership, and marks token accepted.
+  - `create_provider_with_owner(...)`: Transactionally provisions new Provider, initial business profile, person profile, and links caller as explicit `OWNER`.
+  - `accept_staff_invitation(token_hash, display_name, contact_phone)`: Transactionally locks invitation, verifies SHOP provider and single active membership invariant, creates person profile and `STAFF` membership, and marks token accepted.
 - All `SECURITY DEFINER` functions must explicitly set:
   ```sql
   SET search_path = public, pg_temp;
@@ -146,3 +162,4 @@ Do not add without a validated requirement:
 - `customers`, `devices`, `technicians`, `branches`, `inventory`, `parts`, `payments`, `invoices`, `appointments`, `ratings/reviews`.
 
 Customer and device details remain point-in-time snapshots attached to a Repair or Repair Request.
+

@@ -1,12 +1,12 @@
 -- Migration: 20260820000001_create_provider_identity.sql
--- Description: Core schema for Providers, Provider Memberships, and Staff Invitations
--- Reference: Tracknologia Lead Decisions LD-01, LD-03
+-- Description: Core schema for Providers, Provider User Profiles, Provider Memberships, and Staff Invitations
+-- Reference: Tracknologia Lead Decisions LD-01, LD-03; Auth Re-review AUTH-R19 through AUTH-R29
 
 -- 1. Enums
 CREATE TYPE public.provider_type AS ENUM ('SHOP', 'INDEPENDENT');
 CREATE TYPE public.membership_role AS ENUM ('OWNER', 'STAFF');
 
--- 2. Providers table
+-- 2. Providers table (Business entity & profile)
 CREATE TABLE public.providers (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   provider_type public.provider_type NOT NULL DEFAULT 'SHOP',
@@ -24,17 +24,27 @@ CREATE TABLE public.providers (
   updated_at TIMESTAMPTZ NOT NULL DEFAULT now()
 );
 
--- 3. Provider Memberships table
+-- 3. Provider User Profiles table (Canonical person profile for authenticated provider users)
+CREATE TABLE public.provider_user_profiles (
+  user_id UUID PRIMARY KEY REFERENCES auth.users(id) ON DELETE CASCADE,
+  display_name TEXT NOT NULL,
+  contact_phone TEXT,
+  avatar_url TEXT,
+  created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+  updated_at TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+
+-- 4. Provider Memberships table (Authorization relationship only)
 CREATE TABLE public.provider_memberships (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   provider_id UUID NOT NULL REFERENCES public.providers(id) ON DELETE CASCADE,
   user_id UUID NOT NULL REFERENCES auth.users(id) ON DELETE CASCADE,
-  role public.membership_role NOT NULL DEFAULT 'OWNER',
+  role public.membership_role NOT NULL,
   created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
   CONSTRAINT unique_provider_user UNIQUE (provider_id, user_id)
 );
 
--- 4. Provider Invitations table (Staff Onboarding)
+-- 5. Provider Invitations table (Secure Staff Onboarding)
 CREATE TABLE public.provider_invitations (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   provider_id UUID NOT NULL REFERENCES public.providers(id) ON DELETE CASCADE,
@@ -50,9 +60,9 @@ CREATE TABLE public.provider_invitations (
   CONSTRAINT check_invitation_role CHECK (role = 'STAFF')
 );
 
--- 5. Indexes
+-- 6. Indexes (Omitting redundant indexes on UNIQUE columns)
 CREATE INDEX idx_providers_slug ON public.providers(slug);
 CREATE INDEX idx_provider_memberships_user_id ON public.provider_memberships(user_id);
 CREATE INDEX idx_provider_memberships_provider_id ON public.provider_memberships(provider_id);
-CREATE INDEX idx_provider_invitations_token_hash ON public.provider_invitations(token_hash);
 CREATE INDEX idx_provider_invitations_email ON public.provider_invitations(email);
+CREATE INDEX idx_provider_invitations_provider_id ON public.provider_invitations(provider_id);
