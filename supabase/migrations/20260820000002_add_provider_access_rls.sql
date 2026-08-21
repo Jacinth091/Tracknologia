@@ -160,6 +160,7 @@ LANGUAGE plpgsql
 SECURITY DEFINER
 SET search_path = public, pg_temp
 AS $$
+#variable_conflict use_column
 DECLARE
   v_user_id UUID;
   v_provider_id UUID;
@@ -292,6 +293,7 @@ LANGUAGE plpgsql
 SECURITY DEFINER
 SET search_path = public, pg_temp
 AS $$
+#variable_conflict use_column
 DECLARE
   v_user_id UUID;
   v_provider_id UUID;
@@ -405,6 +407,7 @@ LANGUAGE plpgsql
 SECURITY DEFINER
 SET search_path = public, pg_temp
 AS $$
+#variable_conflict use_column
 DECLARE
   v_user_id UUID;
   v_invitation_id UUID;
@@ -518,6 +521,7 @@ LANGUAGE plpgsql
 SECURITY DEFINER
 SET search_path = public, pg_temp
 AS $$
+#variable_conflict use_column
 BEGIN
   RETURN QUERY
   SELECT 
