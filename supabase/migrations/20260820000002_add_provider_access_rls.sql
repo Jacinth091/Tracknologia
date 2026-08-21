@@ -209,12 +209,16 @@ BEGIN
     RAISE EXCEPTION 'Staff invitations are only valid for Repair Shops';
   END IF;
 
+  v_created_at := now();
+  v_expires_at := v_created_at + interval '7 days';
+
   INSERT INTO public.provider_invitations AS pi (
     provider_id,
     email,
     role,
     token_hash,
     invited_by_user_id,
+    created_at,
     expires_at
   ) VALUES (
     v_provider_id,
@@ -222,13 +226,12 @@ BEGIN
     'STAFF'::public.membership_role,
     p_token_hash,
     v_user_id,
-    now() + interval '7 days'
+    v_created_at,
+    v_expires_at
   )
   RETURNING
-    pi.id,
-    pi.created_at,
-    pi.expires_at
-  INTO v_invitation_id, v_created_at, v_expires_at;
+    pi.id
+  INTO v_invitation_id;
 
   RETURN QUERY SELECT v_invitation_id, v_provider_id, v_clean_email, 'STAFF'::public.membership_role, v_created_at, v_expires_at;
 END;
