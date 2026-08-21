@@ -1,6 +1,6 @@
 import type { Metadata } from "next";
 import { getUser, getProviderContext } from "@/features/auth";
-import { getInvitationDetailsByToken } from "@/features/providers";
+import { getInvitationForOnboarding } from "@/features/providers";
 import { createClient } from "@/lib/supabase/server";
 import { redirect } from "next/navigation";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -42,7 +42,7 @@ export default async function OnboardingPage({
   // If staff invitation token is present, resolve the Shop information
   let shopDetails = null;
   if (inviteToken) {
-    shopDetails = await getInvitationDetailsByToken(supabase, inviteToken);
+    shopDetails = await getInvitationForOnboarding(inviteToken, supabase);
   }
 
   return (
@@ -64,7 +64,7 @@ export default async function OnboardingPage({
               : providerType === "INDEPENDENT"
                 ? "Configure your repair brand and service area to get started"
                 : shopDetails
-                  ? `Join ${shopDetails.shopName} as a staff technician`
+                  ? `Join ${shopDetails.shopName} as shop staff`
                   : intent === "STAFF" || inviteToken
                     ? "Complete your staff profile to connect to your repair shop"
                     : "Choose your operating model to set up your profile or join as shop staff"}
@@ -83,3 +83,4 @@ export default async function OnboardingPage({
     </div>
   );
 }
+

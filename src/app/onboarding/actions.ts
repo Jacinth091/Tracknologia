@@ -4,7 +4,8 @@ import { createClient } from "@/lib/supabase/server";
 import {
   createIndependentProviderSchema,
   createShopProviderSchema,
-  createProviderWithOwner,
+  acceptStaffInvitationSchema,
+  createProvider,
   acceptStaffInvitation,
 } from "@/features/providers";
 import { redirect } from "next/navigation";
@@ -21,6 +22,7 @@ export async function onboardIndependentAction(
 ): Promise<OnboardingActionState> {
   const supabase = await createClient();
   const rawData = {
+    ownerName: formData.get("ownerName")?.toString() ?? "",
     displayName: formData.get("displayName")?.toString() ?? "",
     contactEmail: formData.get("contactEmail")?.toString() || undefined,
     contactPhone: formData.get("contactPhone")?.toString() || undefined,
@@ -43,10 +45,19 @@ export async function onboardIndependentAction(
   }
 
   try {
-    await createProviderWithOwner(supabase, {
-      ...parsed.data,
-      providerType: "INDEPENDENT",
-    });
+    await createProvider(
+      {
+        displayName: parsed.data.displayName,
+        providerType: "INDEPENDENT",
+        ownerDisplayName: parsed.data.ownerName,
+        ownerContactPhone: parsed.data.contactPhone,
+        contactEmail: parsed.data.contactEmail,
+        contactPhone: parsed.data.contactPhone,
+        serviceArea: parsed.data.serviceArea,
+        supportedDevices: parsed.data.supportedDevices,
+      },
+      supabase,
+    );
   } catch (err: unknown) {
     return {
       error: err instanceof Error ? err.message : "Failed to create independent provider",
@@ -62,6 +73,7 @@ export async function onboardShopAction(
 ): Promise<OnboardingActionState> {
   const supabase = await createClient();
   const rawData = {
+    ownerName: formData.get("ownerName")?.toString() ?? "",
     displayName: formData.get("displayName")?.toString() ?? "",
     contactEmail: formData.get("contactEmail")?.toString() || undefined,
     contactPhone: formData.get("contactPhone")?.toString() || undefined,
@@ -85,10 +97,20 @@ export async function onboardShopAction(
   }
 
   try {
-    await createProviderWithOwner(supabase, {
-      ...parsed.data,
-      providerType: "SHOP",
-    });
+    await createProvider(
+      {
+        displayName: parsed.data.displayName,
+        providerType: "SHOP",
+        ownerDisplayName: parsed.data.ownerName,
+        ownerContactPhone: parsed.data.contactPhone,
+        contactEmail: parsed.data.contactEmail,
+        contactPhone: parsed.data.contactPhone,
+        publicAddress: parsed.data.publicAddress,
+        serviceArea: parsed.data.serviceArea,
+        supportedDevices: parsed.data.supportedDevices,
+      },
+      supabase,
+    );
   } catch (err: unknown) {
     return {
       error: err instanceof Error ? err.message : "Failed to create repair shop",
@@ -103,35 +125,39 @@ export async function acceptStaffInviteAction(
   formData: FormData,
 ): Promise<OnboardingActionState> {
   const supabase = await createClient();
-  const token = formData.get("token")?.toString()?.trim();
-  const fullName = formData.get("fullName")?.toString()?.trim();
+  const token = formData.get("token")?.toString()?.trim() ?? "";
+  const fullName = formData.get("fullName")?.toString()?.trim() ?? "";
   const contactPhone = formData.get("contactPhone")?.toString()?.trim();
 
-  if (!token) {
-    return {
-      error: "Missing invitation code. Please provide a valid shop invite code.",
-    };
-  }
+  const parsed = acceptStaffInvitationSchema.safeParse({
+    token,
+    displayName: fullName,
+    contactPhone: contactPhone || undefined,
+  });
 
-  if (!fullName || fullName.length < 2) {
+  if (!parsed.success) {
+    const fieldErrors: Record<string, string> = {};
+    parsed.error.issues.forEach((issue) => {
+      const key = issue.path[0] === "displayName" ? "fullName" : issue.path[0]?.toString();
+      if (key) {
+        fieldErrors[key] = issue.message;
+      }
+    });
     return {
-      fieldErrors: {
-        fullName: "Please enter your full name (at least 2 characters)",
-      },
+      error: parsed.error.issues[0]?.message ?? "Invalid invitation details",
+      fieldErrors,
     };
   }
 
   try {
-    // 1. Atomically consume staff invitation and store staff profile on membership
-    await acceptStaffInvitation(supabase, token, fullName, contactPhone);
-
-    // 2. Update staff user auth metadata with their full name & phone
-    await supabase.auth.updateUser({
-      data: {
-        display_name: fullName,
-        contact_phone: contactPhone || undefined,
+    await acceptStaffInvitation(
+      {
+        token: parsed.data.token,
+        displayName: parsed.data.displayName,
+        contactPhone: parsed.data.contactPhone,
       },
-    });
+      supabase,
+    );
   } catch (err: unknown) {
     return {
       error: err instanceof Error ? err.message : "Invalid, expired, or already accepted invitation",
@@ -140,3 +166,4 @@ export async function acceptStaffInviteAction(
 
   redirect("/dashboard");
 }
+

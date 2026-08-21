@@ -5,8 +5,8 @@ import { buttonVariants } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 
 export const metadata: Metadata = {
-  title: "Account Confirmed — Tracknologia",
-  description: "Your Tracknologia provider account is confirmed and ready",
+  title: "Email Confirmed — Tracknologia",
+  description: "Your email has been verified on Tracknologia",
 };
 
 export default function ConfirmedPage() {
@@ -25,20 +25,20 @@ export default function ConfirmedPage() {
             <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
           </svg>
         </div>
-        <CardTitle className="text-2xl font-bold">Account Confirmed!</CardTitle>
+        <CardTitle className="text-2xl font-bold">Email Confirmed!</CardTitle>
         <CardDescription className="text-base text-muted-foreground mt-1">
-          Your email has been verified successfully. Your provider account is active and ready.
+          Your email has been verified successfully.
         </CardDescription>
       </CardHeader>
       <CardContent className="space-y-4">
         <p className="text-xs text-muted-foreground">
-          You can now start managing intake, generating tracking codes, and tracking repair workflows.
+          Continue to finish configuring your provider profile or join your repair shop team.
         </p>
         <Link
-          href="/dashboard"
+          href="/onboarding"
           className={cn(buttonVariants({ size: "lg" }), "w-full")}
         >
-          Open Provider Dashboard →
+          Continue to Onboarding & Dashboard →
         </Link>
       </CardContent>
       <CardFooter className="justify-center border-t border-border/50 pt-4 text-xs text-muted-foreground">
@@ -53,3 +53,4 @@ export default function ConfirmedPage() {
     </Card>
   );
 }
+

@@ -11,6 +11,7 @@ import {
   resetPassword,
   signOutUser,
 } from "@/features/auth";
+import { getSafeInternalRedirectUrl } from "@/lib/utils";
 import { redirect } from "next/navigation";
 import { headers } from "next/headers";
 
@@ -59,7 +60,7 @@ export async function loginAction(
   }
 
   const redirectTo = formData.get("redirectTo")?.toString();
-  const target = redirectTo && redirectTo.startsWith("/") ? redirectTo : "/dashboard";
+  const target = getSafeInternalRedirectUrl(redirectTo, "/dashboard");
   redirect(target);
 }
 

@@ -108,7 +108,7 @@ export function OnboardingClient({
               <h3 className="text-sm font-semibold text-foreground">Independent Repairer Profile</h3>
             </div>
             <p className="text-xs text-muted-foreground">
-              Confirm your brand name, contact info, and service coverage. No physical storefront address required.
+              Confirm your person identity, repair brand, contact info, and service coverage. No physical storefront address required.
             </p>
           </div>
 
@@ -119,7 +119,21 @@ export function OnboardingClient({
           )}
 
           <div className="space-y-2">
-            <Label htmlFor="ind-name">Your Name / Repair Brand *</Label>
+            <Label htmlFor="ind-ownerName">Your Full Name *</Label>
+            <Input
+              id="ind-ownerName"
+              name="ownerName"
+              placeholder="e.g. Alex Martinez"
+              disabled={isPending}
+              required
+            />
+            {indState?.fieldErrors?.ownerName && (
+              <p className="text-xs text-destructive">{indState.fieldErrors.ownerName}</p>
+            )}
+          </div>
+
+          <div className="space-y-2">
+            <Label htmlFor="ind-name">Repair Brand / Business Name *</Label>
             <Input
               id="ind-name"
               name="displayName"
@@ -210,7 +224,7 @@ export function OnboardingClient({
               <h3 className="text-sm font-semibold text-foreground">Repair Shop Profile</h3>
             </div>
             <p className="text-xs text-muted-foreground">
-              Configure your shop information and public storefront location to start managing repairs and staff.
+              Configure your owner identity, shop information, and public storefront location to start managing repairs and staff.
             </p>
           </div>
 
@@ -219,6 +233,20 @@ export function OnboardingClient({
               {shopState.error}
             </div>
           )}
+
+          <div className="space-y-2">
+            <Label htmlFor="shop-ownerName">Your Full Name (Owner) *</Label>
+            <Input
+              id="shop-ownerName"
+              name="ownerName"
+              placeholder="e.g. Maria Santos"
+              disabled={isPending}
+              required
+            />
+            {shopState?.fieldErrors?.ownerName && (
+              <p className="text-xs text-destructive">{shopState.fieldErrors.ownerName}</p>
+            )}
+          </div>
 
           <div className="space-y-2">
             <Label htmlFor="shop-name">Shop / Business Name *</Label>
@@ -327,7 +355,7 @@ export function OnboardingClient({
                   {shopDetails?.shopName || "Repair Shop Invitation"}
                 </h4>
                 <p className="text-xs text-muted-foreground">
-                  Role: <span className="font-semibold text-primary">Staff Technician</span>
+                  Role: <span className="font-semibold text-primary">Staff</span>
                 </p>
               </div>
             </div>
@@ -405,3 +433,4 @@ export function OnboardingClient({
     </div>
   );
 }
+

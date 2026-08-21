@@ -27,12 +27,12 @@ export function TeamClient({ isOwner, isShop, members, invitations }: TeamClient
         <CardHeader>
           <CardTitle>Independent Provider Team</CardTitle>
           <CardDescription>
-            Independent repairers operate as solo technicians and manage repairs directly.
+            Independent repairers operate independently and manage repairs directly.
           </CardDescription>
         </CardHeader>
         <CardContent className="space-y-2 text-sm text-muted-foreground">
           <p>
-            Staff invitations and multi-technician teams are designed for <strong>Repair Shops</strong>. If you decide to expand into a repair workshop with multiple technicians in the future, you can upgrade your provider profile.
+            Staff invitations and multi-member teams are designed for <strong>Repair Shops</strong>. If you decide to expand into a repair workshop with multiple staff members in the future, you can upgrade your provider profile.
           </p>
         </CardContent>
       </Card>
@@ -51,22 +51,22 @@ export function TeamClient({ isOwner, isShop, members, invitations }: TeamClient
       {isOwner && (
         <Card>
           <CardHeader>
-            <CardTitle className="text-lg font-semibold">Invite a Staff Technician</CardTitle>
+            <CardTitle className="text-lg font-semibold">Invite Staff</CardTitle>
             <CardDescription>
-              Generate an invitation link or email an invitation to technicians to join your repair shop
+              Generate an invitation link or email an invitation to staff to join your repair shop
             </CardDescription>
           </CardHeader>
           <CardContent className="space-y-4">
             <form action={formAction} className="flex flex-col sm:flex-row gap-3">
               <div className="flex-1 space-y-1">
                 <Label htmlFor="staff-email" className="sr-only">
-                  Technician Email
+                  Staff Email
                 </Label>
                 <Input
                   id="staff-email"
                   name="email"
                   type="email"
-                  placeholder="technician@example.com"
+                  placeholder="staff@example.com"
                   disabled={isPending}
                   required
                 />
@@ -92,13 +92,21 @@ export function TeamClient({ isOwner, isShop, members, invitations }: TeamClient
               </div>
             )}
 
-            {/* Generated Invite Box */}
+            {/* Generated Invite Box (Displayed strictly once at creation time) */}
             {state?.token && state.inviteUrl && (
               <div className="rounded-2xl border border-primary/30 bg-primary/5 p-4 space-y-3">
                 <div className="flex items-center justify-between">
-                  <span className="text-xs font-semibold text-primary">Invitation Link Generated!</span>
+                  <span className="text-xs font-semibold text-primary">
+                    {state.emailDeliveryFailed ? "Invitation Created (Email Failed)" : "Invitation Created & Sent!"}
+                  </span>
                   <span className="text-[11px] text-muted-foreground">Valid for 7 days</span>
                 </div>
+
+                {state.emailDeliveryFailed && (
+                  <p className="text-xs text-amber-600 dark:text-amber-400 font-medium">
+                    ⚠️ Email delivery could not be completed. You can copy the invitation link below and share it directly with your staff member.
+                  </p>
+                )}
 
                 <div className="flex items-center gap-2">
                   <Input
@@ -132,13 +140,13 @@ export function TeamClient({ isOwner, isShop, members, invitations }: TeamClient
         </Card>
       )}
 
-      {/* 2. Pending Invitations */}
+      {/* 2. Pending Invitations (No credentials / hashes displayed) */}
       {isOwner && invitations.length > 0 && (
         <Card>
           <CardHeader>
             <CardTitle className="text-lg font-semibold">Pending Staff Invitations</CardTitle>
             <CardDescription>
-              Unaccepted invitations sent to technicians
+              Unaccepted invitations sent to staff members
             </CardDescription>
           </CardHeader>
           <CardContent>
@@ -148,24 +156,11 @@ export function TeamClient({ isOwner, isShop, members, invitations }: TeamClient
                   <div className="space-y-0.5">
                     <p className="text-sm font-medium text-foreground">{inv.email}</p>
                     <p className="text-xs text-muted-foreground">
-                      Code: <code className="font-mono">{inv.tokenHash}</code> • Expires{" "}
+                      Sent {new Date(inv.createdAt).toLocaleDateString()} • Expires{" "}
                       {new Date(inv.expiresAt).toLocaleDateString()}
                     </p>
                   </div>
                   <div className="flex items-center gap-2">
-                    <Button
-                      type="button"
-                      variant="ghost"
-                      size="sm"
-                      onClick={() =>
-                        handleCopy(
-                          `${typeof window !== "undefined" ? window.location.origin : ""}/register?invite=${inv.tokenHash}`,
-                        )
-                      }
-                      className="text-xs"
-                    >
-                      Copy Link
-                    </Button>
                     <form action={revokeStaffAction}>
                       <input type="hidden" name="invitationId" value={inv.id} />
                       <Button variant="ghost" size="sm" type="submit" className="text-xs text-destructive hover:text-destructive">
@@ -184,12 +179,12 @@ export function TeamClient({ isOwner, isShop, members, invitations }: TeamClient
       <Card>
         <CardHeader>
           <CardTitle className="text-lg font-semibold">Team Members ({members.length})</CardTitle>
-          <CardDescription>Active staff and technicians belonging to this repair shop</CardDescription>
+          <CardDescription>Active staff belonging to this repair shop</CardDescription>
         </CardHeader>
         <CardContent>
           <div className="divide-y divide-border/60">
             {members.map((member) => {
-              const displayName = member.displayName || member.email || "Team Member";
+              const displayName = member.displayName || "Team Member";
               const initials = displayName.charAt(0).toUpperCase();
 
               return (
@@ -205,10 +200,8 @@ export function TeamClient({ isOwner, isShop, members, invitations }: TeamClient
                         </span>
                       </div>
                       <div className="text-xs text-muted-foreground flex items-center gap-2 flex-wrap">
-                        {member.email && <span>{member.email}</span>}
-                        {member.email && member.contactPhone && <span>•</span>}
                         {member.contactPhone && <span>{member.contactPhone}</span>}
-                        {(member.email || member.contactPhone) && <span>•</span>}
+                        {member.contactPhone && <span>•</span>}
                         <span>Joined {new Date(member.createdAt).toLocaleDateString()}</span>
                       </div>
                     </div>
@@ -222,7 +215,7 @@ export function TeamClient({ isOwner, isShop, members, invitations }: TeamClient
                         : "bg-muted text-muted-foreground font-medium",
                     )}
                   >
-                    {member.role === "OWNER" ? "Shop Owner" : "Staff Technician"}
+                    {member.role === "OWNER" ? "Shop Owner" : "Staff"}
                   </span>
                 </div>
               );
@@ -233,3 +226,4 @@ export function TeamClient({ isOwner, isShop, members, invitations }: TeamClient
     </div>
   );
 }
+
