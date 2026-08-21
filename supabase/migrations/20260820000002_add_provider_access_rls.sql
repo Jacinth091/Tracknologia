@@ -214,7 +214,11 @@ BEGIN
     v_user_id,
     COALESCE(p_expires_at, now() + interval '7 days')
   )
-  RETURNING id, created_at, expires_at INTO v_invitation_id, v_created_at, v_expires_at;
+  RETURNING
+    public.provider_invitations.id,
+    public.provider_invitations.created_at,
+    public.provider_invitations.expires_at
+  INTO v_invitation_id, v_created_at, v_expires_at;
 
   RETURN QUERY SELECT v_invitation_id, v_provider_id, v_clean_email, 'STAFF'::public.membership_role, v_created_at, v_expires_at;
 END;
@@ -351,7 +355,7 @@ BEGIN
     NULLIF(trim(p_public_address), ''),
     NULLIF(trim(p_service_area), ''),
     COALESCE(p_supported_devices, '{}')
-  ) RETURNING id INTO v_provider_id;
+  ) RETURNING public.providers.id INTO v_provider_id;
 
   -- 2. Atomically upsert person profile in provider_user_profiles
   INSERT INTO public.provider_user_profiles (
@@ -377,7 +381,7 @@ BEGIN
     v_provider_id,
     v_user_id,
     'OWNER'::public.membership_role
-  ) RETURNING id INTO v_membership_id;
+  ) RETURNING public.provider_memberships.id INTO v_membership_id;
 
   RETURN QUERY SELECT v_provider_id, v_membership_id, v_slug;
 END;
@@ -482,7 +486,7 @@ BEGIN
     v_provider_id,
     v_user_id,
     v_invite_role
-  ) RETURNING id INTO v_membership_id;
+  ) RETURNING public.provider_memberships.id INTO v_membership_id;
 
   -- 3. Mark invitation as accepted atomically
   UPDATE public.provider_invitations
