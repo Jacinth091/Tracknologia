@@ -76,9 +76,16 @@ Avoid repository-wide barrels that re-export unrelated features/components.
 
 Keep Server Actions and Route Handlers thin. They should not own repair lifecycle logic, Provider authorization rules, tracking-code generation, or database transactions.
 
-## Database access
+## Database access & Migrations
 
-Keep Supabase/database calls behind feature implementation/persistence code. Do not scatter direct `.from("repairs")` queries through pages and UI components.
+- Keep Supabase/database calls behind feature implementation/persistence code. Do not scatter direct `.from("repairs")` queries through pages and UI components.
+- All database changes must follow `docs/DATABASE.md` and `docs/Tracknologia_Supabase_Migration_Rules.md`.
+- Migrations live in `supabase/migrations/YYYYMMDDHHMMSS_description.sql`.
+- Push migrations to the linked Supabase environment:
+  ```bash
+  npx supabase db push
+  ```
+- Never commit `supabase/.temp/` CLI state.
 
 ## New dependencies
 
