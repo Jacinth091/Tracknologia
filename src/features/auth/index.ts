@@ -10,8 +10,6 @@ export {
 export {
   loginWithPassword,
   registerProviderAccount,
-  onboardProviderOwner,
-  acceptStaffInvite,
   requestPasswordReset,
   resetPassword,
   signOutUser,
@@ -36,3 +34,4 @@ export {
   type ProviderRole,
   type ProviderType,
 } from "./types";
+

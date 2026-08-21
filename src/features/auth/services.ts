@@ -1,8 +1,6 @@
 import "server-only";
 import { createClient } from "@/lib/supabase/server";
-import { registerProviderOwner, consumeStaffInvitation } from "./persistence";
 import type { LoginInput, RegisterInput } from "./schemas";
-import type { ProviderType } from "./types";
 
 export async function loginWithPassword(credentials: LoginInput) {
   const supabase = await createClient();
@@ -50,13 +48,6 @@ export async function registerProviderAccount(params: RegisterInput & { emailRed
         });
 
         if (signInResult.data?.session && signInResult.data?.user) {
-          if (params.intent === "STAFF" && params.inviteToken) {
-            try {
-              await consumeStaffInvitation(supabase, params.inviteToken);
-            } catch {
-              // continue
-            }
-          }
           return signInResult.data;
         }
       } catch {
@@ -71,29 +62,7 @@ export async function registerProviderAccount(params: RegisterInput & { emailRed
     throw new Error(error.message);
   }
 
-  // If session is active immediately and user is staff with invite token, try accepting invite
-  if (data.session && data.user && params.intent === "STAFF" && params.inviteToken) {
-    try {
-      await consumeStaffInvitation(supabase, params.inviteToken);
-    } catch {
-      // If error occurs, can be re-attempted on onboarding
-    }
-  }
-
   return data;
-}
-
-export async function onboardProviderOwner(params: {
-  displayName: string;
-  providerType: ProviderType;
-}) {
-  const supabase = await createClient();
-  return registerProviderOwner(supabase, params);
-}
-
-export async function acceptStaffInvite(params: { tokenHash: string }) {
-  const supabase = await createClient();
-  return consumeStaffInvitation(supabase, params.tokenHash);
 }
 
 export async function requestPasswordReset(params: { email: string; redirectTo?: string }) {
@@ -129,3 +98,4 @@ export async function signOutUser() {
     throw new Error(error.message);
   }
 }
+

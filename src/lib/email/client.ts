@@ -51,29 +51,39 @@ export async function sendEmail(params: SendEmailParams): Promise<{ success: boo
   }
 }
 
+function escapeHtml(unsafe: string): string {
+  return unsafe
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;")
+    .replace(/'/g, "&#039;");
+}
+
 export async function sendStaffInviteEmail(params: {
   to: string;
   shopName: string;
   inviteCode: string;
   inviteUrl: string;
 }) {
+  const safeShopName = escapeHtml(params.shopName);
   const subject = `You're invited to join ${params.shopName} on Tracknologia`;
   const html = `
     <div style="font-family: sans-serif; max-width: 580px; margin: 0 auto; padding: 24px; color: #1a1a1a;">
       <h2 style="color: #111; margin-bottom: 12px;">Team Invitation</h2>
       <p style="font-size: 15px; line-height: 1.6; color: #444;">
-        You have been invited to join <strong>${params.shopName}</strong> as a staff technician on Tracknologia.
+        You have been invited to join <strong>${safeShopName}</strong> as staff on Tracknologia.
       </p>
       
       <div style="background-color: #f4f4f5; border-radius: 12px; padding: 16px; margin: 24px 0; border: 1px solid #e4e4e7;">
         <p style="margin: 0 0 8px 0; font-size: 13px; color: #71717a;">Your Invitation Code:</p>
         <code style="font-family: monospace; font-size: 18px; font-weight: bold; color: #18181b; letter-spacing: 1px;">
-          ${params.inviteCode}
+          ${escapeHtml(params.inviteCode)}
         </code>
       </div>
 
       <div style="margin: 28px 0;">
-        <a href="${params.inviteUrl}" style="background-color: #18181b; color: #ffffff; padding: 12px 24px; border-radius: 8px; text-decoration: none; font-size: 14px; font-weight: 600; display: inline-block;">
+        <a href="${escapeHtml(params.inviteUrl)}" style="background-color: #18181b; color: #ffffff; padding: 12px 24px; border-radius: 8px; text-decoration: none; font-size: 14px; font-weight: 600; display: inline-block;">
           Accept Invitation & Join Shop
         </a>
       </div>
@@ -100,3 +110,4 @@ This link is valid for 7 days.
     text,
   });
 }
+
