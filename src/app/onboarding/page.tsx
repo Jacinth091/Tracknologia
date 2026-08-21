@@ -4,12 +4,19 @@ import { getInvitationForOnboarding } from "@/features/providers";
 import { createClient } from "@/lib/supabase/server";
 import { redirect } from "next/navigation";
 import { cookies } from "next/headers";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import {
+  Card,
+  CardContent,
+  CardDescription,
+  CardHeader,
+  CardTitle,
+} from "@/components/ui/card";
 import { OnboardingClient } from "./_components/onboarding-client";
 
 export const metadata: Metadata = {
   title: "Provider Setup & Onboarding — Tracknologia",
-  description: "Set up your Tracknologia Provider profile or join a shop as staff",
+  description:
+    "Set up your Tracknologia Provider profile or join a shop as staff",
 };
 
 export default async function OnboardingPage({
@@ -34,12 +41,18 @@ export default async function OnboardingPage({
   const cookieInviteToken = cookieStore.get("tracknologia_staff_invite")?.value;
 
   const userMetadata = user.userMetadata ?? {};
-  const intent = userMetadata.intent as "INDEPENDENT" | "SHOP" | "STAFF" | undefined;
+  const intent = userMetadata.intent as
+    "INDEPENDENT" | "SHOP" | "STAFF" | undefined;
   const providerType =
     (userMetadata.provider_type as "INDEPENDENT" | "SHOP" | undefined) ??
-    (intent === "SHOP" ? "SHOP" : intent === "INDEPENDENT" ? "INDEPENDENT" : undefined);
+    (intent === "SHOP"
+      ? "SHOP"
+      : intent === "INDEPENDENT"
+        ? "INDEPENDENT"
+        : undefined);
   const inviteToken = invite || cookieInviteToken;
-  const initialDisplayName = (userMetadata.display_name as string | undefined) ?? undefined;
+  const initialDisplayName =
+    (userMetadata.display_name as string | undefined) ?? undefined;
   const initialEmail = user.email || undefined;
 
   // If staff invitation token is present, resolve the Shop information
@@ -86,4 +99,3 @@ export default async function OnboardingPage({
     </div>
   );
 }
-

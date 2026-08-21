@@ -36,7 +36,11 @@ function createMockSupabase(options: {
       if (fn === "create_provider_with_owner") {
         return Promise.resolve({
           data: options.rpcData ?? [
-            { provider_id: "prov-123", membership_id: "mem-123", slug: "apex-repairs" },
+            {
+              provider_id: "prov-123",
+              membership_id: "mem-123",
+              slug: "apex-repairs",
+            },
           ],
           error: null,
         });
@@ -44,7 +48,11 @@ function createMockSupabase(options: {
       if (fn === "accept_staff_invitation") {
         return Promise.resolve({
           data: options.rpcData ?? [
-            { provider_id: "prov-shop-123", membership_id: "mem-staff-123", role: "STAFF" },
+            {
+              provider_id: "prov-shop-123",
+              membership_id: "mem-staff-123",
+              role: "STAFF",
+            },
           ],
           error: null,
         });
@@ -215,8 +223,12 @@ describe("Providers Module — Schemas Validation", () => {
   });
 
   it("validates Staff invitation inputs", () => {
-    expect(staffInvitationSchema.safeParse({ email: "tech@shop.com" }).success).toBe(true);
-    expect(staffInvitationSchema.safeParse({ email: "invalid-email" }).success).toBe(false);
+    expect(
+      staffInvitationSchema.safeParse({ email: "tech@shop.com" }).success,
+    ).toBe(true);
+    expect(
+      staffInvitationSchema.safeParse({ email: "invalid-email" }).success,
+    ).toBe(false);
   });
 
   it("validates Accept staff invitation inputs", () => {
@@ -257,7 +269,13 @@ describe("Providers Module — Persistence & Token Hashing", () => {
 
   it("createProviderWithOwner calls create_provider_with_owner RPC atomically with all initial fields", async () => {
     const mockClient = createMockSupabase({
-      rpcData: [{ provider_id: "prov-123", membership_id: "mem-123", slug: "apex-repairs" }],
+      rpcData: [
+        {
+          provider_id: "prov-123",
+          membership_id: "mem-123",
+          slug: "apex-repairs",
+        },
+      ],
     });
 
     const result = await createProviderWithOwner(mockClient, {
@@ -290,7 +308,13 @@ describe("Providers Module — Persistence & Token Hashing", () => {
 
   it("acceptStaffInvitation calls accept_staff_invitation RPC with token digest", async () => {
     const mockClient = createMockSupabase({
-      rpcData: [{ provider_id: "prov-shop-123", membership_id: "mem-staff-123", role: "STAFF" }],
+      rpcData: [
+        {
+          provider_id: "prov-shop-123",
+          membership_id: "mem-staff-123",
+          role: "STAFF",
+        },
+      ],
     });
 
     const result = await acceptStaffInvitationPersistence(
@@ -318,13 +342,15 @@ describe("Providers Module — Persistence & Token Hashing", () => {
       providerId: "prov-123",
       invitedByUserId: "user-owner",
       email: "tech@shop.com",
-      tokenHash: "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef",
+      tokenHash:
+        "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef",
     });
 
     expect(invitation.email).toBe("tech@shop.com");
     expect(mockClient.rpc).toHaveBeenCalledWith("create_staff_invitation", {
       p_email: "tech@shop.com",
-      p_token_hash: "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef",
+      p_token_hash:
+        "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef",
     });
   });
 
@@ -340,7 +366,10 @@ describe("Providers Module — Persistence & Token Hashing", () => {
 
   it("getPublicProviderProfile selects from public_provider_profiles view", async () => {
     const mockClient = createMockSupabase({});
-    const profile = await getPublicProviderProfile(mockClient, "apex-electronics");
+    const profile = await getPublicProviderProfile(
+      mockClient,
+      "apex-electronics",
+    );
 
     expect(profile).not.toBeNull();
     expect(profile?.displayName).toBe("Apex Electronics");

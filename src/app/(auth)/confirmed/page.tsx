@@ -1,6 +1,13 @@
 import type { Metadata } from "next";
 import Link from "next/link";
-import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
+import {
+  Card,
+  CardContent,
+  CardDescription,
+  CardFooter,
+  CardHeader,
+  CardTitle,
+} from "@/components/ui/card";
 import { buttonVariants } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 
@@ -22,7 +29,11 @@ export default function ConfirmedPage() {
             stroke="currentColor"
             strokeWidth="2.5"
           >
-            <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
+            <path
+              strokeLinecap="round"
+              strokeLinejoin="round"
+              d="M5 13l4 4L19 7"
+            />
           </svg>
         </div>
         <CardTitle className="text-2xl font-bold">Email Confirmed!</CardTitle>
@@ -32,7 +43,8 @@ export default function ConfirmedPage() {
       </CardHeader>
       <CardContent className="space-y-4">
         <p className="text-xs text-muted-foreground">
-          Continue to finish configuring your provider profile or join your repair shop team.
+          Continue to finish configuring your provider profile or join your
+          repair shop team.
         </p>
         <Link
           href="/onboarding"
@@ -53,4 +65,3 @@ export default function ConfirmedPage() {
     </Card>
   );
 }
-

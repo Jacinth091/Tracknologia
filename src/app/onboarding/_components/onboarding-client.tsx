@@ -38,14 +38,24 @@ export function OnboardingClient({
   shopDetails,
 }: OnboardingClientProps) {
   // If the user registered as a specific provider type or has an invite token/shopDetails, lock to that sole flow
-  const lockedType = defaultInviteToken || shopDetails ? "STAFF" : initialProviderType;
-  const [selectedType, setSelectedType] = useState<"INDEPENDENT" | "SHOP" | "STAFF">(
-    lockedType ?? "INDEPENDENT",
-  );
+  const lockedType =
+    defaultInviteToken || shopDetails ? "STAFF" : initialProviderType;
+  const [selectedType, setSelectedType] = useState<
+    "INDEPENDENT" | "SHOP" | "STAFF"
+  >(lockedType ?? "INDEPENDENT");
 
-  const [indState, indAction, indPending] = useActionState(onboardIndependentAction, null);
-  const [shopState, shopAction, shopPending] = useActionState(onboardShopAction, null);
-  const [staffState, staffAction, staffPending] = useActionState(acceptStaffInviteAction, null);
+  const [indState, indAction, indPending] = useActionState(
+    onboardIndependentAction,
+    null,
+  );
+  const [shopState, shopAction, shopPending] = useActionState(
+    onboardShopAction,
+    null,
+  );
+  const [staffState, staffAction, staffPending] = useActionState(
+    acceptStaffInviteAction,
+    null,
+  );
 
   const isPending = indPending || shopPending || staffPending;
   const currentFlow = lockedType ?? selectedType;
@@ -105,10 +115,13 @@ export function OnboardingClient({
           <div className="rounded-2xl border border-border/80 bg-muted/30 p-4 space-y-1">
             <div className="flex items-center gap-2">
               <span className="text-base">🛠️</span>
-              <h3 className="text-sm font-semibold text-foreground">Independent Repairer Profile</h3>
+              <h3 className="text-sm font-semibold text-foreground">
+                Independent Repairer Profile
+              </h3>
             </div>
             <p className="text-xs text-muted-foreground">
-              Confirm your person identity, repair brand, contact info, and service coverage. No physical storefront address required.
+              Confirm your person identity, repair brand, contact info, and
+              service coverage. No physical storefront address required.
             </p>
           </div>
 
@@ -128,7 +141,9 @@ export function OnboardingClient({
               required
             />
             {indState?.fieldErrors?.ownerName && (
-              <p className="text-xs text-destructive">{indState.fieldErrors.ownerName}</p>
+              <p className="text-xs text-destructive">
+                {indState.fieldErrors.ownerName}
+              </p>
             )}
           </div>
 
@@ -143,7 +158,9 @@ export function OnboardingClient({
               required
             />
             {indState?.fieldErrors?.displayName && (
-              <p className="text-xs text-destructive">{indState.fieldErrors.displayName}</p>
+              <p className="text-xs text-destructive">
+                {indState.fieldErrors.displayName}
+              </p>
             )}
           </div>
 
@@ -182,7 +199,9 @@ export function OnboardingClient({
           </div>
 
           <div className="space-y-2">
-            <Label className="text-xs text-muted-foreground">Supported Device Categories (Optional)</Label>
+            <Label className="text-xs text-muted-foreground">
+              Supported Device Categories (Optional)
+            </Label>
             <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
               {DEVICE_OPTIONS.map((device) => (
                 <label
@@ -221,10 +240,13 @@ export function OnboardingClient({
           <div className="rounded-2xl border border-border/80 bg-muted/30 p-4 space-y-1">
             <div className="flex items-center gap-2">
               <span className="text-base">🏬</span>
-              <h3 className="text-sm font-semibold text-foreground">Repair Shop Profile</h3>
+              <h3 className="text-sm font-semibold text-foreground">
+                Repair Shop Profile
+              </h3>
             </div>
             <p className="text-xs text-muted-foreground">
-              Configure your owner identity, shop information, and public storefront location to start managing repairs and staff.
+              Configure your owner identity, shop information, and public
+              storefront location to start managing repairs and staff.
             </p>
           </div>
 
@@ -244,7 +266,9 @@ export function OnboardingClient({
               required
             />
             {shopState?.fieldErrors?.ownerName && (
-              <p className="text-xs text-destructive">{shopState.fieldErrors.ownerName}</p>
+              <p className="text-xs text-destructive">
+                {shopState.fieldErrors.ownerName}
+              </p>
             )}
           </div>
 
@@ -259,12 +283,16 @@ export function OnboardingClient({
               required
             />
             {shopState?.fieldErrors?.displayName && (
-              <p className="text-xs text-destructive">{shopState.fieldErrors.displayName}</p>
+              <p className="text-xs text-destructive">
+                {shopState.fieldErrors.displayName}
+              </p>
             )}
           </div>
 
           <div className="space-y-2">
-            <Label htmlFor="shop-address">Public Storefront Address (Optional)</Label>
+            <Label htmlFor="shop-address">
+              Public Storefront Address (Optional)
+            </Label>
             <Input
               id="shop-address"
               name="publicAddress"
@@ -308,7 +336,9 @@ export function OnboardingClient({
           </div>
 
           <div className="space-y-2">
-            <Label className="text-xs text-muted-foreground">Supported Device Categories (Optional)</Label>
+            <Label className="text-xs text-muted-foreground">
+              Supported Device Categories (Optional)
+            </Label>
             <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
               {DEVICE_OPTIONS.map((device) => (
                 <label
@@ -355,13 +385,17 @@ export function OnboardingClient({
                   {shopDetails?.shopName || "Repair Shop Invitation"}
                 </h4>
                 <p className="text-xs text-muted-foreground">
-                  Role: <span className="font-semibold text-primary">Staff</span>
+                  Role:{" "}
+                  <span className="font-semibold text-primary">Staff</span>
                 </p>
               </div>
             </div>
             {(shopDetails?.publicAddress || shopDetails?.serviceArea) && (
               <p className="text-xs text-muted-foreground pt-1">
-                📍 {[shopDetails.publicAddress, shopDetails.serviceArea].filter(Boolean).join(" • ")}
+                📍{" "}
+                {[shopDetails.publicAddress, shopDetails.serviceArea]
+                  .filter(Boolean)
+                  .join(" • ")}
               </p>
             )}
             {shopDetails?.contactEmail && (
@@ -403,7 +437,9 @@ export function OnboardingClient({
               required
             />
             {staffState?.fieldErrors?.fullName && (
-              <p className="text-xs text-destructive">{staffState.fieldErrors.fullName}</p>
+              <p className="text-xs text-destructive">
+                {staffState.fieldErrors.fullName}
+              </p>
             )}
           </div>
 
@@ -433,4 +469,3 @@ export function OnboardingClient({
     </div>
   );
 }
-

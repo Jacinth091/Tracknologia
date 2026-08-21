@@ -57,7 +57,8 @@ export async function proxy(request: NextRequest) {
   if (user && isAuthRoute) {
     const redirectTo = request.nextUrl.searchParams.get("redirectTo");
     const redirectUrl = request.nextUrl.clone();
-    redirectUrl.pathname = redirectTo && redirectTo.startsWith("/") ? redirectTo : "/dashboard";
+    redirectUrl.pathname =
+      redirectTo && redirectTo.startsWith("/") ? redirectTo : "/dashboard";
     redirectUrl.searchParams.delete("redirectTo");
     return NextResponse.redirect(redirectUrl);
   }

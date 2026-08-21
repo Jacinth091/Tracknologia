@@ -408,7 +408,6 @@ Do not modify a shared or remote database manually and leave the repository unaw
    - Always grant table and schema permissions to `authenticated`, `service_role`, and `anon` where appropriate.
    - Avoid self-referencing subqueries inside RLS policies on the same relation to prevent `infinite recursion detected` errors.
 
-
 ---
 
 ## 13. Authentication and Authorization Are Different

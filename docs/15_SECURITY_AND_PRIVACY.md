@@ -157,4 +157,3 @@ Browser-safe public/publishable configuration is distinct from privileged server
 - Internal Notes never enter public output.
 - repeated Request acceptance cannot create duplicate Repairs.
 - status transitions cannot bypass allowed business rules.
-

@@ -18,7 +18,10 @@ export function LoginForm() {
       {isPending && (
         <div className="absolute inset-0 z-20 flex flex-col items-center justify-center rounded-2xl bg-background/60 backdrop-blur-[1px] transition-all">
           <div className="flex items-center gap-2 rounded-xl bg-card border border-border/80 px-4 py-2 shadow-md">
-            <LoadingSpinner size="sm" className="text-primary border-primary border-t-transparent" />
+            <LoadingSpinner
+              size="sm"
+              className="text-primary border-primary border-t-transparent"
+            />
             <span className="text-xs font-medium text-foreground">
               Authenticating credentials...
             </span>
@@ -45,7 +48,9 @@ export function LoginForm() {
             required
           />
           {state?.fieldErrors?.email && (
-            <p className="text-xs text-destructive">{state.fieldErrors.email}</p>
+            <p className="text-xs text-destructive">
+              {state.fieldErrors.email}
+            </p>
           )}
         </div>
 
@@ -68,7 +73,9 @@ export function LoginForm() {
             required
           />
           {state?.fieldErrors?.password && (
-            <p className="text-xs text-destructive">{state.fieldErrors.password}</p>
+            <p className="text-xs text-destructive">
+              {state.fieldErrors.password}
+            </p>
           )}
         </div>
 

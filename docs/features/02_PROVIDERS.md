@@ -55,6 +55,7 @@ The MVP Providers feature does not include:
 ### `providers`
 
 Business profile information:
+
 - Provider type (`SHOP` | `INDEPENDENT`);
 - display name;
 - slug;
@@ -69,6 +70,7 @@ Business profile information:
 ### `provider_user_profiles`
 
 Canonical person-level display profile for authenticated users:
+
 - `user_id` (PK, FK $\to$ `auth.users.id`);
 - `display_name`;
 - `contact_phone`;
@@ -82,6 +84,7 @@ Associates an authenticated user with a Provider as `OWNER` or `STAFF` (authoriz
 ### `provider_invitations`
 
 Owner-authorized, expiring, single-use invitations for Shop Staff onboarding:
+
 - `id`
 - `provider_id`
 - `email`
@@ -119,6 +122,7 @@ getProviderUserProfile(userId: string): Promise<ProviderUserProfile | null>
 ## Core workflows
 
 ### 1. Independent Repairer / Shop Owner Onboarding (LD-01)
+
 ```text
 Authenticated User
        ↓
@@ -128,6 +132,7 @@ INSERT providers + INSERT provider_user_profiles + INSERT provider_memberships (
 ```
 
 ### 2. Shop Staff Onboarding (LD-01)
+
 ```text
 Shop Owner creates Staff invitation (generates raw token, persists SHA-256 digest in token_hash)
        ↓
@@ -159,6 +164,7 @@ INSERT provider_user_profiles + INSERT provider_memberships (role: STAFF) + UPDA
 ## Testing expectations
 
 Test:
+
 - atomic Independent provider + owner creation with person profile;
 - atomic Shop provider + owner creation with person profile;
 - valid Staff invitation creates exactly one `STAFF` membership atomically;
@@ -167,4 +173,3 @@ Test:
 - Staff invitations cannot be created or accepted for `INDEPENDENT` providers;
 - public lookup by slug returns only public-safe fields;
 - cross-Provider isolation and RLS enforcement.
-

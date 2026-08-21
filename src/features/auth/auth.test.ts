@@ -263,7 +263,9 @@ describe("Auth Module — Context & Authorization", () => {
       },
     });
 
-    await expect(requireProviderRole(["OWNER"], mockClient)).rejects.toThrowError(
+    await expect(
+      requireProviderRole(["OWNER"], mockClient),
+    ).rejects.toThrowError(
       expect.objectContaining({ code: "UNAUTHORIZED_ROLE" }),
     );
   });
@@ -342,8 +344,11 @@ describe("Auth — Validation Schemas & Registration Secrets", () => {
   });
 
   it("validates forgot password inputs", () => {
-    expect(forgotPasswordSchema.safeParse({ email: "valid@email.com" }).success).toBe(true);
-    expect(forgotPasswordSchema.safeParse({ email: "invalid-email" }).success).toBe(false);
+    expect(
+      forgotPasswordSchema.safeParse({ email: "valid@email.com" }).success,
+    ).toBe(true);
+    expect(
+      forgotPasswordSchema.safeParse({ email: "invalid-email" }).success,
+    ).toBe(false);
   });
 });
-

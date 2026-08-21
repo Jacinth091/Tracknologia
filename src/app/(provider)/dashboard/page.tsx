@@ -1,6 +1,12 @@
 import type { Metadata } from "next";
 import { requireProviderContext } from "@/features/auth";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import {
+  Card,
+  CardContent,
+  CardDescription,
+  CardHeader,
+  CardTitle,
+} from "@/components/ui/card";
 
 export const metadata: Metadata = {
   title: "Dashboard — Tracknologia",
@@ -34,14 +40,19 @@ export default async function DashboardPage() {
       {/* Provider Workspace Card */}
       <Card>
         <CardHeader>
-          <CardTitle className="text-lg font-semibold">Provider Workspace</CardTitle>
+          <CardTitle className="text-lg font-semibold">
+            Provider Workspace
+          </CardTitle>
           <CardDescription>
-            Your provider account has been authenticated and authorized with trusted session context.
+            Your provider account has been authenticated and authorized with
+            trusted session context.
           </CardDescription>
         </CardHeader>
         <CardContent className="space-y-3 text-sm text-muted-foreground">
           <p>
-            Welcome to your Tracknologia workspace. Upcoming capabilities (Provider Profile settings, Repair Jobs, Intake Requests, and Customer Tracking) will appear here as each feature is enabled.
+            Welcome to your Tracknologia workspace. Upcoming capabilities
+            (Provider Profile settings, Repair Jobs, Intake Requests, and
+            Customer Tracking) will appear here as each feature is enabled.
           </p>
         </CardContent>
       </Card>

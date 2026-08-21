@@ -7,11 +7,11 @@
 
 ## Decision Summary
 
-| ID | Decision | Final Ruling |
-|---|---|---|
-| **LD-01** | Provider onboarding and Staff access | Independent Repairers and Shop Owners create Providers. Shop Staff may join only through an OWNER-authorized secure invitation. |
-| **LD-02** | Canonical source layout | All application source code belongs under `src/`: `src/app`, `src/features`, `src/components`, and `src/lib`. |
-| **LD-03** | Current migration history | Reset the disposable development Supabase database and re-author the experimental Auth/Provider migrations into a clean baseline. |
+| ID        | Decision                             | Final Ruling                                                                                                                      |
+| --------- | ------------------------------------ | --------------------------------------------------------------------------------------------------------------------------------- |
+| **LD-01** | Provider onboarding and Staff access | Independent Repairers and Shop Owners create Providers. Shop Staff may join only through an OWNER-authorized secure invitation.   |
+| **LD-02** | Canonical source layout              | All application source code belongs under `src/`: `src/app`, `src/features`, `src/components`, and `src/lib`.                     |
+| **LD-03** | Current migration history            | Reset the disposable development Supabase database and re-author the experimental Auth/Provider migrations into a clean baseline. |
 
 These decisions are mandatory unless later superseded by an explicit Lead decision or accepted ADR.
 

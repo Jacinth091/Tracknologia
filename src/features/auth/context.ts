@@ -2,9 +2,16 @@ import "server-only";
 import { createClient } from "@/lib/supabase/server";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { findMembershipByUserId } from "./persistence";
-import { AuthError, type AuthenticatedUser, type ProviderContext, type ProviderRole } from "./types";
+import {
+  AuthError,
+  type AuthenticatedUser,
+  type ProviderContext,
+  type ProviderRole,
+} from "./types";
 
-export async function getUser(client?: SupabaseClient): Promise<AuthenticatedUser | null> {
+export async function getUser(
+  client?: SupabaseClient,
+): Promise<AuthenticatedUser | null> {
   const supabase = client ?? (await createClient());
   const {
     data: { user },
@@ -22,7 +29,9 @@ export async function getUser(client?: SupabaseClient): Promise<AuthenticatedUse
   };
 }
 
-export async function requireUser(client?: SupabaseClient): Promise<AuthenticatedUser> {
+export async function requireUser(
+  client?: SupabaseClient,
+): Promise<AuthenticatedUser> {
   const user = await getUser(client);
   if (!user) {
     throw new AuthError("Authentication required", "UNAUTHENTICATED");
@@ -30,7 +39,9 @@ export async function requireUser(client?: SupabaseClient): Promise<Authenticate
   return user;
 }
 
-export async function getProviderContext(client?: SupabaseClient): Promise<ProviderContext | null> {
+export async function getProviderContext(
+  client?: SupabaseClient,
+): Promise<ProviderContext | null> {
   const supabase = client ?? (await createClient());
   const user = await getUser(supabase);
 
@@ -57,13 +68,18 @@ export async function getProviderContext(client?: SupabaseClient): Promise<Provi
  * Resolves the trusted ProviderContext for the authenticated user.
  * FAILS CLOSED: Throws AuthError('NO_MEMBERSHIP') if the user has no active Provider membership.
  */
-export async function requireProviderContext(client?: SupabaseClient): Promise<ProviderContext> {
+export async function requireProviderContext(
+  client?: SupabaseClient,
+): Promise<ProviderContext> {
   const supabase = client ?? (await createClient());
   const user = await requireUser(supabase);
 
   const membership = await findMembershipByUserId(supabase, user.id);
   if (!membership) {
-    throw new AuthError("No provider membership found for user", "NO_MEMBERSHIP");
+    throw new AuthError(
+      "No provider membership found for user",
+      "NO_MEMBERSHIP",
+    );
   }
 
   return {

@@ -15,16 +15,25 @@ export const registerSchema = z
     inviteToken: z.string().trim().optional(),
     email: z.string().trim().email("Please enter a valid email address"),
     password: z.string().min(8, "Password must be at least 8 characters"),
-    confirmPassword: z.string().min(8, "Confirm password must be at least 8 characters"),
+    confirmPassword: z
+      .string()
+      .min(8, "Confirm password must be at least 8 characters"),
   })
   .refine((data) => data.password === data.confirmPassword, {
     message: "Passwords do not match",
     path: ["confirmPassword"],
   })
-  .refine((data) => !(data.intent === "STAFF" && (!data.inviteToken || data.inviteToken.length < 6)), {
-    message: "Please enter a valid invitation code from your Shop Owner",
-    path: ["inviteToken"],
-  });
+  .refine(
+    (data) =>
+      !(
+        data.intent === "STAFF" &&
+        (!data.inviteToken || data.inviteToken.length < 6)
+      ),
+    {
+      message: "Please enter a valid invitation code from your Shop Owner",
+      path: ["inviteToken"],
+    },
+  );
 
 export const forgotPasswordSchema = z.object({
   email: z.string().trim().email("Please enter a valid email address"),
@@ -33,7 +42,9 @@ export const forgotPasswordSchema = z.object({
 export const resetPasswordSchema = z
   .object({
     password: z.string().min(8, "Password must be at least 8 characters"),
-    confirmPassword: z.string().min(8, "Confirm password must be at least 8 characters"),
+    confirmPassword: z
+      .string()
+      .min(8, "Confirm password must be at least 8 characters"),
   })
   .refine((data) => data.password === data.confirmPassword, {
     message: "Passwords do not match",

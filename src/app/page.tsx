@@ -1,6 +1,12 @@
 import Link from "next/link";
 import { buttonVariants } from "@/components/ui/button";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import {
+  Card,
+  CardContent,
+  CardDescription,
+  CardHeader,
+  CardTitle,
+} from "@/components/ui/card";
 import { cn } from "@/lib/utils";
 
 export default function Home() {
@@ -39,11 +45,14 @@ export default function Home() {
           </div>
           <h1 className="text-4xl font-bold tracking-tight sm:text-5xl md:text-6xl text-foreground">
             Repair tracking built for{" "}
-            <span className="text-primary">shops and independent repairers</span>
+            <span className="text-primary">
+              shops and independent repairers
+            </span>
           </h1>
           <p className="mx-auto mt-6 max-w-2xl text-base sm:text-lg text-muted-foreground">
-            Streamline intake, provide live customer tracking codes, eliminate repetitive
-            status inquiries, and manage repair lifecycles effortlessly.
+            Streamline intake, provide live customer tracking codes, eliminate
+            repetitive status inquiries, and manage repair lifecycles
+            effortlessly.
           </p>
 
           <div className="mt-8 flex flex-col items-center justify-center gap-3 sm:flex-row">
@@ -55,7 +64,10 @@ export default function Home() {
             </Link>
             <Link
               href="/login"
-              className={cn(buttonVariants({ variant: "outline", size: "lg" }), "w-full sm:w-auto")}
+              className={cn(
+                buttonVariants({ variant: "outline", size: "lg" }),
+                "w-full sm:w-auto",
+              )}
             >
               Provider Dashboard
             </Link>
@@ -68,37 +80,49 @@ export default function Home() {
             <div className="grid gap-6 md:grid-cols-3">
               <Card>
                 <CardHeader>
-                  <CardTitle className="text-lg">Customer Intake & Requests</CardTitle>
+                  <CardTitle className="text-lg">
+                    Customer Intake & Requests
+                  </CardTitle>
                   <CardDescription>
-                    Direct repair intake or customer-submitted repair requests with device snapshot and problem details.
+                    Direct repair intake or customer-submitted repair requests
+                    with device snapshot and problem details.
                   </CardDescription>
                 </CardHeader>
                 <CardContent className="text-sm text-muted-foreground">
-                  Accept customer requests with one click into authoritative repairs, whether dropping off, meeting up, or home service.
+                  Accept customer requests with one click into authoritative
+                  repairs, whether dropping off, meeting up, or home service.
                 </CardContent>
               </Card>
 
               <Card>
                 <CardHeader>
-                  <CardTitle className="text-lg">Live Public Tracking</CardTitle>
+                  <CardTitle className="text-lg">
+                    Live Public Tracking
+                  </CardTitle>
                   <CardDescription>
-                    Customers can check repair status and updates anytime with unguessable tracking codes.
+                    Customers can check repair status and updates anytime with
+                    unguessable tracking codes.
                   </CardDescription>
                 </CardHeader>
                 <CardContent className="text-sm text-muted-foreground">
-                  Keep customers informed while protecting your internal notes and diagnostic documentation.
+                  Keep customers informed while protecting your internal notes
+                  and diagnostic documentation.
                 </CardContent>
               </Card>
 
               <Card>
                 <CardHeader>
-                  <CardTitle className="text-lg">Built for Single & Multi-Tech</CardTitle>
+                  <CardTitle className="text-lg">
+                    Built for Single & Multi-Tech
+                  </CardTitle>
                   <CardDescription>
-                    From solo independent repairers operating from a phone to multi-staff repair shops.
+                    From solo independent repairers operating from a phone to
+                    multi-staff repair shops.
                   </CardDescription>
                 </CardHeader>
                 <CardContent className="text-sm text-muted-foreground">
-                  No bloated enterprise menus. Clear statuses, quick updates, and mobile-friendly operational controls.
+                  No bloated enterprise menus. Clear statuses, quick updates,
+                  and mobile-friendly operational controls.
                 </CardContent>
               </Card>
             </div>

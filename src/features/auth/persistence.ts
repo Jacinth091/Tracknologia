@@ -1,6 +1,11 @@
 import "server-only";
 import type { SupabaseClient } from "@supabase/supabase-js";
-import { AuthError, type ProviderMembership, type ProviderRole, type ProviderType } from "./types";
+import {
+  AuthError,
+  type ProviderMembership,
+  type ProviderRole,
+  type ProviderType,
+} from "./types";
 
 interface ProviderMembershipRow {
   id: string;
@@ -30,7 +35,9 @@ export async function findMembershipByUserId(
 ): Promise<ProviderMembershipWithDetails | null> {
   const { data, error } = await supabase
     .from("provider_memberships")
-    .select("id, provider_id, user_id, role, created_at, providers!inner(display_name, provider_type)")
+    .select(
+      "id, provider_id, user_id, role, created_at, providers!inner(display_name, provider_type)",
+    )
     .eq("user_id", userId);
 
   if (error) {
@@ -61,4 +68,3 @@ export async function findMembershipByUserId(
     providerType: provider?.provider_type ?? "SHOP",
   };
 }
-

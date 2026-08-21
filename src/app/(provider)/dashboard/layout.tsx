@@ -57,9 +57,12 @@ export default async function DashboardLayout({
 
           <div className="flex items-center gap-4">
             <div className="hidden sm:flex flex-col items-end text-xs">
-              <span className="font-medium text-foreground">{context.providerName}</span>
+              <span className="font-medium text-foreground">
+                {context.providerName}
+              </span>
               <span className="text-muted-foreground text-[11px]">
-                {context.email} • <span className="font-medium text-primary">{roleDisplay}</span>
+                {context.email} •{" "}
+                <span className="font-medium text-primary">{roleDisplay}</span>
               </span>
             </div>
             <form action={signOutAction}>

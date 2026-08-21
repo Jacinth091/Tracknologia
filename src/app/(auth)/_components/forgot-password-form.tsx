@@ -8,7 +8,10 @@ import { Label } from "@/components/ui/label";
 import { LoadingSpinner } from "@/components/ui/loading-spinner";
 
 export function ForgotPasswordForm() {
-  const [state, formAction, isPending] = useActionState(forgotPasswordAction, null);
+  const [state, formAction, isPending] = useActionState(
+    forgotPasswordAction,
+    null,
+  );
 
   return (
     <div className="relative">
@@ -16,7 +19,10 @@ export function ForgotPasswordForm() {
       {isPending && (
         <div className="absolute inset-0 z-20 flex flex-col items-center justify-center rounded-2xl bg-background/60 backdrop-blur-[1px] transition-all">
           <div className="flex items-center gap-2 rounded-xl bg-card border border-border/80 px-4 py-2 shadow-md">
-            <LoadingSpinner size="sm" className="text-primary border-primary border-t-transparent" />
+            <LoadingSpinner
+              size="sm"
+              className="text-primary border-primary border-t-transparent"
+            />
             <span className="text-xs font-medium text-foreground">
               Sending reset link...
             </span>

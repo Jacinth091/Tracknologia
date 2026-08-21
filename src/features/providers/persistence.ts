@@ -33,7 +33,10 @@ export async function createProviderWithOwner(
     p_contact_phone: params.contactPhone || null,
     p_public_address: params.publicAddress || null,
     p_service_area: params.serviceArea || null,
-    p_supported_devices: params.supportedDevices && params.supportedDevices.length > 0 ? params.supportedDevices : [],
+    p_supported_devices:
+      params.supportedDevices && params.supportedDevices.length > 0
+        ? params.supportedDevices
+        : [],
   });
 
   if (error) {
@@ -157,7 +160,9 @@ export async function listStaffInvitations(
 ): Promise<ProviderInvitation[]> {
   const { data, error } = await supabase
     .from("provider_invitations")
-    .select("id, provider_id, email, role, invited_by_user_id, created_at, expires_at, accepted_at, accepted_by_user_id, revoked_at")
+    .select(
+      "id, provider_id, email, role, invited_by_user_id, created_at, expires_at, accepted_at, accepted_by_user_id, revoked_at",
+    )
     .eq("provider_id", providerId)
     .is("revoked_at", null)
     .is("accepted_at", null)
@@ -209,12 +214,12 @@ export async function listTeamMembers(
     .in("user_id", userIds);
 
   if (profileError) {
-    throw new Error(`Failed to fetch team member profiles: ${profileError.message}`);
+    throw new Error(
+      `Failed to fetch team member profiles: ${profileError.message}`,
+    );
   }
 
-  const profileMap = new Map(
-    (profiles || []).map((p) => [p.user_id, p]),
-  );
+  const profileMap = new Map((profiles || []).map((p) => [p.user_id, p]));
 
   return memberships.map((row) => {
     const profile = profileMap.get(row.user_id);
@@ -222,7 +227,9 @@ export async function listTeamMembers(
       membershipId: row.id,
       userId: row.user_id,
       role: row.role,
-      displayName: profile?.display_name || (row.role === "OWNER" ? "Shop Owner" : "Staff Member"),
+      displayName:
+        profile?.display_name ||
+        (row.role === "OWNER" ? "Shop Owner" : "Staff Member"),
       email: null,
       contactPhone: profile?.contact_phone || null,
       createdAt: row.created_at,
@@ -283,7 +290,10 @@ export async function getPublicProviderProfile(
   supabase: SupabaseClient,
   slugOrId: string,
 ): Promise<PublicProviderProfile | null> {
-  const isUuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(slugOrId);
+  const isUuid =
+    /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(
+      slugOrId,
+    );
 
   let query = supabase.from("public_provider_profiles").select("*");
   if (isUuid) {
@@ -323,7 +333,9 @@ export async function getProviderUserProfile(
 ): Promise<ProviderUserProfile | null> {
   const { data, error } = await supabase
     .from("provider_user_profiles")
-    .select("user_id, display_name, contact_phone, avatar_url, created_at, updated_at")
+    .select(
+      "user_id, display_name, contact_phone, avatar_url, created_at, updated_at",
+    )
     .eq("user_id", userId)
     .maybeSingle();
 
@@ -344,4 +356,3 @@ export async function getProviderUserProfile(
     updatedAt: data.updated_at,
   };
 }
-

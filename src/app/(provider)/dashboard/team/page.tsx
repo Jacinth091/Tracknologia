@@ -1,6 +1,9 @@
 import type { Metadata } from "next";
 import { requireProviderContext } from "@/features/auth";
-import { listPendingStaffInvitations, listTeamMembers } from "@/features/providers";
+import {
+  listPendingStaffInvitations,
+  listTeamMembers,
+} from "@/features/providers";
 import { createClient } from "@/lib/supabase/server";
 import { TeamClient } from "./_components/team-client";
 
@@ -18,7 +21,9 @@ export default async function TeamPage() {
 
   const [members, invitations] = await Promise.all([
     listTeamMembers(context.providerId, supabase),
-    isOwner && isShop ? listPendingStaffInvitations(context.providerId, supabase) : Promise.resolve([]),
+    isOwner && isShop
+      ? listPendingStaffInvitations(context.providerId, supabase)
+      : Promise.resolve([]),
   ]);
 
   return (
@@ -28,7 +33,8 @@ export default async function TeamPage() {
           Team & Staff Management
         </h1>
         <p className="text-sm text-muted-foreground mt-1">
-          Manage staff members, invitations, and workshop access for {context.providerName}
+          Manage staff members, invitations, and workshop access for{" "}
+          {context.providerName}
         </p>
       </div>
 
@@ -41,4 +47,3 @@ export default async function TeamPage() {
     </div>
   );
 }
-

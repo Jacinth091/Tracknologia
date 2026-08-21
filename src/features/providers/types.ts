@@ -101,4 +101,3 @@ export interface InvitationShopDetails {
   contactEmail?: string | null;
   contactPhone?: string | null;
 }
-

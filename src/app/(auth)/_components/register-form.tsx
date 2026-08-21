@@ -47,7 +47,9 @@ export function RegisterForm({ initialInvite }: RegisterFormProps) {
           >
             <div className="flex items-center gap-2 mb-1">
               <span className="text-base">🛠️</span>
-              <span className="text-sm font-semibold text-foreground">Independent</span>
+              <span className="text-sm font-semibold text-foreground">
+                Independent
+              </span>
             </div>
             <span className="text-[11px] text-muted-foreground leading-relaxed">
               Solo technician or mobile repairer.
@@ -70,7 +72,9 @@ export function RegisterForm({ initialInvite }: RegisterFormProps) {
           >
             <div className="flex items-center gap-2 mb-1">
               <span className="text-base">🏬</span>
-              <span className="text-sm font-semibold text-foreground">Shop Owner</span>
+              <span className="text-sm font-semibold text-foreground">
+                Shop Owner
+              </span>
             </div>
             <span className="text-[11px] text-muted-foreground leading-relaxed">
               Storefront or workshop repair business.
@@ -93,7 +97,9 @@ export function RegisterForm({ initialInvite }: RegisterFormProps) {
           >
             <div className="flex items-center gap-2 mb-1">
               <span className="text-base">👥</span>
-              <span className="text-sm font-semibold text-foreground">Shop Staff</span>
+              <span className="text-sm font-semibold text-foreground">
+                Shop Staff
+              </span>
             </div>
             <span className="text-[11px] text-muted-foreground leading-relaxed">
               Joining a shop via Owner invite code.
@@ -122,7 +128,10 @@ export function RegisterForm({ initialInvite }: RegisterFormProps) {
         {intent === "STAFF" && (
           <div className="rounded-2xl border border-primary/20 bg-primary/5 p-4 space-y-3">
             <div className="space-y-1">
-              <Label htmlFor="inviteToken" className="text-xs font-semibold text-foreground">
+              <Label
+                htmlFor="inviteToken"
+                className="text-xs font-semibold text-foreground"
+              >
                 Shop Invitation Code *
               </Label>
               <Input
@@ -135,11 +144,14 @@ export function RegisterForm({ initialInvite }: RegisterFormProps) {
                 className="bg-background"
               />
               {state?.fieldErrors?.inviteToken && (
-                <p className="text-xs text-destructive">{state.fieldErrors.inviteToken}</p>
+                <p className="text-xs text-destructive">
+                  {state.fieldErrors.inviteToken}
+                </p>
               )}
             </div>
             <p className="text-[11px] text-muted-foreground">
-              Don&apos;t have an invite code? Ask your Shop Owner to generate an invite from their dashboard.
+              Don&apos;t have an invite code? Ask your Shop Owner to generate an
+              invite from their dashboard.
             </p>
           </div>
         )}
@@ -162,7 +174,9 @@ export function RegisterForm({ initialInvite }: RegisterFormProps) {
             required
           />
           {state?.fieldErrors?.email && (
-            <p className="text-xs text-destructive">{state.fieldErrors.email}</p>
+            <p className="text-xs text-destructive">
+              {state.fieldErrors.email}
+            </p>
           )}
         </div>
 
@@ -178,7 +192,9 @@ export function RegisterForm({ initialInvite }: RegisterFormProps) {
               required
             />
             {state?.fieldErrors?.password && (
-              <p className="text-xs text-destructive">{state.fieldErrors.password}</p>
+              <p className="text-xs text-destructive">
+                {state.fieldErrors.password}
+              </p>
             )}
           </div>
 
@@ -193,7 +209,9 @@ export function RegisterForm({ initialInvite }: RegisterFormProps) {
               required
             />
             {state?.fieldErrors?.confirmPassword && (
-              <p className="text-xs text-destructive">{state.fieldErrors.confirmPassword}</p>
+              <p className="text-xs text-destructive">
+                {state.fieldErrors.confirmPassword}
+              </p>
             )}
           </div>
         </div>

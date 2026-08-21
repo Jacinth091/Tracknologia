@@ -33,7 +33,9 @@ describe("Provider Security & Invariant Contract Rules", () => {
       // Presenting the raw token directly without hashing must mismatch stored hash
       expect(rawToken).not.toEqual(storedTokenHash);
       // Presenting a forged token must mismatch stored hash
-      expect(hashInvitationToken("inv_forged_token")).not.toEqual(storedTokenHash);
+      expect(hashInvitationToken("inv_forged_token")).not.toEqual(
+        storedTokenHash,
+      );
     });
   });
 
@@ -76,7 +78,9 @@ describe("Provider Security & Invariant Contract Rules", () => {
       expect(publicProjectionKeys).not.toContain("updated_at");
 
       const projected = Object.fromEntries(
-        Object.entries(fullProviderRow).filter(([key]) => publicProjectionKeys.includes(key)),
+        Object.entries(fullProviderRow).filter(([key]) =>
+          publicProjectionKeys.includes(key),
+        ),
       );
 
       expect(projected).not.toHaveProperty("contact_email");
@@ -88,19 +92,24 @@ describe("Provider Security & Invariant Contract Rules", () => {
 
   describe("3. Invariants & Business Constraints Enforcement (AUTH-R23, AUTH-R24)", () => {
     it("enforces that Staff invitations are rejected for INDEPENDENT providers", () => {
-      const independentProvider = { id: "prov-ind-1", provider_type: "INDEPENDENT" };
+      const independentProvider = {
+        id: "prov-ind-1",
+        provider_type: "INDEPENDENT",
+      };
       const shopProvider = { id: "prov-shop-1", provider_type: "SHOP" };
 
-      function validateStaffInviteProvider(provider: { provider_type: string }) {
+      function validateStaffInviteProvider(provider: {
+        provider_type: string;
+      }) {
         if (provider.provider_type !== "SHOP") {
           throw new Error("Staff invitations are only valid for Repair Shops");
         }
         return true;
       }
 
-      expect(() => validateStaffInviteProvider(independentProvider)).toThrowError(
-        "Staff invitations are only valid for Repair Shops",
-      );
+      expect(() =>
+        validateStaffInviteProvider(independentProvider),
+      ).toThrowError("Staff invitations are only valid for Repair Shops");
       expect(validateStaffInviteProvider(shopProvider)).toBe(true);
     });
 
@@ -117,9 +126,9 @@ describe("Provider Security & Invariant Contract Rules", () => {
         return true;
       }
 
-      expect(() => checkCanAcceptInvitation("user-already-member")).toThrowError(
-        "User already has an active provider membership",
-      );
+      expect(() =>
+        checkCanAcceptInvitation("user-already-member"),
+      ).toThrowError("User already has an active provider membership");
       expect(checkCanAcceptInvitation("user-fresh")).toBe(true);
     });
   });

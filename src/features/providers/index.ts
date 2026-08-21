@@ -41,4 +41,3 @@ export type {
   AcceptStaffInvitationInput,
   InvitationShopDetails,
 } from "./types";
-

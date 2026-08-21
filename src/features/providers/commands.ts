@@ -10,10 +10,7 @@ import {
   insertStaffInvitationRecord,
   revokeStaffInvitation as revokeStaffInvitationPersistence,
 } from "./persistence";
-import {
-  acceptStaffInvitationSchema,
-  staffInvitationSchema,
-} from "./schemas";
+import { acceptStaffInvitationSchema, staffInvitationSchema } from "./schemas";
 import type {
   AcceptStaffInvitationInput,
   CreateProviderInput,
@@ -54,7 +51,9 @@ export async function createProvider(
       supportedDevices: input.supportedDevices,
     });
     if (!parsed.success) {
-      throw new Error(parsed.error.issues[0]?.message ?? "Invalid independent provider input");
+      throw new Error(
+        parsed.error.issues[0]?.message ?? "Invalid independent provider input",
+      );
     }
   } else if (input.providerType === "SHOP") {
     const parsed = createShopProviderSchema.safeParse({
@@ -67,7 +66,9 @@ export async function createProvider(
       supportedDevices: input.supportedDevices,
     });
     if (!parsed.success) {
-      throw new Error(parsed.error.issues[0]?.message ?? "Invalid shop provider input");
+      throw new Error(
+        parsed.error.issues[0]?.message ?? "Invalid shop provider input",
+      );
     }
   } else {
     throw new Error("Invalid provider type");
@@ -77,9 +78,15 @@ export async function createProvider(
   const normalizedInput: CreateProviderInput = {
     displayName: input.displayName.trim(),
     providerType: input.providerType,
-    ownerDisplayName: input.ownerDisplayName ? input.ownerDisplayName.trim() : undefined,
-    ownerContactPhone: input.ownerContactPhone ? input.ownerContactPhone.trim() : undefined,
-    contactEmail: input.contactEmail ? input.contactEmail.trim().toLowerCase() : undefined,
+    ownerDisplayName: input.ownerDisplayName
+      ? input.ownerDisplayName.trim()
+      : undefined,
+    ownerContactPhone: input.ownerContactPhone
+      ? input.ownerContactPhone.trim()
+      : undefined,
+    contactEmail: input.contactEmail
+      ? input.contactEmail.trim().toLowerCase()
+      : undefined,
     contactPhone: input.contactPhone ? input.contactPhone.trim() : undefined,
     publicAddress: input.publicAddress ? input.publicAddress.trim() : undefined,
     serviceArea: input.serviceArea ? input.serviceArea.trim() : undefined,
@@ -161,7 +168,9 @@ export async function acceptStaffInvitation(
 
   const parsed = acceptStaffInvitationSchema.safeParse(input);
   if (!parsed.success) {
-    throw new Error(parsed.error.issues[0]?.message ?? "Invalid staff invitation input");
+    throw new Error(
+      parsed.error.issues[0]?.message ?? "Invalid staff invitation input",
+    );
   }
 
   const tokenHash = hashInvitationToken(parsed.data.token);

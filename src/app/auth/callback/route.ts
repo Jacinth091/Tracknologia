@@ -19,4 +19,3 @@ export async function GET(request: Request) {
   // Return to login with error if verification fails
   return NextResponse.redirect(`${origin}/login?error=auth_callback_failed`);
 }
-

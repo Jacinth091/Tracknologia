@@ -16,7 +16,9 @@ export async function loginWithPassword(credentials: LoginInput) {
   return data;
 }
 
-export async function registerProviderAccount(params: RegisterInput & { emailRedirectTo?: string }) {
+export async function registerProviderAccount(
+  params: RegisterInput & { emailRedirectTo?: string },
+) {
   const supabase = await createClient();
 
   const { data, error } = await supabase.auth.signUp({
@@ -26,7 +28,10 @@ export async function registerProviderAccount(params: RegisterInput & { emailRed
       emailRedirectTo: params.emailRedirectTo,
       data: {
         intent: params.intent,
-        provider_type: params.intent === "SHOP" || params.intent === "INDEPENDENT" ? params.intent : undefined,
+        provider_type:
+          params.intent === "SHOP" || params.intent === "INDEPENDENT"
+            ? params.intent
+            : undefined,
       },
     },
   });
@@ -64,11 +69,17 @@ export async function registerProviderAccount(params: RegisterInput & { emailRed
   return data;
 }
 
-export async function requestPasswordReset(params: { email: string; redirectTo?: string }) {
+export async function requestPasswordReset(params: {
+  email: string;
+  redirectTo?: string;
+}) {
   const supabase = await createClient();
-  const { data, error } = await supabase.auth.resetPasswordForEmail(params.email, {
-    redirectTo: params.redirectTo,
-  });
+  const { data, error } = await supabase.auth.resetPasswordForEmail(
+    params.email,
+    {
+      redirectTo: params.redirectTo,
+    },
+  );
 
   if (error) {
     throw new Error(error.message);
@@ -97,4 +108,3 @@ export async function signOutUser() {
     throw new Error(error.message);
   }
 }
-

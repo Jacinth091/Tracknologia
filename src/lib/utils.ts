@@ -20,7 +20,11 @@ export function getSafeInternalRedirectUrl(
 
   const trimmed = url.trim();
   // Must start with a single "/" and NOT followed by another "/" or "\"
-  if (!trimmed.startsWith("/") || trimmed.startsWith("//") || trimmed.startsWith("/\\")) {
+  if (
+    !trimmed.startsWith("/") ||
+    trimmed.startsWith("//") ||
+    trimmed.startsWith("/\\")
+  ) {
     return fallback;
   }
 
@@ -31,4 +35,3 @@ export function getSafeInternalRedirectUrl(
 
   return trimmed;
 }
-

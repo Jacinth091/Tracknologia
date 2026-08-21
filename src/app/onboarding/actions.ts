@@ -23,14 +23,17 @@ export async function onboardIndependentAction(
   formData: FormData,
 ): Promise<OnboardingActionState> {
   const supabase = await createClient();
-  const ownerContactPhone = formData.get("ownerContactPhone")?.toString() || undefined;
+  const ownerContactPhone =
+    formData.get("ownerContactPhone")?.toString() || undefined;
   const rawData = {
     ownerName: formData.get("ownerName")?.toString() ?? "",
     displayName: formData.get("displayName")?.toString() ?? "",
     contactEmail: formData.get("contactEmail")?.toString() || undefined,
     contactPhone: formData.get("contactPhone")?.toString() || undefined,
     serviceArea: formData.get("serviceArea")?.toString() || undefined,
-    supportedDevices: formData.getAll("supportedDevices").map((d) => d.toString()),
+    supportedDevices: formData
+      .getAll("supportedDevices")
+      .map((d) => d.toString()),
   };
 
   const parsed = createIndependentProviderSchema.safeParse(rawData);
@@ -42,7 +45,9 @@ export async function onboardIndependentAction(
       }
     });
     return {
-      error: parsed.error.issues[0]?.message ?? "Invalid independent provider details",
+      error:
+        parsed.error.issues[0]?.message ??
+        "Invalid independent provider details",
       fieldErrors,
     };
   }
@@ -63,7 +68,10 @@ export async function onboardIndependentAction(
     );
   } catch (err: unknown) {
     return {
-      error: err instanceof Error ? err.message : "Failed to create independent provider",
+      error:
+        err instanceof Error
+          ? err.message
+          : "Failed to create independent provider",
     };
   }
 
@@ -75,7 +83,8 @@ export async function onboardShopAction(
   formData: FormData,
 ): Promise<OnboardingActionState> {
   const supabase = await createClient();
-  const ownerContactPhone = formData.get("ownerContactPhone")?.toString() || undefined;
+  const ownerContactPhone =
+    formData.get("ownerContactPhone")?.toString() || undefined;
   const rawData = {
     ownerName: formData.get("ownerName")?.toString() ?? "",
     displayName: formData.get("displayName")?.toString() ?? "",
@@ -83,7 +92,9 @@ export async function onboardShopAction(
     contactPhone: formData.get("contactPhone")?.toString() || undefined,
     publicAddress: formData.get("publicAddress")?.toString() || undefined,
     serviceArea: formData.get("serviceArea")?.toString() || undefined,
-    supportedDevices: formData.getAll("supportedDevices").map((d) => d.toString()),
+    supportedDevices: formData
+      .getAll("supportedDevices")
+      .map((d) => d.toString()),
   };
 
   const parsed = createShopProviderSchema.safeParse(rawData);
@@ -117,7 +128,8 @@ export async function onboardShopAction(
     );
   } catch (err: unknown) {
     return {
-      error: err instanceof Error ? err.message : "Failed to create repair shop",
+      error:
+        err instanceof Error ? err.message : "Failed to create repair shop",
     };
   }
 
@@ -142,7 +154,10 @@ export async function acceptStaffInviteAction(
   if (!parsed.success) {
     const fieldErrors: Record<string, string> = {};
     parsed.error.issues.forEach((issue) => {
-      const key = issue.path[0] === "displayName" ? "fullName" : issue.path[0]?.toString();
+      const key =
+        issue.path[0] === "displayName"
+          ? "fullName"
+          : issue.path[0]?.toString();
       if (key) {
         fieldErrors[key] = issue.message;
       }
@@ -166,10 +181,12 @@ export async function acceptStaffInviteAction(
     cookieStore.delete("tracknologia_staff_invite");
   } catch (err: unknown) {
     return {
-      error: err instanceof Error ? err.message : "Invalid, expired, or already accepted invitation",
+      error:
+        err instanceof Error
+          ? err.message
+          : "Invalid, expired, or already accepted invitation",
     };
   }
 
   redirect("/dashboard");
 }
-
