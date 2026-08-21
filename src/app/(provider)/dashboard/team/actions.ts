@@ -47,12 +47,16 @@ export async function inviteStaffAction(
     };
   } catch (error) {
     return {
-      error: error instanceof Error ? error.message : "Failed to create staff invitation",
+      error:
+        error instanceof Error
+          ? error.message
+          : "Failed to create staff invitation",
     };
   }
 }
 
 export async function revokeStaffAction(
+  _prevState: { error?: string; success?: string } | null,
   formData: FormData,
 ): Promise<{ error?: string; success?: string }> {
   const supabase = await createClient();
@@ -66,10 +70,9 @@ export async function revokeStaffAction(
     await revokeStaffInvitation(invitationId, supabase);
     revalidatePath("/dashboard/team");
     return { success: "Invitation revoked" };
-  } catch (error) {
+  } catch {
     return {
-      error: error instanceof Error ? error.message : "Failed to revoke invitation",
+      error: "Unable to revoke invitation",
     };
   }
 }
-

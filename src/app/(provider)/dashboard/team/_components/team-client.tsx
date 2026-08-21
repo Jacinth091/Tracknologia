@@ -5,7 +5,13 @@ import { inviteStaffAction, revokeStaffAction } from "../actions";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import {
+  Card,
+  CardContent,
+  CardDescription,
+  CardHeader,
+  CardTitle,
+} from "@/components/ui/card";
 import { LoadingSpinner } from "@/components/ui/loading-spinner";
 import { cn } from "@/lib/utils";
 import type { ProviderInvitation, TeamMember } from "@/features/providers";
@@ -17,8 +23,20 @@ interface TeamClientProps {
   invitations: ProviderInvitation[];
 }
 
-export function TeamClient({ isOwner, isShop, members, invitations }: TeamClientProps) {
-  const [state, formAction, isPending] = useActionState(inviteStaffAction, null);
+export function TeamClient({
+  isOwner,
+  isShop,
+  members,
+  invitations,
+}: TeamClientProps) {
+  const [state, formAction, isPending] = useActionState(
+    inviteStaffAction,
+    null,
+  );
+  const [revokeState, revokeFormAction, isRevokePending] = useActionState(
+    revokeStaffAction,
+    null,
+  );
   const [copied, setCopied] = useState(false);
 
   if (!isShop) {
@@ -27,12 +45,16 @@ export function TeamClient({ isOwner, isShop, members, invitations }: TeamClient
         <CardHeader>
           <CardTitle>Independent Provider Team</CardTitle>
           <CardDescription>
-            Independent repairers operate independently and manage repairs directly.
+            Independent repairers operate independently and manage repairs
+            directly.
           </CardDescription>
         </CardHeader>
         <CardContent className="space-y-2 text-sm text-muted-foreground">
           <p>
-            Staff invitations and multi-member teams are designed for <strong>Repair Shops</strong>. If you decide to expand into a repair workshop with multiple staff members in the future, you can upgrade your provider profile.
+            Staff invitations and multi-member teams are designed for{" "}
+            <strong>Repair Shops</strong>. If you decide to expand into a repair
+            workshop with multiple staff members in the future, you can upgrade
+            your provider profile.
           </p>
         </CardContent>
       </Card>
@@ -51,13 +73,19 @@ export function TeamClient({ isOwner, isShop, members, invitations }: TeamClient
       {isOwner && (
         <Card>
           <CardHeader>
-            <CardTitle className="text-lg font-semibold">Invite Staff</CardTitle>
+            <CardTitle className="text-lg font-semibold">
+              Invite Staff
+            </CardTitle>
             <CardDescription>
-              Generate an invitation link or email an invitation to staff to join your repair shop
+              Generate an invitation link or email an invitation to staff to
+              join your repair shop
             </CardDescription>
           </CardHeader>
           <CardContent className="space-y-4">
-            <form action={formAction} className="flex flex-col sm:flex-row gap-3">
+            <form
+              action={formAction}
+              className="flex flex-col sm:flex-row gap-3"
+            >
               <div className="flex-1 space-y-1">
                 <Label htmlFor="staff-email" className="sr-only">
                   Staff Email
@@ -71,7 +99,9 @@ export function TeamClient({ isOwner, isShop, members, invitations }: TeamClient
                   required
                 />
                 {state?.fieldErrors?.email && (
-                  <p className="text-xs text-destructive">{state.fieldErrors.email}</p>
+                  <p className="text-xs text-destructive">
+                    {state.fieldErrors.email}
+                  </p>
                 )}
               </div>
               <Button type="submit" disabled={isPending}>
@@ -97,14 +127,20 @@ export function TeamClient({ isOwner, isShop, members, invitations }: TeamClient
               <div className="rounded-2xl border border-primary/30 bg-primary/5 p-4 space-y-3">
                 <div className="flex items-center justify-between">
                   <span className="text-xs font-semibold text-primary">
-                    {state.emailDeliveryFailed ? "Invitation Created (Email Failed)" : "Invitation Created & Sent!"}
+                    {state.emailDeliveryFailed
+                      ? "Invitation Created (Email Failed)"
+                      : "Invitation Created & Sent!"}
                   </span>
-                  <span className="text-[11px] text-muted-foreground">Valid for 7 days</span>
+                  <span className="text-[11px] text-muted-foreground">
+                    Valid for 7 days
+                  </span>
                 </div>
 
                 {state.emailDeliveryFailed && (
                   <p className="text-xs text-amber-600 dark:text-amber-400 font-medium">
-                    ⚠️ Email delivery could not be completed. You can copy the invitation link below and share it directly with your staff member.
+                    ⚠️ Email delivery could not be completed. You can copy the
+                    invitation link below and share it directly with your staff
+                    member.
                   </p>
                 )}
 
@@ -140,11 +176,25 @@ export function TeamClient({ isOwner, isShop, members, invitations }: TeamClient
         </Card>
       )}
 
+      {isOwner && revokeState?.success && (
+        <div className="rounded-xl border border-primary/20 bg-primary/10 p-3 text-xs font-medium text-primary">
+          Invitation revoked
+        </div>
+      )}
+
+      {isOwner && revokeState?.error && (
+        <div className="rounded-xl border border-destructive/20 bg-destructive/10 p-3 text-xs font-medium text-destructive">
+          Unable to revoke invitation
+        </div>
+      )}
+
       {/* 2. Pending Invitations (No credentials / hashes displayed) */}
       {isOwner && invitations.length > 0 && (
         <Card>
           <CardHeader>
-            <CardTitle className="text-lg font-semibold">Pending Staff Invitations</CardTitle>
+            <CardTitle className="text-lg font-semibold">
+              Pending Staff Invitations
+            </CardTitle>
             <CardDescription>
               Unaccepted invitations sent to staff members
             </CardDescription>
@@ -152,19 +202,30 @@ export function TeamClient({ isOwner, isShop, members, invitations }: TeamClient
           <CardContent>
             <div className="divide-y divide-border/60">
               {invitations.map((inv) => (
-                <div key={inv.id} className="py-3 flex items-center justify-between gap-4">
+                <div
+                  key={inv.id}
+                  className="py-3 flex items-center justify-between gap-4"
+                >
                   <div className="space-y-0.5">
-                    <p className="text-sm font-medium text-foreground">{inv.email}</p>
+                    <p className="text-sm font-medium text-foreground">
+                      {inv.email}
+                    </p>
                     <p className="text-xs text-muted-foreground">
-                      Sent {new Date(inv.createdAt).toLocaleDateString()} • Expires{" "}
-                      {new Date(inv.expiresAt).toLocaleDateString()}
+                      Sent {new Date(inv.createdAt).toLocaleDateString()} •
+                      Expires {new Date(inv.expiresAt).toLocaleDateString()}
                     </p>
                   </div>
                   <div className="flex items-center gap-2">
-                    <form action={revokeStaffAction}>
+                    <form action={revokeFormAction}>
                       <input type="hidden" name="invitationId" value={inv.id} />
-                      <Button variant="ghost" size="sm" type="submit" className="text-xs text-destructive hover:text-destructive">
-                        Revoke
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        type="submit"
+                        disabled={isRevokePending}
+                        className="text-xs text-destructive hover:text-destructive"
+                      >
+                        {isRevokePending ? "Revoking..." : "Revoke"}
                       </Button>
                     </form>
                   </div>
@@ -178,8 +239,12 @@ export function TeamClient({ isOwner, isShop, members, invitations }: TeamClient
       {/* 3. Active Team Members */}
       <Card>
         <CardHeader>
-          <CardTitle className="text-lg font-semibold">Team Members ({members.length})</CardTitle>
-          <CardDescription>Active staff belonging to this repair shop</CardDescription>
+          <CardTitle className="text-lg font-semibold">
+            Team Members ({members.length})
+          </CardTitle>
+          <CardDescription>
+            Active staff belonging to this repair shop
+          </CardDescription>
         </CardHeader>
         <CardContent>
           <div className="divide-y divide-border/60">
@@ -188,7 +253,10 @@ export function TeamClient({ isOwner, isShop, members, invitations }: TeamClient
               const initials = displayName.charAt(0).toUpperCase();
 
               return (
-                <div key={member.membershipId} className="py-3.5 flex items-center justify-between gap-4">
+                <div
+                  key={member.membershipId}
+                  className="py-3.5 flex items-center justify-between gap-4"
+                >
                   <div className="flex items-center gap-3">
                     <div className="h-9 w-9 rounded-full bg-primary/10 text-primary flex items-center justify-center font-semibold text-sm">
                       {initials}
@@ -200,9 +268,14 @@ export function TeamClient({ isOwner, isShop, members, invitations }: TeamClient
                         </span>
                       </div>
                       <div className="text-xs text-muted-foreground flex items-center gap-2 flex-wrap">
-                        {member.contactPhone && <span>{member.contactPhone}</span>}
+                        {member.contactPhone && (
+                          <span>{member.contactPhone}</span>
+                        )}
                         {member.contactPhone && <span>•</span>}
-                        <span>Joined {new Date(member.createdAt).toLocaleDateString()}</span>
+                        <span>
+                          Joined{" "}
+                          {new Date(member.createdAt).toLocaleDateString()}
+                        </span>
                       </div>
                     </div>
                   </div>
@@ -226,4 +299,3 @@ export function TeamClient({ isOwner, isShop, members, invitations }: TeamClient
     </div>
   );
 }
-

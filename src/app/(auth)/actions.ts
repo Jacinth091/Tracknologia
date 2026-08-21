@@ -13,7 +13,7 @@ import {
 } from "@/features/auth";
 import { getSafeInternalRedirectUrl } from "@/lib/utils";
 import { redirect } from "next/navigation";
-import { headers } from "next/headers";
+import { cookies, headers } from "next/headers";
 
 export interface ActionState {
   error?: string;
@@ -22,12 +22,17 @@ export interface ActionState {
 }
 
 async function resolveAppOrigin(): Promise<string> {
-  if (process.env.NEXT_PUBLIC_APP_URL && process.env.NEXT_PUBLIC_APP_URL.trim() !== "") {
+  if (
+    process.env.NEXT_PUBLIC_APP_URL &&
+    process.env.NEXT_PUBLIC_APP_URL.trim() !== ""
+  ) {
     return process.env.NEXT_PUBLIC_APP_URL.trim().replace(/\/$/, "");
   }
   const headersList = await headers();
   const host = headersList.get("host") || "localhost:3000";
-  const protocol = headersList.get("x-forwarded-proto") || (host.includes("localhost") ? "http" : "https");
+  const protocol =
+    headersList.get("x-forwarded-proto") ||
+    (host.includes("localhost") ? "http" : "https");
   return `${protocol}://${host}`;
 }
 
@@ -117,7 +122,8 @@ export async function registerAction(
   }
 
   // 2. If email confirmation is disabled via dev environment toggle, auto-authenticate
-  const requireEmailConfirmation = process.env.NEXT_PUBLIC_REQUIRE_EMAIL_CONFIRMATION !== "false";
+  const requireEmailConfirmation =
+    process.env.NEXT_PUBLIC_REQUIRE_EMAIL_CONFIRMATION !== "false";
   if (!requireEmailConfirmation) {
     try {
       await loginWithPassword({
@@ -131,7 +137,8 @@ export async function registerAction(
   }
 
   return {
-    success: "Check your email for confirmation instructions to complete your registration.",
+    success:
+      "Check your email for confirmation instructions to complete your registration.",
   };
 }
 
@@ -144,7 +151,9 @@ export async function forgotPasswordAction(
 
   if (!parsed.success) {
     return {
-      error: parsed.error.issues[0]?.message ?? "Please provide a valid email address",
+      error:
+        parsed.error.issues[0]?.message ??
+        "Please provide a valid email address",
     };
   }
 
@@ -158,7 +167,8 @@ export async function forgotPasswordAction(
     });
   } catch (err: unknown) {
     return {
-      error: err instanceof Error ? err.message : "Failed to request password reset",
+      error:
+        err instanceof Error ? err.message : "Failed to request password reset",
     };
   }
 
