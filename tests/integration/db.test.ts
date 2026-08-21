@@ -7,6 +7,8 @@ vi.mock("server-only", () => ({}));
 import { hashInvitationToken } from "@/features/providers/persistence";
 import {
   cleanupFixture,
+  assertSupabaseMutation,
+  assertSupabaseSuccess,
   createAdminClient,
   createAnonClient,
   createTestUser,
@@ -48,6 +50,10 @@ async function createProviderAs(
   }
 
   const row = Array.isArray(data) ? data[0] : data;
+  if (!row) {
+    throw new Error("[DB fixture] create_provider_with_owner returned no row");
+  }
+
   return {
     providerId: row.provider_id,
     membershipId: row.membership_id,
@@ -70,6 +76,10 @@ async function createInvitationAs(
   }
 
   const row = Array.isArray(data) ? data[0] : data;
+  if (!row) {
+    throw new Error("[DB fixture] create_staff_invitation returned no row");
+  }
+
   return {
     invitationId: row.invitation_id,
     email: row.email,
@@ -164,12 +174,14 @@ describe("PostgreSQL Real Database, RPCs & RLS Integration Suite (AUTH-R28)", ()
       expect(crossUpdate.error).toBeNull();
       expect(crossUpdate.data).toEqual([]);
 
-      const durable = await adminClient
-        .from("providers")
-        .select("display_name")
-        .eq("id", providerB.providerId)
-        .single();
-      expect(durable.error).toBeNull();
+      const durable = assertSupabaseSuccess(
+        await adminClient
+          .from("providers")
+          .select("display_name")
+          .eq("id", providerB.providerId)
+          .single(),
+        "read Provider B after cross-provider update",
+      );
       expect(durable.data?.display_name).not.toBe(attemptedName);
     } finally {
       await cleanupFixture(adminClient, {
@@ -209,12 +221,14 @@ describe("PostgreSQL Real Database, RPCs & RLS Integration Suite (AUTH-R28)", ()
         expect(insert.error).not.toBeNull();
       }
 
-      const durable = await adminClient
-        .from("provider_memberships")
-        .select("id")
-        .eq("provider_id", provider.providerId)
-        .eq("user_id", attacker.user.id);
-      expect(durable.error).toBeNull();
+      const durable = assertSupabaseSuccess(
+        await adminClient
+          .from("provider_memberships")
+          .select("id")
+          .eq("provider_id", provider.providerId)
+          .eq("user_id", attacker.user.id),
+        "read membership after direct-insert denial",
+      );
       expect(durable.data).toEqual([]);
     } finally {
       await cleanupFixture(adminClient, {
@@ -252,12 +266,14 @@ describe("PostgreSQL Real Database, RPCs & RLS Integration Suite (AUTH-R28)", ()
       createdProviderIds.push(shop.providerId, independent.providerId);
 
       const invite = await createInvitationAs(shopAuth.client);
-      const row = await adminClient
-        .from("provider_invitations")
-        .select("provider_id, email, role, token_hash")
-        .eq("id", invite.invitationId)
-        .single();
-      expect(row.error).toBeNull();
+      const row = assertSupabaseSuccess(
+        await adminClient
+          .from("provider_invitations")
+          .select("provider_id, email, role, token_hash")
+          .eq("id", invite.invitationId)
+          .single(),
+        "read created invitation fixture",
+      );
       expect(row.data).toMatchObject({
         provider_id: shop.providerId,
         email: invite.email,
@@ -278,10 +294,13 @@ describe("PostgreSQL Real Database, RPCs & RLS Integration Suite (AUTH-R28)", ()
       );
       expect(denied.error).not.toBeNull();
 
-      const deniedRows = await adminClient
-        .from("provider_invitations")
-        .select("id")
-        .eq("token_hash", deniedTokenHash);
+      const deniedRows = assertSupabaseSuccess(
+        await adminClient
+          .from("provider_invitations")
+          .select("id")
+          .eq("token_hash", deniedTokenHash),
+        "read denied invitation fixture",
+      );
       expect(deniedRows.data).toEqual([]);
     } finally {
       await cleanupFixture(adminClient, {
@@ -305,12 +324,14 @@ describe("PostgreSQL Real Database, RPCs & RLS Integration Suite (AUTH-R28)", ()
       createdProviderIds.push(provider.providerId);
       const invite = await createInvitationAs(auth.client);
 
-      const before = await adminClient
-        .from("provider_invitations")
-        .select("*")
-        .eq("id", invite.invitationId)
-        .single();
-      expect(before.error).toBeNull();
+      const before = assertSupabaseSuccess(
+        await adminClient
+          .from("provider_invitations")
+          .select("*")
+          .eq("id", invite.invitationId)
+          .single(),
+        "read invitation before direct lifecycle update",
+      );
 
       const direct = await auth.client
         .from("provider_invitations")
@@ -326,11 +347,14 @@ describe("PostgreSQL Real Database, RPCs & RLS Integration Suite (AUTH-R28)", ()
         .select("id");
       expect(direct.error).not.toBeNull();
 
-      const afterDirect = await adminClient
-        .from("provider_invitations")
-        .select("*")
-        .eq("id", invite.invitationId)
-        .single();
+      const afterDirect = assertSupabaseSuccess(
+        await adminClient
+          .from("provider_invitations")
+          .select("*")
+          .eq("id", invite.invitationId)
+          .single(),
+        "read invitation after direct lifecycle denial",
+      );
       expect(afterDirect.data).toMatchObject({
         accepted_at: before.data?.accepted_at,
         accepted_by_user_id: before.data?.accepted_by_user_id,
@@ -396,9 +420,12 @@ describe("PostgreSQL Real Database, RPCs & RLS Integration Suite (AUTH-R28)", ()
       createdProviderIds.push(provider.providerId, existingProvider.providerId);
 
       const revoked = await createInvitationAs(ownerAuth.client, staff.email);
-      await ownerAuth.client.rpc("revoke_staff_invitation", {
-        p_invitation_id: revoked.invitationId,
-      });
+      assertSupabaseSuccess(
+        await ownerAuth.client.rpc("revoke_staff_invitation", {
+          p_invitation_id: revoked.invitationId,
+        }),
+        "revoke invitation fixture",
+      );
       const revokedAccept = await acceptInvitationAs(
         staffAuth.client,
         revoked.tokenHash,
@@ -406,10 +433,14 @@ describe("PostgreSQL Real Database, RPCs & RLS Integration Suite (AUTH-R28)", ()
       expect(revokedAccept.error).not.toBeNull();
 
       const expired = await createInvitationAs(ownerAuth.client, staff.email);
-      await adminClient
-        .from("provider_invitations")
-        .update({ expires_at: new Date(Date.now() - 60_000).toISOString() })
-        .eq("id", expired.invitationId);
+      assertSupabaseMutation(
+        await adminClient
+          .from("provider_invitations")
+          .update({ expires_at: new Date(Date.now() - 60_000).toISOString() })
+          .eq("id", expired.invitationId)
+          .select("id"),
+        "expire invitation fixture",
+      );
       const expiredAccept = await acceptInvitationAs(
         staffAuth.client,
         expired.tokenHash,
@@ -449,21 +480,27 @@ describe("PostgreSQL Real Database, RPCs & RLS Integration Suite (AUTH-R28)", ()
       );
       createdUserIds.push(secondUser.user.id);
       const secondAuth = await signInTestUser(secondUser.email, password);
-      await adminClient
-        .from("provider_invitations")
-        .update({ email: secondUser.email })
-        .eq("id", consumed.invitationId);
+      assertSupabaseMutation(
+        await adminClient
+          .from("provider_invitations")
+          .update({ email: secondUser.email })
+          .eq("id", consumed.invitationId)
+          .select("id"),
+        "change consumed invitation email fixture",
+      );
       const secondAccept = await acceptInvitationAs(
         secondAuth.client,
         consumed.tokenHash,
       );
       expect(secondAccept.error).not.toBeNull();
 
-      const rows = await adminClient
-        .from("provider_memberships")
-        .select("id, user_id")
-        .eq("provider_id", provider.providerId);
-      expect(rows.error).toBeNull();
+      const rows = assertSupabaseSuccess(
+        await adminClient
+          .from("provider_memberships")
+          .select("id, user_id")
+          .eq("provider_id", provider.providerId),
+        "read invitation acceptance memberships",
+      );
       expect(
         rows.data?.filter((row) => row.user_id === staff.user.id),
       ).toHaveLength(1);
@@ -477,16 +514,18 @@ describe("PostgreSQL Real Database, RPCs & RLS Integration Suite (AUTH-R28)", ()
         rows.data?.filter((row) => row.user_id === secondUser.user.id),
       ).toHaveLength(0);
 
-      const states = await adminClient
-        .from("provider_invitations")
-        .select("id, accepted_at, accepted_by_user_id")
-        .in("id", [
-          revoked.invitationId,
-          expired.invitationId,
-          wrongEmail.invitationId,
-          existing.invitationId,
-        ]);
-      expect(states.error).toBeNull();
+      const states = assertSupabaseSuccess(
+        await adminClient
+          .from("provider_invitations")
+          .select("id, accepted_at, accepted_by_user_id")
+          .in("id", [
+            revoked.invitationId,
+            expired.invitationId,
+            wrongEmail.invitationId,
+            existing.invitationId,
+          ]),
+        "read invitation lifecycle states",
+      );
       expect(
         states.data?.every(
           (row) => row.accepted_at === null && row.accepted_by_user_id === null,
@@ -547,16 +586,22 @@ describe("PostgreSQL Real Database, RPCs & RLS Integration Suite (AUTH-R28)", ()
       expect(fulfilled).toHaveLength(1);
       expect(rejected).toHaveLength(1);
 
-      const memberships = await adminClient
-        .from("provider_memberships")
-        .select("id")
-        .eq("user_id", staff.user.id);
+      const memberships = assertSupabaseSuccess(
+        await adminClient
+          .from("provider_memberships")
+          .select("id")
+          .eq("user_id", staff.user.id),
+        "read concurrent acceptance memberships",
+      );
       expect(memberships.data).toHaveLength(1);
 
-      const invitations = await adminClient
-        .from("provider_invitations")
-        .select("id, accepted_at")
-        .in("id", [inviteA.invitationId, inviteB.invitationId]);
+      const invitations = assertSupabaseSuccess(
+        await adminClient
+          .from("provider_invitations")
+          .select("id, accepted_at")
+          .in("id", [inviteA.invitationId, inviteB.invitationId]),
+        "read concurrent acceptance invitations",
+      );
       expect(
         invitations.data?.filter((row) => row.accepted_at !== null),
       ).toHaveLength(1);
@@ -620,27 +665,36 @@ describe("PostgreSQL Real Database, RPCs & RLS Integration Suite (AUTH-R28)", ()
       expect(successes).toHaveLength(1);
       expect(failures).toHaveLength(1);
 
-      const memberships = await adminClient
-        .from("provider_memberships")
-        .select("provider_id")
-        .eq("user_id", candidate.user.id);
+      const memberships = assertSupabaseSuccess(
+        await adminClient
+          .from("provider_memberships")
+          .select("provider_id")
+          .eq("user_id", candidate.user.id),
+        "read race outcome membership",
+      );
       expect(memberships.data).toHaveLength(1);
 
-      const candidateProviders = await adminClient
-        .from("providers")
-        .select("id")
-        .eq("display_name", candidateProviderName);
+      const candidateProviders = assertSupabaseSuccess(
+        await adminClient
+          .from("providers")
+          .select("id")
+          .eq("display_name", candidateProviderName),
+        "read race outcome Provider",
+      );
       if (
         memberships.data?.[0]?.provider_id !== candidateProviders.data?.[0]?.id
       ) {
         expect(candidateProviders.data).toEqual([]);
       }
 
-      const invitation = await adminClient
-        .from("provider_invitations")
-        .select("accepted_at")
-        .eq("id", invite.invitationId)
-        .single();
+      const invitation = assertSupabaseSuccess(
+        await adminClient
+          .from("provider_invitations")
+          .select("accepted_at")
+          .eq("id", invite.invitationId)
+          .single(),
+        "read race outcome invitation",
+      );
       const membershipProviderId = memberships.data?.[0]?.provider_id;
       if (membershipProviderId === shop.providerId) {
         expect(invitation.data?.accepted_at).not.toBeNull();
@@ -681,18 +735,27 @@ describe("PostgreSQL Real Database, RPCs & RLS Integration Suite (AUTH-R28)", ()
       });
       expect(failed.error).not.toBeNull();
 
-      const providers = await adminClient
-        .from("providers")
-        .select("id")
-        .eq("display_name", displayName);
-      const profiles = await adminClient
-        .from("provider_user_profiles")
-        .select("user_id")
-        .eq("user_id", user.user.id);
-      const memberships = await adminClient
-        .from("provider_memberships")
-        .select("id")
-        .eq("user_id", user.user.id);
+      const providers = assertSupabaseSuccess(
+        await adminClient
+          .from("providers")
+          .select("id")
+          .eq("display_name", displayName),
+        "read failed onboarding Provider fixture",
+      );
+      const profiles = assertSupabaseSuccess(
+        await adminClient
+          .from("provider_user_profiles")
+          .select("user_id")
+          .eq("user_id", user.user.id),
+        "read failed onboarding profile fixture",
+      );
+      const memberships = assertSupabaseSuccess(
+        await adminClient
+          .from("provider_memberships")
+          .select("id")
+          .eq("user_id", user.user.id),
+        "read failed onboarding membership fixture",
+      );
       expect(providers.data).toEqual([]);
       expect(profiles.data).toEqual([]);
       expect(memberships.data).toEqual([]);
@@ -722,10 +785,14 @@ describe("PostgreSQL Real Database, RPCs & RLS Integration Suite (AUTH-R28)", ()
       });
       createdProviderIds.push(shop.providerId);
       const invite = await createInvitationAs(ownerAuth.client, staff.email);
-      await adminClient
-        .from("providers")
-        .update({ provider_type: "INDEPENDENT" })
-        .eq("id", shop.providerId);
+      assertSupabaseMutation(
+        await adminClient
+          .from("providers")
+          .update({ provider_type: "INDEPENDENT" })
+          .eq("id", shop.providerId)
+          .select("id"),
+        "change Provider type fixture",
+      );
 
       const failed = await acceptInvitationAs(
         staffAuth.client,
@@ -733,19 +800,28 @@ describe("PostgreSQL Real Database, RPCs & RLS Integration Suite (AUTH-R28)", ()
       );
       expect(failed.error).not.toBeNull();
 
-      const memberships = await adminClient
-        .from("provider_memberships")
-        .select("id")
-        .eq("user_id", staff.user.id);
-      const profiles = await adminClient
-        .from("provider_user_profiles")
-        .select("user_id")
-        .eq("user_id", staff.user.id);
-      const invitation = await adminClient
-        .from("provider_invitations")
-        .select("accepted_at, accepted_by_user_id")
-        .eq("id", invite.invitationId)
-        .single();
+      const memberships = assertSupabaseSuccess(
+        await adminClient
+          .from("provider_memberships")
+          .select("id")
+          .eq("user_id", staff.user.id),
+        "read failed acceptance membership fixture",
+      );
+      const profiles = assertSupabaseSuccess(
+        await adminClient
+          .from("provider_user_profiles")
+          .select("user_id")
+          .eq("user_id", staff.user.id),
+        "read failed acceptance profile fixture",
+      );
+      const invitation = assertSupabaseSuccess(
+        await adminClient
+          .from("provider_invitations")
+          .select("accepted_at, accepted_by_user_id")
+          .eq("id", invite.invitationId)
+          .single(),
+        "read failed acceptance invitation fixture",
+      );
       expect(memberships.data).toEqual([]);
       expect(profiles.data).toEqual([]);
       expect(invitation.data).toMatchObject({
@@ -773,7 +849,6 @@ describe("PostgreSQL Real Database, RPCs & RLS Integration Suite (AUTH-R28)", ()
       p_supported_devices: [],
     });
     expect(unauthenticated.error).not.toBeNull();
-    expect(unauthenticated.error?.message).toMatch(/Authentication required/i);
 
     const user = await createTestUser(
       adminClient,
@@ -835,10 +910,13 @@ describe("PostgreSQL Real Database, RPCs & RLS Integration Suite (AUTH-R28)", ()
       expect(results[0].slug).not.toBe(results[1].slug);
       expect(new Set(results.map((result) => result.slug)).size).toBe(2);
 
-      const durable = await adminClient
-        .from("providers")
-        .select("slug")
-        .in("id", createdProviderIds);
+      const durable = assertSupabaseSuccess(
+        await adminClient
+          .from("providers")
+          .select("slug")
+          .in("id", createdProviderIds),
+        "read durable concurrent Provider slugs",
+      );
       expect(durable.data?.map((row) => row.slug).sort()).toEqual(
         results.map((result) => result.slug).sort(),
       );

@@ -9,7 +9,7 @@ ALTER TABLE public.provider_memberships ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.provider_invitations ENABLE ROW LEVEL SECURITY;
 
 -- 2. Schema Permissions & Public Projections (Least Privilege)
-GRANT USAGE ON SCHEMA public TO anon, authenticated;
+GRANT USAGE ON SCHEMA public TO anon, authenticated, service_role;
 
 -- Public Provider Projection View (Explicitly projects public-safe fields only)
 CREATE OR REPLACE VIEW public.public_provider_profiles AS
@@ -29,6 +29,15 @@ FROM public.providers
 WHERE accepting_requests = true;
 
 GRANT SELECT ON public.public_provider_profiles TO anon, authenticated;
+
+-- Trusted integration fixtures and administrative maintenance use the service role.
+GRANT ALL PRIVILEGES ON TABLE
+  public.providers,
+  public.provider_user_profiles,
+  public.provider_memberships,
+  public.provider_invitations
+TO service_role;
+GRANT SELECT ON public.public_provider_profiles TO service_role;
 
 -- Table Grants:
 -- NOTE: anon has NO direct SELECT on raw public.providers table.

@@ -66,6 +66,33 @@ export function createAuthenticatedClient(session: Session): SupabaseClient {
   });
 }
 
+type SupabaseResult = { error: { message: string } | null };
+
+export function assertSupabaseSuccess<T extends SupabaseResult>(
+  result: T,
+  operation: string,
+): T {
+  if (result.error) {
+    throw new Error(
+      `[DB fixture] ${operation} failed: ${result.error.message}`,
+    );
+  }
+
+  return result;
+}
+
+export function assertSupabaseMutation<
+  T extends SupabaseResult & { data: unknown[] | null },
+>(result: T, operation: string): T {
+  assertSupabaseSuccess(result, operation);
+
+  if (!result.data || result.data.length === 0) {
+    throw new Error(`[DB fixture] ${operation} affected no rows`);
+  }
+
+  return result;
+}
+
 export function uniqueEmail(prefix: string): string {
   return `${prefix}.${randomUUID()}@example.test`;
 }
@@ -79,19 +106,18 @@ export async function createTestUser(
   email = uniqueEmail("user"),
   password = "TestPassword123!",
 ): Promise<{ user: User; email: string; password: string }> {
-  const { data, error } = await adminClient.auth.admin.createUser({
+  const result = await adminClient.auth.admin.createUser({
     email,
     password,
     email_confirm: true,
   });
+  assertSupabaseSuccess(result, `create test user ${email}`);
 
-  if (error || !data.user) {
-    throw new Error(
-      `Failed to create test user: ${error?.message ?? "missing user"}`,
-    );
+  if (!result.data.user) {
+    throw new Error(`[DB fixture] create test user ${email} returned no user`);
   }
 
-  return { user: data.user, email, password };
+  return { user: result.data.user, email, password };
 }
 
 export async function signInTestUser(
@@ -99,20 +125,21 @@ export async function signInTestUser(
   password: string,
 ): Promise<{ session: Session; client: SupabaseClient }> {
   const signInClient = createAnonClient();
-  const { data, error } = await signInClient.auth.signInWithPassword({
+  const result = await signInClient.auth.signInWithPassword({
     email,
     password,
   });
+  assertSupabaseSuccess(result, `sign in test user ${email}`);
 
-  if (error || !data.session) {
+  if (!result.data.session) {
     throw new Error(
-      `Failed to sign in test user: ${error?.message ?? "missing session"}`,
+      `[DB fixture] sign in test user ${email} returned no session`,
     );
   }
 
   return {
-    session: data.session,
-    client: createAuthenticatedClient(data.session),
+    session: result.data.session,
+    client: createAuthenticatedClient(result.data.session),
   };
 }
 
@@ -121,13 +148,21 @@ export async function cleanupFixture(
   params: { userIds?: string[]; providerIds?: string[] },
 ): Promise<void> {
   if (params.providerIds && params.providerIds.length > 0) {
-    await adminClient.from("providers").delete().in("id", params.providerIds);
+    const deletedProviders = await adminClient
+      .from("providers")
+      .delete()
+      .in("id", params.providerIds);
+    assertSupabaseSuccess(
+      deletedProviders,
+      `delete fixture Providers ${params.providerIds.join(", ")}`,
+    );
   }
 
   if (params.userIds) {
     await Promise.all(
       params.userIds.map(async (userId) => {
-        await adminClient.auth.admin.deleteUser(userId);
+        const deletedUser = await adminClient.auth.admin.deleteUser(userId);
+        assertSupabaseSuccess(deletedUser, `delete fixture user ${userId}`);
       }),
     );
   }
