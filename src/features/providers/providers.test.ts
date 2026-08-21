@@ -49,6 +49,27 @@ function createMockSupabase(options: {
           error: null,
         });
       }
+      if (fn === "create_staff_invitation") {
+        return Promise.resolve({
+          data: options.rpcData ?? [
+            {
+              invitation_id: "inv-new-123",
+              provider_id: "prov-123",
+              email: "tech@shop.com",
+              role: "STAFF",
+              created_at: "2026-08-20T00:00:00Z",
+              expires_at: "2026-08-27T00:00:00Z",
+            },
+          ],
+          error: null,
+        });
+      }
+      if (fn === "revoke_staff_invitation") {
+        return Promise.resolve({
+          data: true,
+          error: null,
+        });
+      }
       if (fn === "get_invitation_details") {
         return Promise.resolve({
           data: options.rpcData ?? [
@@ -291,14 +312,20 @@ describe("Providers Module — Persistence & Token Hashing", () => {
     });
   });
 
-  it("listStaffInvitations never returns or exposes token_hash in invitation list", async () => {
+  it("insertStaffInvitationRecord calls create_staff_invitation RPC with parameters", async () => {
     const mockClient = createMockSupabase({});
-    const invitations = await listStaffInvitations(mockClient, "prov-123");
+    const invitation = await insertStaffInvitationRecord(mockClient, {
+      providerId: "prov-123",
+      invitedByUserId: "user-owner",
+      email: "tech@shop.com",
+      tokenHash: "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef",
+    });
 
-    expect(invitations).toHaveLength(1);
-    expect(invitations[0].email).toBe("active@shop.com");
-    expect((invitations[0] as Record<string, unknown>).tokenHash).toBeUndefined();
-    expect((invitations[0] as Record<string, unknown>).token_hash).toBeUndefined();
+    expect(invitation.email).toBe("tech@shop.com");
+    expect(mockClient.rpc).toHaveBeenCalledWith("create_staff_invitation", {
+      p_email: "tech@shop.com",
+      p_token_hash: "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef",
+    });
   });
 
   it("listTeamMembers combines provider_memberships and canonical provider_user_profiles", async () => {

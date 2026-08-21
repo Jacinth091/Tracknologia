@@ -1,6 +1,6 @@
 -- Migration: 20260820000001_create_provider_identity.sql
 -- Description: Core schema for Providers, Provider User Profiles, Provider Memberships, and Staff Invitations
--- Reference: Tracknologia Lead Decisions LD-01, LD-03; Auth Re-review AUTH-R19 through AUTH-R29
+-- Reference: Tracknologia Lead Decisions LD-01, LD-03; Auth Re-review AUTH-R19 through AUTH-R30
 
 -- 1. Enums
 CREATE TYPE public.provider_type AS ENUM ('SHOP', 'INDEPENDENT');
@@ -21,7 +21,8 @@ CREATE TABLE public.providers (
   supported_devices TEXT[] DEFAULT '{}',
   accepting_requests BOOLEAN NOT NULL DEFAULT true,
   created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
-  updated_at TIMESTAMPTZ NOT NULL DEFAULT now()
+  updated_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+  CONSTRAINT check_providers_display_name_nonblank CHECK (char_length(trim(display_name)) > 0)
 );
 
 -- 3. Provider User Profiles table (Canonical person profile for authenticated provider users)
@@ -31,7 +32,8 @@ CREATE TABLE public.provider_user_profiles (
   contact_phone TEXT,
   avatar_url TEXT,
   created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
-  updated_at TIMESTAMPTZ NOT NULL DEFAULT now()
+  updated_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+  CONSTRAINT check_user_profiles_display_name_nonblank CHECK (char_length(trim(display_name)) > 0)
 );
 
 -- 4. Provider Memberships table (Authorization relationship only)
@@ -57,12 +59,13 @@ CREATE TABLE public.provider_invitations (
   accepted_at TIMESTAMPTZ,
   accepted_by_user_id UUID REFERENCES auth.users(id) ON DELETE SET NULL,
   revoked_at TIMESTAMPTZ,
-  CONSTRAINT check_invitation_role CHECK (role = 'STAFF')
+  CONSTRAINT check_invitation_role CHECK (role = 'STAFF'),
+  CONSTRAINT check_token_hash_format CHECK (token_hash ~* '^[a-f0-9]{64}$')
 );
 
--- 6. Indexes (Omitting redundant indexes on UNIQUE columns)
-CREATE INDEX idx_providers_slug ON public.providers(slug);
+-- 6. Indexes (Omitting redundant indexes on UNIQUE columns such as providers.slug)
 CREATE INDEX idx_provider_memberships_user_id ON public.provider_memberships(user_id);
 CREATE INDEX idx_provider_memberships_provider_id ON public.provider_memberships(provider_id);
 CREATE INDEX idx_provider_invitations_email ON public.provider_invitations(email);
 CREATE INDEX idx_provider_invitations_provider_id ON public.provider_invitations(provider_id);
+

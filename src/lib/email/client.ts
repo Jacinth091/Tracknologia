@@ -18,16 +18,22 @@ export async function sendEmail(params: SendEmailParams): Promise<{ success: boo
   const from = params.from || defaultFrom;
 
   if (!resend) {
-    // Development mode fallback: Log email content to terminal for easy testing
-    console.log("----------------------------------------");
-    console.log("[DEV EMAIL LOGGER] (No RESEND_API_KEY configured)");
-    console.log(`To: ${Array.isArray(params.to) ? params.to.join(", ") : params.to}`);
-    console.log(`From: ${from}`);
-    console.log(`Subject: ${params.subject}`);
-    console.log("----------------------------------------");
-    console.log(params.text || params.html);
-    console.log("----------------------------------------");
-    return { success: true, id: "dev-mock-id" };
+    const isDev = process.env.NODE_ENV === "development" || process.env.NODE_ENV === "test";
+    if (isDev) {
+      // Development mode fallback: Log email content to terminal for easy testing
+      console.log("----------------------------------------");
+      console.log("[DEV EMAIL LOGGER] (No RESEND_API_KEY configured)");
+      console.log(`To: ${Array.isArray(params.to) ? params.to.join(", ") : params.to}`);
+      console.log(`From: ${from}`);
+      console.log(`Subject: ${params.subject}`);
+      console.log("----------------------------------------");
+      console.log(params.text || params.html);
+      console.log("----------------------------------------");
+      return { success: true, id: "dev-mock-id" };
+    }
+
+    console.error("[Email Error]: RESEND_API_KEY is missing in non-development environment.");
+    return { success: false };
   }
 
   try {

@@ -88,7 +88,11 @@ export async function getInvitationDetailsByTokenHash(
     p_token_hash: tokenHash,
   });
 
-  if (error || !data) {
+  if (error) {
+    throw new Error(`Failed to fetch invitation details: ${error.message}`);
+  }
+
+  if (!data) {
     return null;
   }
 
@@ -119,36 +123,31 @@ export async function insertStaffInvitationRecord(
     tokenHash: string;
   },
 ): Promise<ProviderInvitation> {
-  const expiresAt = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString();
-
-  const { data, error } = await supabase
-    .from("provider_invitations")
-    .insert({
-      provider_id: params.providerId,
-      invited_by_user_id: params.invitedByUserId,
-      email: params.email.toLowerCase().trim(),
-      token_hash: params.tokenHash,
-      role: "STAFF",
-      expires_at: expiresAt,
-    })
-    .select("id, provider_id, email, role, invited_by_user_id, created_at, expires_at, accepted_at, accepted_by_user_id, revoked_at")
-    .single();
+  const { data, error } = await supabase.rpc("create_staff_invitation", {
+    p_email: params.email,
+    p_token_hash: params.tokenHash,
+  });
 
   if (error) {
     throw new Error(`Failed to create staff invitation: ${error.message}`);
   }
 
+  const result = Array.isArray(data) ? data[0] : data;
+  if (!result || !result.invitation_id) {
+    throw new Error("Staff invitation creation returned empty result");
+  }
+
   return {
-    id: data.id,
-    providerId: data.provider_id,
-    email: data.email,
-    role: data.role,
-    invitedByUserId: data.invited_by_user_id,
-    createdAt: data.created_at,
-    expiresAt: data.expires_at,
-    acceptedAt: data.accepted_at,
-    acceptedByUserId: data.accepted_by_user_id,
-    revokedAt: data.revoked_at,
+    id: result.invitation_id,
+    providerId: result.provider_id,
+    email: result.email,
+    role: result.role,
+    invitedByUserId: params.invitedByUserId,
+    createdAt: result.created_at,
+    expiresAt: result.expires_at,
+    acceptedAt: null,
+    acceptedByUserId: null,
+    revokedAt: null,
   };
 }
 
@@ -203,11 +202,15 @@ export async function listTeamMembers(
 
   const userIds = memberships.map((m) => m.user_id);
 
-  // Query canonical person profiles from provider_user_profiles
-  const { data: profiles } = await supabase
+  // Query canonical person profiles from provider_user_profiles (surface errors if query fails)
+  const { data: profiles, error: profileError } = await supabase
     .from("provider_user_profiles")
     .select("user_id, display_name, contact_phone")
     .in("user_id", userIds);
+
+  if (profileError) {
+    throw new Error(`Failed to fetch team member profiles: ${profileError.message}`);
+  }
 
   const profileMap = new Map(
     (profiles || []).map((p) => [p.user_id, p]),
@@ -230,13 +233,10 @@ export async function listTeamMembers(
 export async function revokeStaffInvitation(
   supabase: SupabaseClient,
   invitationId: string,
-  providerId: string,
 ): Promise<void> {
-  const { error } = await supabase
-    .from("provider_invitations")
-    .update({ revoked_at: new Date().toISOString() })
-    .eq("id", invitationId)
-    .eq("provider_id", providerId);
+  const { error } = await supabase.rpc("revoke_staff_invitation", {
+    p_invitation_id: invitationId,
+  });
 
   if (error) {
     throw new Error(`Failed to revoke invitation: ${error.message}`);

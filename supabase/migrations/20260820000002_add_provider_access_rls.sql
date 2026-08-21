@@ -1,6 +1,6 @@
 -- Migration: 20260820000002_add_provider_access_rls.sql
--- Description: Least-privilege RLS policies, public Provider projection, and atomic onboarding/invitation RPCs
--- Reference: Tracknologia Lead Decisions LD-01, LD-03; Auth Re-review AUTH-R19 through AUTH-R29
+-- Description: Least-privilege RLS policies, public Provider projection, atomic RPCs, and narrow invitation lifecycle operations
+-- Reference: Tracknologia Lead Decisions LD-01, LD-03; Auth Re-review AUTH-R19 through AUTH-R30
 
 -- 1. Enable Row Level Security
 ALTER TABLE public.providers ENABLE ROW LEVEL SECURITY;
@@ -31,11 +31,13 @@ WHERE accepting_requests = true;
 GRANT SELECT ON public.public_provider_profiles TO anon, authenticated;
 
 -- Table Grants:
--- NOTE: anon has NO direct SELECT on raw public.providers table (they must query public_provider_profiles).
+-- NOTE: anon has NO direct SELECT on raw public.providers table.
+-- NOTE: authenticated users have SELECT on provider_invitations, but NO direct INSERT/UPDATE/DELETE.
 GRANT SELECT, UPDATE ON public.providers TO authenticated;
 GRANT SELECT, INSERT, UPDATE ON public.provider_user_profiles TO authenticated;
 GRANT SELECT ON public.provider_memberships TO authenticated;
-GRANT SELECT, INSERT, UPDATE ON public.provider_invitations TO authenticated;
+GRANT SELECT ON public.provider_invitations TO authenticated;
+REVOKE INSERT, UPDATE, DELETE ON public.provider_invitations FROM authenticated, anon;
 
 -- 3. Non-recursive SECURITY DEFINER helper to return provider IDs of current authenticated user
 DROP FUNCTION IF EXISTS public.get_auth_user_provider_ids();
@@ -123,7 +125,7 @@ CREATE POLICY "Users can update own profile"
     user_id = auth.uid()
   );
 
--- 7. RLS Policies on provider_invitations
+-- 7. RLS Policies on provider_invitations (SELECT only; direct INSERT/UPDATE/DELETE denied)
 DROP POLICY IF EXISTS "Owners can view invitations" ON public.provider_invitations;
 DROP POLICY IF EXISTS "Owners can create invitations" ON public.provider_invitations;
 DROP POLICY IF EXISTS "Owners can revoke invitations" ON public.provider_invitations;
@@ -139,36 +141,130 @@ CREATE POLICY "Owners can view invitations"
     )
   );
 
-CREATE POLICY "Owners can create invitations"
-  ON public.provider_invitations
-  FOR INSERT
-  TO authenticated
-  WITH CHECK (
-    provider_id IN (
-      SELECT provider_id FROM public.provider_memberships
-      WHERE user_id = auth.uid() AND role = 'OWNER'
-    )
-    AND invited_by_user_id = auth.uid()
-  );
+-- 8. Narrow RPC: Create Staff Invitation (SHOP-only, Owner-verified, token hash digest only)
+DROP FUNCTION IF EXISTS public.create_staff_invitation(TEXT, TEXT, TIMESTAMPTZ);
+CREATE OR REPLACE FUNCTION public.create_staff_invitation(
+  p_email TEXT,
+  p_token_hash TEXT,
+  p_expires_at TIMESTAMPTZ DEFAULT (now() + interval '7 days')
+)
+RETURNS TABLE (
+  invitation_id UUID,
+  provider_id UUID,
+  email TEXT,
+  role public.membership_role,
+  created_at TIMESTAMPTZ,
+  expires_at TIMESTAMPTZ
+)
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path = public, pg_temp
+AS $$
+DECLARE
+  v_user_id UUID;
+  v_provider_id UUID;
+  v_provider_type public.provider_type;
+  v_invitation_id UUID;
+  v_created_at TIMESTAMPTZ;
+  v_expires_at TIMESTAMPTZ;
+  v_clean_email TEXT;
+BEGIN
+  v_user_id := auth.uid();
+  IF v_user_id IS NULL THEN
+    RAISE EXCEPTION 'Authentication required';
+  END IF;
 
-CREATE POLICY "Owners can revoke invitations"
-  ON public.provider_invitations
-  FOR UPDATE
-  TO authenticated
-  USING (
-    provider_id IN (
-      SELECT provider_id FROM public.provider_memberships
-      WHERE user_id = auth.uid() AND role = 'OWNER'
-    )
+  v_clean_email := lower(trim(p_email));
+  IF v_clean_email IS NULL OR v_clean_email = '' THEN
+    RAISE EXCEPTION 'Valid email address is required';
+  END IF;
+
+  IF p_token_hash IS NULL OR p_token_hash !~* '^[a-f0-9]{64}$' THEN
+    RAISE EXCEPTION 'Invalid token hash format';
+  END IF;
+
+  -- Invariant: Verify caller is OWNER of a SHOP provider
+  SELECT pm.provider_id, p.provider_type
+  INTO v_provider_id, v_provider_type
+  FROM public.provider_memberships pm
+  JOIN public.providers p ON p.id = pm.provider_id
+  WHERE pm.user_id = v_user_id AND pm.role = 'OWNER'
+  LIMIT 1;
+
+  IF v_provider_id IS NULL THEN
+    RAISE EXCEPTION 'Only Provider Owners can invite staff members';
+  END IF;
+
+  IF v_provider_type <> 'SHOP' THEN
+    RAISE EXCEPTION 'Staff invitations are only valid for Repair Shops';
+  END IF;
+
+  INSERT INTO public.provider_invitations (
+    provider_id,
+    email,
+    role,
+    token_hash,
+    invited_by_user_id,
+    expires_at
+  ) VALUES (
+    v_provider_id,
+    v_clean_email,
+    'STAFF'::public.membership_role,
+    p_token_hash,
+    v_user_id,
+    COALESCE(p_expires_at, now() + interval '7 days')
   )
-  WITH CHECK (
-    provider_id IN (
-      SELECT provider_id FROM public.provider_memberships
-      WHERE user_id = auth.uid() AND role = 'OWNER'
-    )
-  );
+  RETURNING id, created_at, expires_at INTO v_invitation_id, v_created_at, v_expires_at;
 
--- 8. Atomic RPC: Create Provider with Initial OWNER (Independent or Shop Owner Onboarding)
+  RETURN QUERY SELECT v_invitation_id, v_provider_id, v_clean_email, 'STAFF'::public.membership_role, v_created_at, v_expires_at;
+END;
+$$;
+
+-- 9. Narrow RPC: Revoke Staff Invitation (Pending -> Revoked transition only)
+DROP FUNCTION IF EXISTS public.revoke_staff_invitation(UUID);
+CREATE OR REPLACE FUNCTION public.revoke_staff_invitation(
+  p_invitation_id UUID
+)
+RETURNS BOOLEAN
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path = public, pg_temp
+AS $$
+DECLARE
+  v_user_id UUID;
+  v_provider_id UUID;
+  v_rows_updated INT;
+BEGIN
+  v_user_id := auth.uid();
+  IF v_user_id IS NULL THEN
+    RAISE EXCEPTION 'Authentication required';
+  END IF;
+
+  SELECT pm.provider_id INTO v_provider_id
+  FROM public.provider_memberships pm
+  WHERE pm.user_id = v_user_id AND pm.role = 'OWNER';
+
+  IF v_provider_id IS NULL THEN
+    RAISE EXCEPTION 'Only Provider Owners can revoke staff invitations';
+  END IF;
+
+  UPDATE public.provider_invitations
+  SET revoked_at = now()
+  WHERE id = p_invitation_id
+    AND provider_id = v_provider_id
+    AND accepted_at IS NULL
+    AND revoked_at IS NULL;
+
+  GET DIAGNOSTICS v_rows_updated = ROW_COUNT;
+  IF v_rows_updated = 0 THEN
+    RAISE EXCEPTION 'Invitation not found, already accepted, or already revoked';
+  END IF;
+
+  RETURN TRUE;
+END;
+$$;
+
+-- 10. Atomic RPC: Create Provider with Initial OWNER (Independent or Shop Owner Onboarding)
 DROP FUNCTION IF EXISTS public.create_provider_with_owner(TEXT, public.provider_type);
 DROP FUNCTION IF EXISTS public.create_provider_with_owner(TEXT, public.provider_type, TEXT, TEXT, TEXT, TEXT, TEXT, TEXT, TEXT[]);
 
@@ -207,6 +303,13 @@ BEGIN
     RAISE EXCEPTION 'Authentication required';
   END IF;
 
+  IF trim(p_display_name) = '' THEN
+    RAISE EXCEPTION 'Provider display name cannot be blank';
+  END IF;
+
+  -- Phase 3: Transactionally serialize all membership-establishing operations per User
+  PERFORM pg_advisory_xact_lock(hashtext(v_user_id::text));
+
   -- Invariant: User cannot already have ANY active provider membership
   IF EXISTS (SELECT 1 FROM public.provider_memberships pm WHERE pm.user_id = v_user_id) THEN
     RAISE EXCEPTION 'User already has an active provider membership';
@@ -216,7 +319,7 @@ BEGIN
 
   v_owner_name := COALESCE(NULLIF(trim(p_owner_display_name), ''), NULLIF(trim(p_display_name), ''), NULLIF(trim(v_user_email), ''), 'Owner');
 
-  -- Generate unique slug
+  -- Generate unique slug with bounded retry / suffix
   v_base_slug := lower(regexp_replace(COALESCE(NULLIF(trim(p_display_name), ''), 'provider'), '[^a-zA-Z0-9]+', '-', 'g'));
   v_base_slug := trim(both '-' from v_base_slug);
   IF v_base_slug = '' THEN
@@ -280,7 +383,7 @@ BEGIN
 END;
 $$;
 
--- 9. Atomic RPC: Accept Staff Invitation (Shop Staff Onboarding)
+-- 11. Atomic RPC: Accept Staff Invitation (Shop Staff Onboarding)
 DROP FUNCTION IF EXISTS public.accept_staff_invitation(TEXT);
 DROP FUNCTION IF EXISTS public.accept_staff_invitation(TEXT, TEXT, TEXT);
 
@@ -314,7 +417,14 @@ BEGIN
     RAISE EXCEPTION 'Authentication required';
   END IF;
 
-  -- Invariant: User cannot already have ANY active provider membership while multi-provider is unsupported
+  IF trim(p_display_name) = '' THEN
+    RAISE EXCEPTION 'Staff display name cannot be blank';
+  END IF;
+
+  -- Phase 3: Transactionally serialize all membership-establishing operations per User
+  PERFORM pg_advisory_xact_lock(hashtext(v_user_id::text));
+
+  -- Invariant: User cannot already have ANY active provider membership
   IF EXISTS (SELECT 1 FROM public.provider_memberships pm WHERE pm.user_id = v_user_id) THEN
     RAISE EXCEPTION 'User already has an active provider membership';
   END IF;
@@ -340,6 +450,11 @@ BEGIN
   END IF;
 
   SELECT u.email INTO v_user_email FROM auth.users u WHERE u.id = v_user_id;
+
+  -- P2: Email binding verification (Ensure authenticated user email matches invitation email if available)
+  IF v_user_email IS NOT NULL AND lower(trim(v_user_email)) <> lower(trim(v_invite_email)) THEN
+    RAISE EXCEPTION 'Authenticated email does not match invitation recipient';
+  END IF;
 
   v_staff_name := COALESCE(NULLIF(trim(p_display_name), ''), NULLIF(trim(v_user_email), ''), NULLIF(trim(v_invite_email), ''), 'Staff');
 
@@ -379,7 +494,7 @@ BEGIN
 END;
 $$;
 
--- 10. Safe RPC: Resolve Invitation & Shop Details (For Staff Onboarding UI)
+-- 12. Safe RPC: Resolve Invitation & Shop Details (For Staff Onboarding UI)
 DROP FUNCTION IF EXISTS public.get_invitation_details(TEXT);
 CREATE OR REPLACE FUNCTION public.get_invitation_details(
   p_token_hash TEXT
@@ -421,13 +536,18 @@ BEGIN
 END;
 $$;
 
--- 11. Explicit Grants and Revokes
+-- 13. Explicit Grants and Revokes
 REVOKE ALL ON FUNCTION public.create_provider_with_owner(TEXT, public.provider_type, TEXT, TEXT, TEXT, TEXT, TEXT, TEXT, TEXT[]) FROM PUBLIC;
 GRANT EXECUTE ON FUNCTION public.create_provider_with_owner(TEXT, public.provider_type, TEXT, TEXT, TEXT, TEXT, TEXT, TEXT, TEXT[]) TO authenticated;
+
+REVOKE ALL ON FUNCTION public.create_staff_invitation(TEXT, TEXT, TIMESTAMPTZ) FROM PUBLIC;
+GRANT EXECUTE ON FUNCTION public.create_staff_invitation(TEXT, TEXT, TIMESTAMPTZ) TO authenticated;
+
+REVOKE ALL ON FUNCTION public.revoke_staff_invitation(UUID) FROM PUBLIC;
+GRANT EXECUTE ON FUNCTION public.revoke_staff_invitation(UUID) TO authenticated;
 
 REVOKE ALL ON FUNCTION public.accept_staff_invitation(TEXT, TEXT, TEXT) FROM PUBLIC;
 GRANT EXECUTE ON FUNCTION public.accept_staff_invitation(TEXT, TEXT, TEXT) TO authenticated;
 
 REVOKE ALL ON FUNCTION public.get_invitation_details(TEXT) FROM PUBLIC;
 GRANT EXECUTE ON FUNCTION public.get_invitation_details(TEXT) TO authenticated, anon;
-

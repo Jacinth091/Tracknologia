@@ -21,8 +21,15 @@ import type {
 } from "./types";
 import { sendStaffInviteEmail } from "@/lib/email/client";
 
+import { requireUser } from "@/features/auth";
+import {
+  createIndependentProviderSchema,
+  createShopProviderSchema,
+} from "./schemas";
+
 /**
  * Creates a new Provider with its initial OWNER membership and person profile atomically.
+ * Owns business validation, authentication precondition, and value normalization.
  */
 export async function createProvider(
   input: CreateProviderInput,
@@ -30,7 +37,56 @@ export async function createProvider(
 ): Promise<{ providerId: string; membershipId: string; slug: string }> {
   const supabase = client ?? (await createClient());
 
-  return createProviderWithOwner(supabase, input);
+  // 1. Require authenticated user precondition
+  const user = await requireUser(supabase);
+  if (!user) {
+    throw new Error("Authentication required to create a provider");
+  }
+
+  // 2. Validate input with feature Zod schema based on provider type
+  if (input.providerType === "INDEPENDENT") {
+    const parsed = createIndependentProviderSchema.safeParse({
+      ownerName: input.ownerDisplayName,
+      displayName: input.displayName,
+      contactEmail: input.contactEmail,
+      contactPhone: input.contactPhone,
+      serviceArea: input.serviceArea,
+      supportedDevices: input.supportedDevices,
+    });
+    if (!parsed.success) {
+      throw new Error(parsed.error.issues[0]?.message ?? "Invalid independent provider input");
+    }
+  } else if (input.providerType === "SHOP") {
+    const parsed = createShopProviderSchema.safeParse({
+      ownerName: input.ownerDisplayName,
+      displayName: input.displayName,
+      contactEmail: input.contactEmail,
+      contactPhone: input.contactPhone,
+      publicAddress: input.publicAddress,
+      serviceArea: input.serviceArea,
+      supportedDevices: input.supportedDevices,
+    });
+    if (!parsed.success) {
+      throw new Error(parsed.error.issues[0]?.message ?? "Invalid shop provider input");
+    }
+  } else {
+    throw new Error("Invalid provider type");
+  }
+
+  // 3. Normalize values
+  const normalizedInput: CreateProviderInput = {
+    displayName: input.displayName.trim(),
+    providerType: input.providerType,
+    ownerDisplayName: input.ownerDisplayName ? input.ownerDisplayName.trim() : undefined,
+    ownerContactPhone: input.ownerContactPhone ? input.ownerContactPhone.trim() : undefined,
+    contactEmail: input.contactEmail ? input.contactEmail.trim().toLowerCase() : undefined,
+    contactPhone: input.contactPhone ? input.contactPhone.trim() : undefined,
+    publicAddress: input.publicAddress ? input.publicAddress.trim() : undefined,
+    serviceArea: input.serviceArea ? input.serviceArea.trim() : undefined,
+    supportedDevices: input.supportedDevices || [],
+  };
+
+  return createProviderWithOwner(supabase, normalizedInput);
 }
 
 export interface CreateStaffInvitationResult {
@@ -126,7 +182,7 @@ export async function revokeStaffInvitation(
   client?: SupabaseClient,
 ): Promise<void> {
   const supabase = client ?? (await createClient());
-  const context = await requireProviderRole(["OWNER"], supabase);
+  await requireProviderRole(["OWNER"], supabase);
 
-  return revokeStaffInvitationPersistence(supabase, invitationId, context.providerId);
+  return revokeStaffInvitationPersistence(supabase, invitationId);
 }
