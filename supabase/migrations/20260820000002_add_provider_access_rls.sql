@@ -143,10 +143,10 @@ CREATE POLICY "Owners can view invitations"
 
 -- 8. Narrow RPC: Create Staff Invitation (SHOP-only, Owner-verified, token hash digest only)
 DROP FUNCTION IF EXISTS public.create_staff_invitation(TEXT, TEXT, TIMESTAMPTZ);
+DROP FUNCTION IF EXISTS public.create_staff_invitation(TEXT, TEXT);
 CREATE OR REPLACE FUNCTION public.create_staff_invitation(
   p_email TEXT,
-  p_token_hash TEXT,
-  p_expires_at TIMESTAMPTZ DEFAULT (now() + interval '7 days')
+  p_token_hash TEXT
 )
 RETURNS TABLE (
   invitation_id UUID,
@@ -213,7 +213,7 @@ BEGIN
     'STAFF'::public.membership_role,
     p_token_hash,
     v_user_id,
-    COALESCE(p_expires_at, now() + interval '7 days')
+    now() + interval '7 days'
   )
   RETURNING
     pi.id,
@@ -300,17 +300,23 @@ DECLARE
   v_membership_id UUID;
   v_base_slug TEXT;
   v_slug TEXT;
-  v_counter INT := 0;
-  v_user_email TEXT;
   v_owner_name TEXT;
+  v_attempt INT := 0;
+  v_retry_limit CONSTANT INT := 25;
+  v_constraint_name TEXT;
 BEGIN
   v_user_id := auth.uid();
   IF v_user_id IS NULL THEN
     RAISE EXCEPTION 'Authentication required';
   END IF;
 
-  IF trim(p_display_name) = '' THEN
+  IF p_display_name IS NULL OR trim(p_display_name) = '' THEN
     RAISE EXCEPTION 'Provider display name cannot be blank';
+  END IF;
+
+  v_owner_name := NULLIF(trim(p_owner_display_name), '');
+  IF v_owner_name IS NULL THEN
+    RAISE EXCEPTION 'Owner display name cannot be blank';
   END IF;
 
   -- Phase 3: Transactionally serialize all membership-establishing operations per User
@@ -321,43 +327,52 @@ BEGIN
     RAISE EXCEPTION 'User already has an active provider membership';
   END IF;
 
-  SELECT u.email INTO v_user_email FROM auth.users u WHERE u.id = v_user_id;
-
-  v_owner_name := COALESCE(NULLIF(trim(p_owner_display_name), ''), NULLIF(trim(p_display_name), ''), NULLIF(trim(v_user_email), ''), 'Owner');
-
-  -- Generate unique slug with bounded retry / suffix
-  v_base_slug := lower(regexp_replace(COALESCE(NULLIF(trim(p_display_name), ''), 'provider'), '[^a-zA-Z0-9]+', '-', 'g'));
+  -- Generate slug candidates and let the UNIQUE constraint arbitrate collisions.
+  v_base_slug := lower(regexp_replace(trim(p_display_name), '[^a-zA-Z0-9]+', '-', 'g'));
   v_base_slug := trim(both '-' from v_base_slug);
   IF v_base_slug = '' THEN
     v_base_slug := 'provider';
   END IF;
 
-  v_slug := v_base_slug;
-  WHILE EXISTS (SELECT 1 FROM public.providers p WHERE p.slug = v_slug) LOOP
-    v_counter := v_counter + 1;
-    v_slug := v_base_slug || '-' || v_counter;
-  END LOOP;
-
   -- 1. Atomically insert Provider with full initial profile
-  INSERT INTO public.providers (
-    display_name,
-    provider_type,
-    slug,
-    contact_email,
-    contact_phone,
-    public_address,
-    service_area,
-    supported_devices
-  ) VALUES (
-    trim(p_display_name),
-    p_provider_type,
-    v_slug,
-    COALESCE(NULLIF(trim(p_contact_email), ''), v_user_email),
-    NULLIF(trim(p_contact_phone), ''),
-    NULLIF(trim(p_public_address), ''),
-    NULLIF(trim(p_service_area), ''),
-    COALESCE(p_supported_devices, '{}')
-  ) RETURNING public.providers.id INTO v_provider_id;
+  LOOP
+    v_attempt := v_attempt + 1;
+    v_slug := CASE
+      WHEN v_attempt = 1 THEN v_base_slug
+      ELSE v_base_slug || '-' || (v_attempt - 1)
+    END;
+
+    BEGIN
+      INSERT INTO public.providers (
+        display_name,
+        provider_type,
+        slug,
+        contact_email,
+        contact_phone,
+        public_address,
+        service_area,
+        supported_devices
+      ) VALUES (
+        trim(p_display_name),
+        p_provider_type,
+        v_slug,
+        NULLIF(trim(p_contact_email), ''),
+        NULLIF(trim(p_contact_phone), ''),
+        NULLIF(trim(p_public_address), ''),
+        NULLIF(trim(p_service_area), ''),
+        COALESCE(p_supported_devices, '{}')
+      ) RETURNING public.providers.id INTO v_provider_id;
+
+      EXIT;
+    EXCEPTION
+      WHEN unique_violation THEN
+        GET STACKED DIAGNOSTICS v_constraint_name = CONSTRAINT_NAME;
+        IF v_constraint_name = 'providers_slug_key' AND v_attempt < v_retry_limit THEN
+          CONTINUE;
+        END IF;
+        RAISE;
+    END;
+  END LOOP;
 
   -- 2. Atomically upsert person profile in provider_user_profiles
   INSERT INTO public.provider_user_profiles (
@@ -424,9 +439,10 @@ BEGIN
     RAISE EXCEPTION 'Authentication required';
   END IF;
 
-  IF trim(p_display_name) = '' THEN
+  IF p_display_name IS NULL OR trim(p_display_name) = '' THEN
     RAISE EXCEPTION 'Staff display name cannot be blank';
   END IF;
+  v_staff_name := NULLIF(trim(p_display_name), '');
 
   -- Phase 3: Transactionally serialize all membership-establishing operations per User
   PERFORM pg_advisory_xact_lock(hashtext(v_user_id::text));
@@ -462,8 +478,6 @@ BEGIN
   IF v_user_email IS NOT NULL AND lower(trim(v_user_email)) <> lower(trim(v_invite_email)) THEN
     RAISE EXCEPTION 'Authenticated email does not match invitation recipient';
   END IF;
-
-  v_staff_name := COALESCE(NULLIF(trim(p_display_name), ''), NULLIF(trim(v_user_email), ''), NULLIF(trim(v_invite_email), ''), 'Staff');
 
   -- 1. Atomically upsert person profile in provider_user_profiles
   INSERT INTO public.provider_user_profiles (
@@ -548,8 +562,8 @@ $$;
 REVOKE ALL ON FUNCTION public.create_provider_with_owner(TEXT, public.provider_type, TEXT, TEXT, TEXT, TEXT, TEXT, TEXT, TEXT[]) FROM PUBLIC;
 GRANT EXECUTE ON FUNCTION public.create_provider_with_owner(TEXT, public.provider_type, TEXT, TEXT, TEXT, TEXT, TEXT, TEXT, TEXT[]) TO authenticated;
 
-REVOKE ALL ON FUNCTION public.create_staff_invitation(TEXT, TEXT, TIMESTAMPTZ) FROM PUBLIC;
-GRANT EXECUTE ON FUNCTION public.create_staff_invitation(TEXT, TEXT, TIMESTAMPTZ) TO authenticated;
+REVOKE ALL ON FUNCTION public.create_staff_invitation(TEXT, TEXT) FROM PUBLIC;
+GRANT EXECUTE ON FUNCTION public.create_staff_invitation(TEXT, TEXT) TO authenticated;
 
 REVOKE ALL ON FUNCTION public.revoke_staff_invitation(UUID) FROM PUBLIC;
 GRANT EXECUTE ON FUNCTION public.revoke_staff_invitation(UUID) TO authenticated;
