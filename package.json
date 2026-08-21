@@ -14,8 +14,10 @@
     "format": "prettier --write .",
     "format:check": "prettier --check .",
     "typecheck": "next typegen && tsc --noEmit",
-    "test": "vitest",
-    "test:run": "vitest run --passWithNoTests"
+    "test": "vitest src tests/contracts",
+    "test:run": "vitest run --passWithNoTests src tests/contracts",
+    "test:db": "vitest run tests/integration/db.test.ts",
+    "db:reset": "supabase db reset"
   },
   "dependencies": {
     "@base-ui/react": "^1.7.0",

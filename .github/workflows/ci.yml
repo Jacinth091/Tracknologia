@@ -63,3 +63,52 @@ jobs:
 
       - name: Build application
         run: pnpm build
+
+  db-integration:
+    name: Database integration
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v7
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v6
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v6
+        with:
+          node-version: 24
+          cache: pnpm
+          cache-dependency-path: pnpm-lock.yaml
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Setup Supabase CLI
+        uses: supabase/setup-cli@v2
+
+      - name: Initialize local Supabase config
+        run: supabase init
+
+      - name: Prepare empty local seed
+        run: touch supabase/seed.sql
+
+      - name: Start local Supabase
+        run: supabase start
+
+      - name: Reset local database
+        run: pnpm db:reset
+
+      - name: Export local Supabase test environment
+        shell: bash
+        run: |
+          supabase status -o env \
+            --override-name api.url=SUPABASE_TEST_URL \
+            --override-name auth.anon_key=SUPABASE_TEST_ANON_KEY \
+            --override-name auth.service_role_key=SUPABASE_TEST_SERVICE_ROLE_KEY \
+            | sed -E 's/^([^=]+)="(.*)"$/\1=\2/' >> "$GITHUB_ENV"
+
+      - name: Run database integration tests
+        run: pnpm test:db
