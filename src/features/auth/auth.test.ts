@@ -277,7 +277,7 @@ describe("Auth Module — Persistence Membership Queries", () => {
   });
 });
 
-describe("Auth — Validation Schemas", () => {
+describe("Auth — Validation Schemas & Registration Secrets", () => {
   it("validates login inputs correctly", () => {
     const valid = loginSchema.safeParse({
       email: "test@example.com",

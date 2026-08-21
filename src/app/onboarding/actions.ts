@@ -16,11 +16,14 @@ export interface OnboardingActionState {
   fieldErrors?: Record<string, string>;
 }
 
+import { cookies } from "next/headers";
+
 export async function onboardIndependentAction(
   _prevState: OnboardingActionState | null,
   formData: FormData,
 ): Promise<OnboardingActionState> {
   const supabase = await createClient();
+  const ownerContactPhone = formData.get("ownerContactPhone")?.toString() || undefined;
   const rawData = {
     ownerName: formData.get("ownerName")?.toString() ?? "",
     displayName: formData.get("displayName")?.toString() ?? "",
@@ -50,7 +53,7 @@ export async function onboardIndependentAction(
         displayName: parsed.data.displayName,
         providerType: "INDEPENDENT",
         ownerDisplayName: parsed.data.ownerName,
-        ownerContactPhone: parsed.data.contactPhone,
+        ownerContactPhone: ownerContactPhone,
         contactEmail: parsed.data.contactEmail,
         contactPhone: parsed.data.contactPhone,
         serviceArea: parsed.data.serviceArea,
@@ -72,6 +75,7 @@ export async function onboardShopAction(
   formData: FormData,
 ): Promise<OnboardingActionState> {
   const supabase = await createClient();
+  const ownerContactPhone = formData.get("ownerContactPhone")?.toString() || undefined;
   const rawData = {
     ownerName: formData.get("ownerName")?.toString() ?? "",
     displayName: formData.get("displayName")?.toString() ?? "",
@@ -102,7 +106,7 @@ export async function onboardShopAction(
         displayName: parsed.data.displayName,
         providerType: "SHOP",
         ownerDisplayName: parsed.data.ownerName,
-        ownerContactPhone: parsed.data.contactPhone,
+        ownerContactPhone: ownerContactPhone,
         contactEmail: parsed.data.contactEmail,
         contactPhone: parsed.data.contactPhone,
         publicAddress: parsed.data.publicAddress,
@@ -158,6 +162,8 @@ export async function acceptStaffInviteAction(
       },
       supabase,
     );
+    const cookieStore = await cookies();
+    cookieStore.delete("tracknologia_staff_invite");
   } catch (err: unknown) {
     return {
       error: err instanceof Error ? err.message : "Invalid, expired, or already accepted invitation",

@@ -27,7 +27,6 @@ export async function registerProviderAccount(params: RegisterInput & { emailRed
       data: {
         intent: params.intent,
         provider_type: params.intent === "SHOP" || params.intent === "INDEPENDENT" ? params.intent : undefined,
-        invite_token: params.intent === "STAFF" ? params.inviteToken : undefined,
       },
     },
   });

@@ -84,6 +84,18 @@ export async function registerAction(
     };
   }
 
+  // Store temporary staff invitation token in secure httpOnly cookie (never in Auth metadata)
+  if (parsed.data.intent === "STAFF" && parsed.data.inviteToken) {
+    const cookieStore = await cookies();
+    cookieStore.set("tracknologia_staff_invite", parsed.data.inviteToken, {
+      httpOnly: true,
+      sameSite: "lax",
+      secure: process.env.NODE_ENV === "production",
+      path: "/onboarding",
+      maxAge: 60 * 60 * 24 * 7,
+    });
+  }
+
   const origin = await resolveAppOrigin();
   const emailRedirectTo = `${origin}/auth/callback?next=/confirmed`;
 
