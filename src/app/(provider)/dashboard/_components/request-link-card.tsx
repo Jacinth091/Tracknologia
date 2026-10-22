@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useRef, useState } from "react";
+import { useRef } from "react";
 
 import { buttonVariants } from "@/components/ui/button";
 import {
@@ -11,7 +11,7 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
-import { cn } from "@/lib/utils";
+import { CopyButton } from "./copy-button";
 
 export function RequestLinkCard({
   url,
@@ -20,34 +20,7 @@ export function RequestLinkCard({
   url: string;
   acceptingRequests: boolean;
 }) {
-  const [copied, setCopied] = useState(false);
   const urlRef = useRef<HTMLElement>(null);
-
-  function selectUrl() {
-    const node = urlRef.current;
-    if (!node) {
-      return;
-    }
-    const selection = window.getSelection();
-    const range = document.createRange();
-    range.selectNodeContents(node);
-    selection?.removeAllRanges();
-    selection?.addRange(range);
-  }
-
-  async function copyUrl() {
-    if (navigator.clipboard) {
-      try {
-        await navigator.clipboard.writeText(url);
-        setCopied(true);
-        window.setTimeout(() => setCopied(false), 2000);
-        return;
-      } catch {
-        // Clipboard was refused; fall back to selecting the link below.
-      }
-    }
-    selectUrl();
-  }
 
   return (
     <Card>
@@ -66,18 +39,7 @@ export function RequestLinkCard({
           {url}
         </code>
         <div className="flex flex-wrap items-center gap-2">
-          <button
-            type="button"
-            onClick={copyUrl}
-            className={cn(
-              buttonVariants({
-                variant: copied ? "default" : "outline",
-                size: "sm",
-              }),
-            )}
-          >
-            {copied ? "Copied" : "Copy"}
-          </button>
+          <CopyButton text={url} targetRef={urlRef} />
           <a
             href={url}
             target="_blank"

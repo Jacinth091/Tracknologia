@@ -1,6 +1,6 @@
 "use client";
 
-import { useActionState, useState, type ReactNode } from "react";
+import { useActionState, useRef, useState, type ReactNode } from "react";
 import { HugeiconsIcon } from "@hugeicons/react";
 import {
   AlertCircleIcon,
@@ -38,6 +38,8 @@ import { Label } from "@/components/ui/label";
 import { LoadingSpinner } from "@/components/ui/loading-spinner";
 import type { ProviderInvitation, TeamMember } from "@/features/providers";
 
+import { CopyButton } from "../../_components/copy-button";
+
 interface TeamClientProps {
   isOwner: boolean;
   isShop: boolean;
@@ -65,7 +67,7 @@ export function TeamClient({
     removeStaffAction,
     null,
   );
-  const [copied, setCopied] = useState(false);
+  const inviteInputRef = useRef<HTMLInputElement>(null);
   const [confirmingRemovalId, setConfirmingRemovalId] = useState<string | null>(
     null,
   );
@@ -98,12 +100,6 @@ export function TeamClient({
   }
 
   const staffMembers = members.filter((member) => member.role === "STAFF");
-
-  const handleCopy = (text: string) => {
-    navigator.clipboard.writeText(text);
-    setCopied(true);
-    setTimeout(() => setCopied(false), 2000);
-  };
 
   return (
     <div className="flex flex-col gap-6 lg:flex-row lg:items-start">
@@ -225,22 +221,17 @@ export function TeamClient({
 
                   <div className="flex items-center gap-2">
                     <Input
+                      ref={inviteInputRef}
                       readOnly
                       value={`${typeof window !== "undefined" ? window.location.origin : ""}${state.inviteUrl}`}
                       className="bg-background font-mono text-xs"
                     />
-                    <Button
-                      type="button"
-                      variant="outline"
-                      size="sm"
-                      onClick={() =>
-                        handleCopy(
-                          `${typeof window !== "undefined" ? window.location.origin : ""}${state.inviteUrl}`,
-                        )
-                      }
-                    >
-                      {copied ? "Copied!" : "Copy Link"}
-                    </Button>
+                    <CopyButton
+                      text={`${typeof window !== "undefined" ? window.location.origin : ""}${state.inviteUrl}`}
+                      targetRef={inviteInputRef}
+                      label="Copy Link"
+                      copiedLabel="Copied!"
+                    />
                   </div>
 
                   <div className="flex items-center gap-2 text-xs text-muted-foreground">
