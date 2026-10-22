@@ -19,7 +19,10 @@ vi.mock("react", async (importOriginal) => ({
   useActionState: actionState,
 }));
 vi.mock("next/navigation", () => ({ usePathname: pathname }));
-vi.mock("@/app/(auth)/actions", () => ({ registerAction: vi.fn() }));
+vi.mock("@/app/(auth)/actions", () => ({
+  registerAction: vi.fn(),
+  signOutAction: vi.fn(),
+}));
 vi.mock("@/app/(public)/track/actions", () => ({ trackRepairAction: vi.fn() }));
 vi.mock("@/app/(public)/p/[providerSlug]/request/actions", () => ({
   submitRepairRequestAction: vi.fn(),
