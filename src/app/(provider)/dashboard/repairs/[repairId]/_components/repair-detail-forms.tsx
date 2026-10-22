@@ -2,6 +2,7 @@
 
 import { useActionState } from "react";
 
+import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
 import {
   Card,
@@ -32,19 +33,16 @@ import { repairStatusLabel } from "../../_components/repair-status-badge";
 function ActionMessage({ state }: { state: RepairActionState | null }) {
   if (state?.error) {
     return (
-      <p
-        className="rounded-xl border border-destructive/20 bg-destructive/10 p-3 text-sm text-destructive"
-        role="alert"
-      >
-        {state.error}
-      </p>
+      <Alert variant="destructive" role="alert">
+        <AlertDescription>{state.error}</AlertDescription>
+      </Alert>
     );
   }
   if (state?.success) {
     return (
-      <p className="rounded-xl border border-primary/20 bg-primary/10 p-3 text-sm text-foreground">
-        {state.success}
-      </p>
+      <Alert>
+        <AlertDescription>{state.success}</AlertDescription>
+      </Alert>
     );
   }
   return null;
@@ -72,29 +70,21 @@ function repairValues(repair: RepairDetail): RepairFieldValues {
   };
 }
 
-export function RepairDetailForms({
-  repair,
-  serviceModes,
+// Lifecycle actions for the sticky status panel. Rendered without its own
+// Card so the page can place it inside the panel.
+export function RepairLifecycleActions({
+  repairId,
   allowedTransitions,
 }: {
-  repair: RepairDetail;
-  serviceModes: ProviderServiceMode[];
+  repairId: string;
   allowedTransitions: RepairStatus[];
 }) {
-  const [detailState, detailAction, detailPending] = useActionState(
-    updateRepairDetailsAction,
-    null,
-  );
   const [statusState, statusAction, statusPending] = useActionState(
     changeRepairStatusAction,
     null,
   );
   const [completeState, completeAction, completePending] = useActionState(
     completeRepairAction,
-    null,
-  );
-  const [updateState, updateAction, updatePending] = useActionState(
-    addCustomerUpdateAction,
     null,
   );
   const operationalTransitions = allowedTransitions.filter(
@@ -104,50 +94,61 @@ export function RepairDetailForms({
   const canComplete = allowedTransitions.includes("COMPLETED");
 
   return (
-    <div className="space-y-6">
-      <Card>
-        <CardHeader>
-          <CardTitle>Repair status</CardTitle>
-          <CardDescription>
-            Choose the status that reflects what is happening with this repair.
-          </CardDescription>
-        </CardHeader>
-        <CardContent className="space-y-4">
-          <ActionMessage state={statusState} />
-          <ActionMessage state={completeState} />
-          {operationalTransitions.length > 0 ? (
-            <form action={statusAction} className="flex flex-wrap gap-2">
-              <input type="hidden" name="repairId" value={repair.id} />
-              {operationalTransitions.map((status) => (
-                <Button
-                  key={status}
-                  type="submit"
-                  name="nextStatus"
-                  value={status}
-                  variant={status === "READY" ? "default" : "outline"}
-                  disabled={statusPending || completePending}
-                >
-                  {statusPending ? "Updating..." : repairStatusLabel(status)}
-                </Button>
-              ))}
-            </form>
-          ) : null}
-          {canComplete ? (
-            <form action={completeAction}>
-              <input type="hidden" name="repairId" value={repair.id} />
-              <Button type="submit" disabled={completePending || statusPending}>
-                {completePending ? "Completing..." : "Mark Completed"}
-              </Button>
-            </form>
-          ) : null}
-          {allowedTransitions.length === 0 ? (
-            <p className="text-sm text-muted-foreground">
-              This repair is completed and cannot be reopened.
-            </p>
-          ) : null}
-        </CardContent>
-      </Card>
+    <div className="space-y-4">
+      <ActionMessage state={statusState} />
+      <ActionMessage state={completeState} />
+      {operationalTransitions.length > 0 ? (
+        <form action={statusAction} className="flex flex-wrap gap-2">
+          <input type="hidden" name="repairId" value={repairId} />
+          {operationalTransitions.map((status) => (
+            <Button
+              key={status}
+              type="submit"
+              name="nextStatus"
+              value={status}
+              variant={status === "READY" ? "default" : "outline"}
+              disabled={statusPending || completePending}
+            >
+              {statusPending ? "Updating..." : repairStatusLabel(status)}
+            </Button>
+          ))}
+        </form>
+      ) : null}
+      {canComplete ? (
+        <form action={completeAction}>
+          <input type="hidden" name="repairId" value={repairId} />
+          <Button type="submit" disabled={completePending || statusPending}>
+            {completePending ? "Completing..." : "Mark Completed"}
+          </Button>
+        </form>
+      ) : null}
+      {allowedTransitions.length === 0 ? (
+        <p className="text-sm text-muted-foreground">
+          This repair is completed and cannot be reopened.
+        </p>
+      ) : null}
+    </div>
+  );
+}
 
+export function RepairDetailForms({
+  repair,
+  serviceModes,
+}: {
+  repair: RepairDetail;
+  serviceModes: ProviderServiceMode[];
+}) {
+  const [detailState, detailAction, detailPending] = useActionState(
+    updateRepairDetailsAction,
+    null,
+  );
+  const [updateState, updateAction, updatePending] = useActionState(
+    addCustomerUpdateAction,
+    null,
+  );
+
+  return (
+    <div className="space-y-6">
       <Card>
         <CardHeader>
           <CardTitle>Add Customer Update</CardTitle>
