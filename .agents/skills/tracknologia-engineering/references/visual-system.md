@@ -16,7 +16,7 @@ Use the installed project's actual theme variables as the source of truth. Do no
 ## Palette Direction
 
 Use the approved **Hi-Vis on Paper** brand (the shipped "Workshop Hi-Vis"
-direction): warm Paper, Ink, cream cards, and selective yellow action fills. The
+direction): soft Paper app background (`#FAF8F3`; brand Paper `#FBF6E9` is the reference), Ink, white cards, and selective yellow action fills. The
 canonical palette, supplied vector provenance, control styling, and rollout scope
 are in
 [UI and Information Architecture](../../../../docs/18_UI_INFORMATION_ARCHITECTURE.md#brand-foundation).

@@ -7,8 +7,8 @@ direction. `src/app/globals.css` owns the light and `.dark` palettes:
 
 | Role           | Light                          | Dark            |
 | -------------- | ------------------------------ | --------------- |
-| Background     | Paper `#FBF6E9`                | Ink `#141414`   |
-| Card           | `#FFFDF7`                      | `#1E1D1A`       |
+| Background     | Soft Paper `#FAF8F3` (brand Paper `#FBF6E9` is the reference) | Ink `#141414`   |
+| Card           | `#FFFFFF`                      | `#1E1D1A`       |
 | Text           | Ink `#141414`                  | Paper `#FBF6E9` |
 | Muted text     | `#6B6455`                      | `#B5AC98`       |
 | Primary action | Yellow `#FFC72C` with Ink text | Same            |
