@@ -60,7 +60,7 @@ export function ProviderNav({
     <>
       <nav
         aria-label="Provider navigation"
-        className="hidden self-stretch gap-1 md:flex"
+        className="hidden items-center gap-1 md:flex"
       >
         {links.map(({ href, label, active }) => (
           <Link
@@ -68,9 +68,9 @@ export function ProviderNav({
             href={href}
             aria-current={active ? "page" : undefined}
             className={cn(
-              "relative inline-flex items-center px-3 text-sm font-medium transition-colors",
+              "relative inline-flex items-center rounded-md px-3 py-2 text-sm font-medium transition-colors",
               active
-                ? "text-foreground after:absolute after:inset-x-3 after:bottom-0 after:h-0.5 after:bg-primary"
+                ? "text-foreground after:absolute after:inset-x-3 after:bottom-1 after:h-0.5 after:bg-primary"
                 : "text-muted-foreground hover:text-foreground",
             )}
           >
