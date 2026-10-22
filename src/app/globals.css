@@ -136,6 +136,33 @@
   }
 }
 
+/* Charging gauge loader: the pie fills and holds; static at ~60% if reduced. */
+.gauge-charge-pie {
+  stroke-dasharray: 60 100;
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  .gauge-charge-pie {
+    animation: gauge-charge 1.8s ease-in-out infinite;
+  }
+}
+
+@keyframes gauge-charge {
+  0% {
+    stroke-dasharray: 2 100;
+  }
+  60%,
+  100% {
+    stroke-dasharray: 60 100;
+  }
+}
+
+/* On a yellow primary button the pie is ink-tinted so it shows on the fill. */
+.bg-primary[data-slot="button"] [data-slot="loading-spinner"] .gauge-charge-pie {
+  stroke: var(--primary-foreground);
+  stroke-opacity: 0.45;
+}
+
 @keyframes status-gauge-hold {
   50% {
     opacity: 0.6;
