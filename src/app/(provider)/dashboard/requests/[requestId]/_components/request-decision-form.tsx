@@ -2,6 +2,7 @@
 
 import { useActionState } from "react";
 
+import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
 import {
   Card,
@@ -121,12 +122,9 @@ export function RequestDecisionForm({
             <input type="hidden" name="requestId" value={request.id} />
 
             {acceptState?.error && (
-              <div
-                role="alert"
-                className="rounded-xl border border-destructive/20 bg-destructive/10 p-3 text-sm text-destructive"
-              >
-                {acceptState.error}
-              </div>
+              <Alert variant="destructive" role="alert">
+                <AlertDescription>{acceptState.error}</AlertDescription>
+              </Alert>
             )}
 
             <section className="space-y-4">
@@ -433,9 +431,9 @@ export function RequestDecisionForm({
           >
             <input type="hidden" name="requestId" value={request.id} />
             {declineState?.error && (
-              <p role="alert" className="text-sm text-destructive">
-                {declineState.error}
-              </p>
+              <Alert variant="destructive" role="alert">
+                <AlertDescription>{declineState.error}</AlertDescription>
+              </Alert>
             )}
             <Button
               type="submit"
