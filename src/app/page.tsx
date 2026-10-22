@@ -183,7 +183,7 @@ export default function Home() {
           <h2 className="text-3xl font-bold tracking-tight text-balance">
             From request to return.
           </h2>
-          <ol className="mt-10 grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+          <ol className="mt-10 grid grid-cols-2 gap-4 lg:grid-cols-4">
             {journey.map((step) => (
               <li key={step.status}>
                 <Card className="h-full p-5">
@@ -247,8 +247,8 @@ export default function Home() {
         </section>
       </main>
 
-      <footer className="bg-foreground px-4 py-8 text-background sm:px-6">
-        <div className="mx-auto flex max-w-6xl flex-col gap-6 sm:flex-row sm:items-center sm:justify-between">
+      <footer className="bg-foreground py-8 text-background">
+        <div className="mx-auto flex max-w-6xl flex-col gap-6 px-4 sm:flex-row sm:items-center sm:justify-between sm:px-6">
           <div className="flex flex-col gap-3">
             <BrandLogo className="text-background" />
             <p className="text-xs text-background/70">
