@@ -38,26 +38,6 @@ function formatDateTime(value: string) {
   }).format(date);
 }
 
-const DEVICE_SUMMARY_SEPARATOR = " · ";
-
-function splitDeviceSummary(summary: string) {
-  const separatorIndex = summary.lastIndexOf(DEVICE_SUMMARY_SEPARATOR);
-  if (separatorIndex === -1) {
-    return { deviceType: summary, brandModel: null };
-  }
-
-  const brandModel = summary.slice(0, separatorIndex).trim();
-  const deviceType = summary
-    .slice(separatorIndex + DEVICE_SUMMARY_SEPARATOR.length)
-    .trim();
-
-  if (!brandModel || !deviceType) {
-    return { deviceType: summary, brandModel: null };
-  }
-
-  return { deviceType, brandModel };
-}
-
 function formatRelativeTime(value: string) {
   const date = new Date(value);
   if (Number.isNaN(date.getTime())) {
@@ -198,7 +178,7 @@ function TrackingResult({ view }: { view: PublicRepairView }) {
   const [latestUpdate, ...earlierUpdates] = view.customerUpdates;
   const eyebrow =
     view.trackingType === "REQUEST" ? "Repair request" : "Customer tracking";
-  const { deviceType, brandModel } = splitDeviceSummary(view.deviceSummary);
+  const { deviceType, brandModel } = view;
   const relativeLastUpdate = formatRelativeTime(view.lastUpdatedAt);
   const lastUpdate = relativeLastUpdate
     ? `${relativeLastUpdate} · ${formatDateTime(view.lastUpdatedAt)}`

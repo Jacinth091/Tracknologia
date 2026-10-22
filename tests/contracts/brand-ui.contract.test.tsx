@@ -143,6 +143,8 @@ describe("Provider navigation", () => {
 const view: PublicRepairView = {
   providerDisplayName: "River Repair",
   deviceSummary: "Customer laptop",
+  deviceType: "Customer laptop",
+  brandModel: null,
   currentStatus: "READY",
   statusLabel: "Ready",
   statusDescription: "Your device is ready.",
