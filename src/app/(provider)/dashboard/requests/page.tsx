@@ -28,6 +28,8 @@ export const metadata: Metadata = {
   description: "Review customer-submitted Repair Requests",
 };
 
+const PAGE_SIZE = 25;
+
 const FILTERS: Array<{ label: string; status?: RepairRequestStatus }> = [
   { label: "All" },
   { label: "Submitted", status: "SUBMITTED" },
@@ -84,6 +86,8 @@ export default async function RepairRequestsPage({
   );
   const page = parsedPage.success ? parsedPage.data : 1;
   const requestPage = await listRepairRequests({ status, page });
+  const rangeStart = (requestPage.page - 1) * PAGE_SIZE + 1;
+  const rangeEnd = rangeStart + requestPage.items.length - 1;
 
   return (
     <div className="space-y-6">
@@ -187,7 +191,7 @@ export default async function RepairRequestsPage({
         </Card>
       )}
 
-      {requestPage.hasPrevious || requestPage.hasNext ? (
+      {requestPage.items.length > 0 ? (
         <nav
           className="flex items-center justify-between gap-3"
           aria-label="Repair Request pagination"
@@ -215,7 +219,7 @@ export default async function RepairRequestsPage({
           )}
 
           <span className="text-sm tabular-nums text-muted-foreground">
-            Page {requestPage.page}
+            Page {requestPage.page} · Showing {rangeStart}–{rangeEnd}
           </span>
 
           {requestPage.hasNext ? (

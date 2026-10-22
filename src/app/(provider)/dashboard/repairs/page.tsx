@@ -36,6 +36,8 @@ export const metadata: Metadata = {
   description: "Manage active and completed Repairs",
 };
 
+const PAGE_SIZE = 25;
+
 const FILTERS: Array<{ label: string; status?: RepairListStatus }> = [
   { label: "All" },
   { label: "In Progress", status: "IN_PROGRESS" },
@@ -112,6 +114,8 @@ export default async function RepairsPage({
     ? optionsResult.data
     : { status, page: 1, query: undefined };
   const repairPage = await listRepairs(options);
+  const rangeStart = (repairPage.page - 1) * PAGE_SIZE + 1;
+  const rangeEnd = rangeStart + repairPage.items.length - 1;
 
   return (
     <div className="space-y-6">
@@ -270,7 +274,7 @@ export default async function RepairsPage({
         </Card>
       )}
 
-      {repairPage.hasPrevious || repairPage.hasNext ? (
+      {repairPage.items.length > 0 ? (
         <nav
           className="flex items-center justify-between gap-3"
           aria-label="Repair pagination"
@@ -301,7 +305,7 @@ export default async function RepairsPage({
             </span>
           )}
           <span className="text-sm tabular-nums text-muted-foreground">
-            Page {repairPage.page}
+            Page {repairPage.page} · Showing {rangeStart}–{rangeEnd}
           </span>
           {repairPage.hasNext ? (
             <Link
