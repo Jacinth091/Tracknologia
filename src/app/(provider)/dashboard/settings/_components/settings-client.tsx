@@ -345,6 +345,7 @@ export function SettingsClient({
             <Switch
               name="acceptingRequests"
               aria-labelledby="accepting-requests-label"
+              size="lg"
               defaultChecked={provider.acceptingRequests}
               disabled={providerPending}
               className="mt-0.5"
@@ -484,13 +485,16 @@ export function SettingsClient({
   }
 
   return (
-    <Tabs defaultValue="profile" className="w-full gap-5">
-      <TabsList className="w-full justify-start sm:w-fit">
-        <TabsTrigger value="profile">
+    <Tabs
+      defaultValue="profile"
+      className="w-full flex-col gap-5 lg:flex-row lg:items-start"
+    >
+      <TabsList className="w-full justify-start sm:w-fit lg:h-auto lg:w-56 lg:shrink-0 lg:flex-col lg:items-stretch lg:justify-start lg:rounded-xl">
+        <TabsTrigger value="profile" className="lg:w-full lg:justify-start">
           <HugeiconsIcon icon={UserIcon} strokeWidth={1.8} aria-hidden="true" />
           Profile
         </TabsTrigger>
-        <TabsTrigger value="business">
+        <TabsTrigger value="business" className="lg:w-full lg:justify-start">
           <HugeiconsIcon
             icon={Store01Icon}
             strokeWidth={1.8}
@@ -498,7 +502,10 @@ export function SettingsClient({
           />
           Business
         </TabsTrigger>
-        <TabsTrigger value="service-modes">
+        <TabsTrigger
+          value="service-modes"
+          className="lg:w-full lg:justify-start"
+        >
           <HugeiconsIcon
             icon={DeliveryTruck01Icon}
             strokeWidth={1.8}
@@ -507,9 +514,15 @@ export function SettingsClient({
           Service modes
         </TabsTrigger>
       </TabsList>
-      <TabsContent value="profile">{personalPanel}</TabsContent>
-      <TabsContent value="business">{providerPanel}</TabsContent>
-      <TabsContent value="service-modes">{serviceModesPanel}</TabsContent>
+      <TabsContent value="profile" className="min-w-0 flex-1">
+        {personalPanel}
+      </TabsContent>
+      <TabsContent value="business" className="min-w-0 flex-1">
+        {providerPanel}
+      </TabsContent>
+      <TabsContent value="service-modes" className="min-w-0 flex-1">
+        {serviceModesPanel}
+      </TabsContent>
     </Tabs>
   );
 }

@@ -5,6 +5,7 @@ import {
   listTeamMembers,
 } from "@/features/providers";
 import { createClient } from "@/lib/supabase/server";
+import { PageHeader } from "../_components/page-header";
 import { TeamClient } from "./_components/team-client";
 
 export const metadata: Metadata = {
@@ -27,19 +28,12 @@ export default async function TeamPage() {
   ]);
 
   return (
-    <div className="space-y-6 max-w-4xl">
-      <div className="space-y-1.5">
-        <p className="font-mono text-[11px] uppercase tracking-[0.16em] text-muted-foreground">
-          Team
-        </p>
-        <h1 className="text-2xl font-bold tracking-tight text-foreground sm:text-3xl">
-          Team &amp; Staff Management
-        </h1>
-        <p className="text-sm text-muted-foreground">
-          Manage staff members, invitations, and workshop access for{" "}
-          {context.providerName}
-        </p>
-      </div>
+    <div className="space-y-6">
+      <PageHeader
+        eyebrow="Team"
+        title="Team & Staff Management"
+        description={`Manage staff members, invitations, and workshop access for ${context.providerName}`}
+      />
 
       <TeamClient
         isOwner={isOwner}

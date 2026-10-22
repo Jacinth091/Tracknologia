@@ -8,6 +8,7 @@ import {
 } from "@/features/providers";
 import { createClient } from "@/lib/supabase/server";
 
+import { PageHeader } from "../_components/page-header";
 import { SettingsClient } from "./_components/settings-client";
 
 export const metadata: Metadata = {
@@ -29,19 +30,12 @@ export default async function ProviderSettingsPage() {
   }
 
   return (
-    <div className="max-w-4xl space-y-6">
-      <div className="space-y-1.5">
-        <p className="font-mono text-[11px] uppercase tracking-[0.16em] text-muted-foreground">
-          Provider
-        </p>
-        <h1 className="text-2xl font-bold tracking-tight text-foreground sm:text-3xl">
-          Provider Settings
-        </h1>
-        <p className="text-sm text-muted-foreground">
-          Manage your personal identity and the operating details customers can
-          use to understand this Provider.
-        </p>
-      </div>
+    <div className="space-y-6">
+      <PageHeader
+        eyebrow="Provider"
+        title="Provider Settings"
+        description="Manage your personal identity and the operating details customers can use to understand this Provider."
+      />
 
       <SettingsClient
         provider={provider}
