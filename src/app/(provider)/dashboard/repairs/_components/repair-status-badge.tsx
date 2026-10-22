@@ -22,7 +22,6 @@ export function RepairStatusBadge({
     <span className="inline-flex w-fit shrink-0 items-center gap-2">
       <StatusGauge
         status={status}
-        compact={!prominent}
         className={prominent ? "size-16" : "size-5"}
       />
       <span

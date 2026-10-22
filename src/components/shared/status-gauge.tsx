@@ -16,12 +16,10 @@ const CHARGE: Record<RepairStatus | RepairRequestStatus, number> = {
 
 export function StatusGauge({
   status,
-  compact = false,
   label,
   className,
 }: {
   status: RepairStatus | RepairRequestStatus | null;
-  compact?: boolean;
   label?: string;
   className?: string;
 }) {
@@ -41,10 +39,10 @@ export function StatusGauge({
       <circle
         cx="25"
         cy="25"
-        r={compact ? 21 : 21.5}
+        r="21"
         fill="none"
         stroke="currentColor"
-        strokeWidth={compact ? 8 : 6}
+        strokeWidth="8"
         strokeDasharray={status === null ? "4 5" : undefined}
         opacity={declined || status === null ? 0.45 : 1}
       />
@@ -52,9 +50,9 @@ export function StatusGauge({
         <circle
           cx="25"
           cy="25"
-          r="6.75"
+          r="7.5"
           fill="none"
-          strokeWidth="13.5"
+          strokeWidth="15"
           pathLength="100"
           strokeDasharray={`${charge} 100`}
           transform="rotate(-90 25 25)"

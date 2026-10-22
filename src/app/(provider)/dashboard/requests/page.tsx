@@ -143,11 +143,7 @@ export default async function RepairRequestsPage({
                     </CardTitle>
                   </div>
                   <span className="inline-flex shrink-0 items-center gap-2">
-                    <StatusGauge
-                      status={request.status}
-                      compact
-                      className="size-5"
-                    />
+                    <StatusGauge status={request.status} className="size-5" />
                     <span
                       data-status={request.status}
                       className="status-badge rounded-full border px-2.5 py-1 text-xs font-semibold"

@@ -64,9 +64,9 @@ describe("status illustrations", () => {
     }
   });
 
-  it("names a standalone image and gives compact marks a heavier ring", () => {
+  it("names a standalone image with the single thick-ring geometry", () => {
     const html = renderToStaticMarkup(
-      <StatusGauge status="READY" compact label="Ready for handover" />,
+      <StatusGauge status="READY" label="Ready for handover" />,
     );
     expect(html).toContain('role="img"');
     expect(html).toContain('aria-label="Ready for handover"');
