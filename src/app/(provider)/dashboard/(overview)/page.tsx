@@ -38,7 +38,7 @@ import {
   EmptyTitle,
 } from "@/components/ui/empty";
 import { cn } from "@/lib/utils";
-import { repairStatusLabel } from "./_components/repair-status-badge";
+import { repairStatusLabel } from "../_components/repair-status-badge";
 
 export const metadata: Metadata = {
   title: "Dashboard — Tracknologia",
