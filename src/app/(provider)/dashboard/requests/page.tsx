@@ -1,15 +1,18 @@
-import { StatusGauge } from "@/components/shared/status-gauge";
 import type { Metadata } from "next";
 import Link from "next/link";
+import { HugeiconsIcon } from "@hugeicons/react";
+import { ArrowRight01Icon, Message01Icon } from "@hugeicons/core-free-icons";
 
+import { StatusGauge } from "@/components/shared/status-gauge";
 import { buttonVariants } from "@/components/ui/button";
+import { Card } from "@/components/ui/card";
 import {
-  Card,
-  CardContent,
-  CardDescription,
-  CardHeader,
-  CardTitle,
-} from "@/components/ui/card";
+  Empty,
+  EmptyDescription,
+  EmptyHeader,
+  EmptyMedia,
+  EmptyTitle,
+} from "@/components/ui/empty";
 import {
   listRepairRequests,
   repairRequestPageSchema,
@@ -91,7 +94,10 @@ export default async function RepairRequestsPage({
         </p>
       </div>
 
-      <div className="flex flex-wrap gap-2" aria-label="Request status filters">
+      <nav
+        aria-label="Request status filters"
+        className="-mx-4 flex gap-1 overflow-x-auto border-b border-border px-4 sm:mx-0 sm:px-0"
+      >
         {FILTERS.map((filter) => {
           const active =
             filter.status === status || (!filter.status && !status);
@@ -103,78 +109,83 @@ export default async function RepairRequestsPage({
               href={href}
               aria-current={active ? "page" : undefined}
               className={cn(
-                buttonVariants({
-                  variant: active ? "default" : "outline",
-                  size: "sm",
-                }),
+                "relative shrink-0 px-3 py-2.5 text-sm font-medium whitespace-nowrap transition-colors",
+                active
+                  ? "text-foreground after:absolute after:inset-x-3 after:bottom-0 after:h-0.5 after:bg-primary"
+                  : "text-muted-foreground hover:text-foreground",
               )}
             >
               {filter.label}
             </Link>
           );
         })}
-      </div>
+      </nav>
 
       {requestPage.items.length === 0 ? (
-        <Card>
-          <CardHeader>
-            <CardTitle className="text-lg">No matching Requests</CardTitle>
-            <CardDescription>
+        <Empty className="rounded-xl border border-border bg-card p-8">
+          <EmptyHeader>
+            <EmptyMedia variant="icon">
+              <HugeiconsIcon icon={Message01Icon} aria-hidden="true" />
+            </EmptyMedia>
+            <EmptyTitle>No matching Requests</EmptyTitle>
+            <EmptyDescription>
               New customer submissions will appear here for Provider review.
-            </CardDescription>
-          </CardHeader>
-        </Card>
+            </EmptyDescription>
+          </EmptyHeader>
+        </Empty>
       ) : (
-        <div className="grid gap-4 lg:grid-cols-2">
-          {requestPage.items.map((request) => (
-            <Card key={request.id} className="flex flex-col">
-              <CardHeader className="pb-4">
-                <div className="flex flex-col items-start gap-3 xl:flex-row xl:justify-between">
-                  <div className="min-w-0">
-                    <p className="font-mono text-xs text-muted-foreground wrap-anywhere">
-                      {request.referenceCode}
-                    </p>
-                    <CardTitle className="mt-1 text-lg wrap-anywhere">
-                      {deviceLabel(
-                        request.deviceType,
-                        request.brand,
-                        request.model,
-                      )}
-                    </CardTitle>
-                  </div>
-                  <span className="inline-flex shrink-0 items-center gap-2">
-                    <StatusGauge status={request.status} className="size-5" />
-                    <span
-                      data-status={request.status}
-                      className="status-badge rounded-full border px-2.5 py-1 text-xs font-semibold"
-                    >
-                      {request.status.charAt(0) +
-                        request.status.slice(1).toLowerCase()}
-                    </span>
-                  </span>
-                </div>
-                <CardDescription className="wrap-anywhere">
-                  {request.customerName} ·{" "}
-                  {formatSubmittedAt(request.submittedAt)}
-                </CardDescription>
-              </CardHeader>
-              <CardContent className="flex flex-1 flex-col gap-4">
-                <p className="line-clamp-3 text-sm text-muted-foreground wrap-anywhere">
-                  {request.reportedProblem}
-                </p>
-                <Link
-                  href={`/dashboard/requests/${request.id}`}
-                  className={cn(
-                    buttonVariants({ variant: "outline" }),
-                    "mt-auto w-full sm:w-fit",
-                  )}
-                >
-                  Review Request
-                </Link>
-              </CardContent>
-            </Card>
-          ))}
-        </div>
+        <Card className="overflow-hidden p-0">
+          <ul className="divide-y divide-border">
+            {requestPage.items.map((request) => {
+              const device = deviceLabel(
+                request.deviceType,
+                request.brand,
+                request.model,
+              );
+              return (
+                <li key={request.id}>
+                  <Link
+                    href={`/dashboard/requests/${request.id}`}
+                    aria-label={`Review Request: ${device}`}
+                    className="flex items-center gap-3 px-4 py-3 transition-colors hover:bg-muted/50 sm:px-5 sm:py-3.5"
+                  >
+                    <StatusGauge
+                      status={request.status}
+                      className="size-7 shrink-0"
+                    />
+                    <div className="min-w-0 flex-1">
+                      <p className="line-clamp-1 text-sm font-bold break-words text-foreground">
+                        {device}
+                        <span className="font-normal text-muted-foreground">
+                          {" · "}
+                          {request.reportedProblem}
+                        </span>
+                      </p>
+                      <p className="mt-0.5 truncate font-mono text-xs text-muted-foreground">
+                        {request.referenceCode} · {request.customerName} ·
+                        Submitted {formatSubmittedAt(request.submittedAt)}
+                      </p>
+                    </div>
+                    <div className="flex shrink-0 items-center gap-2">
+                      <span
+                        data-status={request.status}
+                        className="status-badge shrink-0 rounded-full border px-2.5 py-1 text-xs font-semibold"
+                      >
+                        {request.status.charAt(0) +
+                          request.status.slice(1).toLowerCase()}
+                      </span>
+                      <HugeiconsIcon
+                        icon={ArrowRight01Icon}
+                        aria-hidden="true"
+                        className="size-4 text-muted-foreground"
+                      />
+                    </div>
+                  </Link>
+                </li>
+              );
+            })}
+          </ul>
+        </Card>
       )}
 
       {requestPage.hasPrevious || requestPage.hasNext ? (

@@ -11,6 +11,17 @@ export function repairStatusLabel(status: RepairStatus) {
   }[status];
 }
 
+export function RepairStatusPill({ status }: { status: RepairStatus }) {
+  return (
+    <span
+      data-status={status}
+      className="status-badge shrink-0 rounded-full border px-2.5 py-1 text-xs font-semibold"
+    >
+      {repairStatusLabel(status)}
+    </span>
+  );
+}
+
 export function RepairStatusBadge({
   status,
   prominent = false,
@@ -22,14 +33,9 @@ export function RepairStatusBadge({
     <span className="inline-flex w-fit shrink-0 items-center gap-2">
       <StatusGauge
         status={status}
-        className={prominent ? "size-16" : "size-5"}
+        className={prominent ? "size-16" : "size-7"}
       />
-      <span
-        data-status={status}
-        className="status-badge rounded-full border px-2.5 py-1 text-xs font-semibold"
-      >
-        {repairStatusLabel(status)}
-      </span>
+      <RepairStatusPill status={status} />
     </span>
   );
 }
