@@ -83,7 +83,13 @@ describe("Provider navigation", () => {
     ["/dashboard/settings", "Settings"],
   ])("marks only the current section for %s", (route, label) => {
     pathname.mockReturnValue(route);
-    const html = renderToStaticMarkup(<ProviderNav isShop={false} />);
+    const html = renderToStaticMarkup(
+      <ProviderNav
+        isShop={false}
+        providerName="River Repair"
+        roleLabel="Shop Owner"
+      />,
+    );
     const current = html.match(/<a\b[^>]*aria-current="page"[^>]*>[^<]*<\/a>/g);
     expect(current).toHaveLength(1);
     expect(current?.[0]).toContain(`>${label}</a>`);
@@ -92,10 +98,42 @@ describe("Provider navigation", () => {
 
   it("preserves Shop-only Team navigation", () => {
     pathname.mockReturnValue("/dashboard/team");
-    const html = renderToStaticMarkup(<ProviderNav isShop />);
+    const html = renderToStaticMarkup(
+      <ProviderNav isShop providerName="River Repair" roleLabel="Shop Owner" />,
+    );
     expect(html).toMatch(
       /<a\b[^>]*aria-current="page"[^>]*>Team &amp; Staff<\/a>/,
     );
+  });
+
+  it("gives the desktop nav the same role-gated links as the phone sheet", () => {
+    // The phone sheet is closed in static markup, so this checks the desktop
+    // nav; both render the single `links` list in ProviderNav.
+    const linkLabels = (isShop: boolean) => {
+      const html = renderToStaticMarkup(
+        <ProviderNav
+          isShop={isShop}
+          providerName="River Repair"
+          roleLabel="Shop Owner"
+        />,
+      );
+      return [...html.matchAll(/<a\b[^>]*>([^<]*)<\/a>/g)].map(
+        (match) => match[1],
+      );
+    };
+    expect(linkLabels(true)).toEqual([
+      "Dashboard",
+      "Requests",
+      "Repairs",
+      "Team &amp; Staff",
+      "Settings",
+    ]);
+    expect(linkLabels(false)).toEqual([
+      "Dashboard",
+      "Requests",
+      "Repairs",
+      "Settings",
+    ]);
   });
 });
 

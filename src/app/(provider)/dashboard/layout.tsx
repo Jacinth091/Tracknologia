@@ -77,32 +77,21 @@ export default async function DashboardLayout({
   return (
     <div className="min-h-screen flex flex-col bg-background text-foreground">
       <header className="border-b border-border bg-card">
-        <div className="mx-auto max-w-7xl px-4 sm:px-6">
-          <div className="flex min-h-18 items-center justify-between gap-4 py-4">
-            <div className="flex min-w-0 flex-wrap items-center gap-x-6 gap-y-2">
-              <Link href="/dashboard" className="shrink-0 rounded-sm">
-                <BrandLogo />
-              </Link>
-              <div className="min-w-0 border-border sm:border-l sm:pl-6">
-                <p className="max-w-64 truncate text-sm font-semibold">
-                  {context.providerName}
-                </p>
-                <p className="text-xs text-muted-foreground">{roleDisplay}</p>
-              </div>
-            </div>
-            <form action={signOutAction}>
-              <Button variant="outline" type="submit">
-                Sign Out
-              </Button>
-            </form>
-          </div>
-          <ProviderNav isShop={context.providerType === "SHOP"} />
+        <div className="mx-auto flex h-16 max-w-6xl items-center gap-6 px-4 sm:px-6">
+          <Link href="/dashboard" className="shrink-0 rounded-sm">
+            <BrandLogo />
+          </Link>
+          <ProviderNav
+            isShop={context.providerType === "SHOP"}
+            providerName={context.providerName}
+            roleLabel={roleDisplay}
+          />
         </div>
       </header>
 
       {/* Main Content Area */}
       <main className="flex-1 px-4 py-8 sm:px-6">
-        <div className="mx-auto max-w-7xl">{children}</div>
+        <div className="mx-auto max-w-6xl">{children}</div>
       </main>
     </div>
   );
