@@ -226,7 +226,7 @@ export default function Home() {
           </div>
         </section>
 
-        <section className="bg-secondary">
+        <section className="border-y border-border bg-secondary">
           <div className="mx-auto flex max-w-6xl flex-col gap-6 px-4 py-14 sm:px-6 md:flex-row md:items-center md:justify-between">
             <div className="max-w-xl">
               <h2 className="text-2xl font-bold tracking-tight text-balance sm:text-3xl">
