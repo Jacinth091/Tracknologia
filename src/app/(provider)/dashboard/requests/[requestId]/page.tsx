@@ -88,7 +88,7 @@ export default async function RepairRequestDetailPage({
         >
           ← Back to Requests
         </Link>
-        <h1 className="mt-1 text-2xl font-bold tracking-tight text-foreground wrap-anywhere sm:text-3xl">
+        <h1 className="mt-1 line-clamp-2 text-2xl font-bold tracking-tight break-words text-foreground sm:text-3xl">
           {request.brand || request.model
             ? [request.brand, request.model].filter(Boolean).join(" ")
             : request.deviceType}
@@ -190,7 +190,7 @@ export default async function RepairRequestDetailPage({
           )}
         </div>
 
-        <aside className="lg:sticky lg:top-20">
+        <aside className="order-first lg:sticky lg:top-20 lg:order-none">
           <Card>
             <CardHeader>
               <CardTitle>Request status</CardTitle>

@@ -103,7 +103,10 @@ export default async function RepairDetailPage({
         <p className="font-mono text-xs text-muted-foreground">
           {repair.ticketNumber}
         </p>
-        <h1 className="mt-1 text-2xl font-bold tracking-tight wrap-anywhere sm:text-3xl">
+        <h1
+          title={deviceName}
+          className="mt-1 line-clamp-2 text-2xl font-bold tracking-tight break-words sm:text-3xl"
+        >
           {deviceName}
         </h1>
         <p className="mt-1 text-sm text-muted-foreground wrap-anywhere">
@@ -299,7 +302,7 @@ export default async function RepairDetailPage({
           </div>
         </div>
 
-        <aside className="lg:sticky lg:top-20">
+        <aside className="order-first lg:sticky lg:top-20 lg:order-none">
           <Card>
             <CardHeader>
               <CardTitle>Repair status</CardTitle>
