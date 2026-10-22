@@ -6,6 +6,7 @@ import {
   getProviderServiceModes,
   getProviderUserProfile,
 } from "@/features/providers";
+import { getAppOrigin } from "@/lib/config/server";
 import { createClient } from "@/lib/supabase/server";
 
 import { PageHeader } from "../_components/page-header";
@@ -42,6 +43,7 @@ export default async function ProviderSettingsPage() {
         personalProfile={personalProfile}
         serviceModes={serviceModes}
         canManageProvider={context.role === "OWNER"}
+        requestLinkUrl={`${getAppOrigin()}/p/${provider.slug}/request`}
       />
     </div>
   );

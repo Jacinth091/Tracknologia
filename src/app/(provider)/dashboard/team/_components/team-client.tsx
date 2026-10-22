@@ -1,6 +1,6 @@
 "use client";
 
-import { useActionState, useState } from "react";
+import { useActionState, useState, type ReactNode } from "react";
 import { HugeiconsIcon } from "@hugeicons/react";
 import {
   AlertCircleIcon,
@@ -43,6 +43,7 @@ interface TeamClientProps {
   isShop: boolean;
   members: TeamMember[];
   invitations: ProviderInvitation[];
+  requestLink?: ReactNode;
 }
 
 export function TeamClient({
@@ -50,6 +51,7 @@ export function TeamClient({
   isShop,
   members,
   invitations,
+  requestLink,
 }: TeamClientProps) {
   const [state, formAction, isPending] = useActionState(
     inviteStaffAction,
@@ -361,6 +363,7 @@ export function TeamClient({
             </CardContent>
           </Card>
         )}
+        {requestLink}
       </div>
 
       <div className="min-w-0 flex-1">

@@ -42,6 +42,7 @@ import {
   updateServiceModesAction,
   type SettingsActionState,
 } from "../actions";
+import { RequestLinkCard } from "../../_components/request-link-card";
 
 const SERVICE_MODE_OPTIONS = [
   {
@@ -109,6 +110,7 @@ interface SettingsClientProps {
   personalProfile: ProviderUserProfile;
   serviceModes: ProviderServiceMode[];
   canManageProvider: boolean;
+  requestLinkUrl: string;
 }
 
 export function SettingsClient({
@@ -116,6 +118,7 @@ export function SettingsClient({
   personalProfile,
   serviceModes,
   canManageProvider,
+  requestLinkUrl,
 }: SettingsClientProps) {
   const [personalState, personalAction, personalPending] = useActionState(
     updatePersonalProfileAction,
@@ -463,6 +466,10 @@ export function SettingsClient({
     return (
       <div className="space-y-6">
         {personalPanel}
+        <RequestLinkCard
+          url={requestLinkUrl}
+          acceptingRequests={provider.acceptingRequests}
+        />
         <Card>
           <CardHeader>
             <CardTitle className="flex items-center gap-2.5 text-lg">
@@ -518,7 +525,13 @@ export function SettingsClient({
         {personalPanel}
       </TabsContent>
       <TabsContent value="business" className="min-w-0 flex-1">
-        {providerPanel}
+        <div className="space-y-6">
+          <RequestLinkCard
+            url={requestLinkUrl}
+            acceptingRequests={provider.acceptingRequests}
+          />
+          {providerPanel}
+        </div>
       </TabsContent>
       <TabsContent value="service-modes" className="min-w-0 flex-1">
         {serviceModesPanel}

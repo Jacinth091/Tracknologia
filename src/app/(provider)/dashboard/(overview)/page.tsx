@@ -9,6 +9,8 @@ import {
   Wrench01Icon,
 } from "@hugeicons/core-free-icons";
 import { requireProviderContext } from "@/features/auth";
+import { getProvider } from "@/features/providers";
+import { getAppOrigin } from "@/lib/config/server";
 import {
   getRepairCounts,
   listRepairs,
@@ -39,6 +41,7 @@ import {
 } from "@/components/ui/empty";
 import { cn } from "@/lib/utils";
 import { PageHeader } from "../_components/page-header";
+import { RequestLinkCard } from "../_components/request-link-card";
 import { repairStatusLabel } from "../_components/repair-status-badge";
 
 export const metadata: Metadata = {
@@ -90,9 +93,10 @@ function requestRow(request: RepairRequestSummary): AttentionRow {
 }
 
 export default async function DashboardPage() {
-  const [context, repairCounts, readyRepairs, approvalRepairs, newRequests] =
+  const context = await requireProviderContext();
+  const [provider, repairCounts, readyRepairs, approvalRepairs, newRequests] =
     await Promise.all([
-      requireProviderContext(),
+      getProvider(context.providerId),
       getRepairCounts(),
       listRepairs({ status: "READY" }),
       listRepairs({ status: "AWAITING_APPROVAL" }),
@@ -213,6 +217,13 @@ export default async function DashboardPage() {
           </Link>
         ))}
       </div>
+
+      {provider ? (
+        <RequestLinkCard
+          url={`${getAppOrigin()}/p/${provider.slug}/request`}
+          acceptingRequests={provider.acceptingRequests}
+        />
+      ) : null}
 
       <section aria-labelledby="needs-attention" className="space-y-3">
         <h2
