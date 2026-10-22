@@ -37,7 +37,10 @@ const SERVICE_MODE_OPTIONS = [
 function ActionMessage({ state }: { state: SettingsActionState | null }) {
   if (state?.error) {
     return (
-      <div className="rounded-xl border border-destructive/20 bg-destructive/10 p-3 text-xs font-medium text-destructive">
+      <div
+        role="alert"
+        className="rounded-xl border border-destructive/20 bg-destructive/10 p-3 text-xs font-medium text-destructive"
+      >
         {state.error}
       </div>
     );
@@ -45,7 +48,10 @@ function ActionMessage({ state }: { state: SettingsActionState | null }) {
 
   if (state?.success) {
     return (
-      <div className="rounded-xl border border-primary/20 bg-primary/10 p-3 text-xs font-medium text-primary">
+      <div
+        role="status"
+        className="rounded-xl border border-primary/20 bg-primary/10 p-3 text-xs font-medium text-foreground"
+      >
         {state.success}
       </div>
     );
@@ -89,7 +95,7 @@ export function SettingsClient({
         <CardHeader>
           <CardTitle className="text-lg">Your Profile</CardTitle>
           <CardDescription>
-            This is your personal identity within the Provider workspace.
+            Update the name and contact details your team sees.
           </CardDescription>
         </CardHeader>
         <CardContent>
@@ -128,7 +134,11 @@ export function SettingsClient({
                 disabled={personalPending}
               />
             </div>
-            <Button type="submit" disabled={personalPending}>
+            <Button
+              type="submit"
+              disabled={personalPending}
+              className="w-full sm:w-auto"
+            >
               {personalPending ? (
                 <span className="flex items-center gap-2">
                   <LoadingSpinner size="sm" /> Saving profile...
@@ -159,8 +169,8 @@ export function SettingsClient({
             <CardHeader>
               <CardTitle className="text-lg">Provider Profile</CardTitle>
               <CardDescription>
-                Provider type and slug are stable identity fields. These
-                operating details may be updated by an Owner.
+                Update the business details customers see when requesting a
+                repair.
               </CardDescription>
             </CardHeader>
             <CardContent>
@@ -279,7 +289,7 @@ export function SettingsClient({
                     type="checkbox"
                     name="acceptingRequests"
                     defaultChecked={provider.acceptingRequests}
-                    className="mt-0.5 rounded border-border accent-primary"
+                    className="mt-0.5 rounded border-border accent-ring"
                     disabled={providerPending}
                   />
                   <span>
@@ -287,11 +297,15 @@ export function SettingsClient({
                       Accept new Repair Requests
                     </span>
                     <span className="block text-xs text-muted-foreground">
-                      Include this Provider in public request surfaces.
+                      Let customers submit requests through your Provider link.
                     </span>
                   </span>
                 </label>
-                <Button type="submit" disabled={providerPending}>
+                <Button
+                  type="submit"
+                  disabled={providerPending}
+                  className="w-full sm:w-auto"
+                >
                   {providerPending ? (
                     <span className="flex items-center gap-2">
                       <LoadingSpinner size="sm" /> Saving Provider...
@@ -314,18 +328,18 @@ export function SettingsClient({
             <CardContent>
               <form action={modeAction} className="space-y-4">
                 <ActionMessage state={modeState} />
-                <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
+                <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-4">
                   {SERVICE_MODE_OPTIONS.map((option) => (
                     <label
                       key={option.value}
-                      className="flex cursor-pointer items-center gap-2 rounded-xl border border-border/70 p-3 text-sm font-medium"
+                      className="flex cursor-pointer items-center gap-2 rounded-xl border border-input p-3 text-sm font-medium"
                     >
                       <input
                         type="checkbox"
                         name="serviceModes"
                         value={option.value}
                         defaultChecked={configuredModes.has(option.value)}
-                        className="rounded border-border accent-primary"
+                        className="rounded border-border accent-ring"
                         disabled={modePending}
                       />
                       <span>{option.label}</span>
@@ -344,7 +358,11 @@ export function SettingsClient({
                     disabled={modePending}
                   />
                 </div>
-                <Button type="submit" disabled={modePending}>
+                <Button
+                  type="submit"
+                  disabled={modePending}
+                  className="w-full sm:w-auto"
+                >
                   {modePending ? (
                     <span className="flex items-center gap-2">
                       <LoadingSpinner size="sm" /> Saving modes...

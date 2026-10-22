@@ -15,29 +15,15 @@ Use the installed project's actual theme variables as the source of truth. Do no
 
 ## Palette Direction
 
-Use a cool neutral foundation with a restrained teal technology/service accent.
+Use the approved **Hi-Vis on Paper** brand: warm Paper, Ink, cream cards, and
+selective yellow action fills. The canonical palette, supplied vector provenance,
+control styling, and rollout scope are in
+[UI and Information Architecture](../../../../docs/18_UI_INFORMATION_ARCHITECTURE.md#brand-foundation).
+This replaces the earlier teal/cool-neutral recommendation.
 
-Suggested light-theme reference values:
-
-| Token         | Reference |
-| ------------- | --------- |
-| Background    | `#F8FAFC` |
-| Surface/Card  | `#FFFFFF` |
-| Foreground    | `#0F172A` |
-| Muted surface | `#F1F5F9` |
-| Muted text    | `#64748B` |
-| Border        | `#E2E8F0` |
-| Primary       | `#0F766E` |
-| Primary hover | `#115E59` |
-| Soft accent   | `#CCFBF1` |
-| Focus/accent  | `#14B8A6` |
-| Success       | `#15803D` |
-| Warning       | `#B45309` |
-| Destructive   | `#B91C1C` |
-
-Treat these as a coherent design direction, not permission to scatter raw hex values. Map them into CSS/theme variables and use semantic tokens in components.
-
-Do not add dark mode unless it is explicitly in scope or already supported by the repository.
+Use semantic tokens from `src/app/globals.css`. Keep links and notices in the
+foreground color; primary yellow is a fill, not body text. Maintain the existing
+`.dark` theme without adding a preference subsystem.
 
 ## Radius and Depth
 
@@ -100,13 +86,15 @@ Use a focused form width, grouped sections, and clear progress through the infor
 
 Status is semantic, not decorative.
 
-- `IN_PROGRESS`: primary/neutral informative treatment.
-- `WAITING_FOR_PARTS`: warning treatment.
-- `AWAITING_APPROVAL`: attention/warning treatment distinct from destructive errors.
-- `READY`: positive/success treatment.
-- `COMPLETED`: subdued success/neutral completed treatment.
+- `IN_PROGRESS`: blue informative treatment.
+- `WAITING_FOR_PARTS`: rust waiting treatment.
+- `AWAITING_APPROVAL`: purple attention treatment.
+- `READY`: Ink on yellow; the most prominent status.
+- `COMPLETED`: subdued warm-gray treatment.
 
-Use badge background + text + optional icon; do not rely on color alone.
+Use the shared `.status-badge` styles with the existing status in `data-status`.
+Keep the text label. Request SUBMITTED is blue, ACCEPTED is a green outline, and
+DECLINED is red. Decorative brand charge is not measured repair progress.
 
 ## UI Anti-Patterns
 

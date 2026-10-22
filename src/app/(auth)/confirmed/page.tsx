@@ -20,7 +20,7 @@ export default function ConfirmedPage() {
   return (
     <Card className="text-center border-primary/20 shadow-sm">
       <CardHeader className="pb-4">
-        <div className="mx-auto mb-3 flex h-14 w-14 items-center justify-center rounded-full bg-primary/10 border border-primary/20 text-primary">
+        <div className="mx-auto mb-3 flex h-14 w-14 items-center justify-center rounded-full bg-primary/10 border border-primary/20 text-foreground">
           <svg
             xmlns="http://www.w3.org/2000/svg"
             className="h-7 w-7"

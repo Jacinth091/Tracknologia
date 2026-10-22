@@ -21,7 +21,7 @@ export function ResetPasswordForm() {
           <div className="flex items-center gap-2 rounded-xl bg-card border border-border/80 px-4 py-2 shadow-md">
             <LoadingSpinner
               size="sm"
-              className="text-primary border-primary border-t-transparent"
+              className="text-foreground border-current border-t-transparent"
             />
             <span className="text-xs font-medium text-foreground">
               Updating your password...

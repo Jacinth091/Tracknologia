@@ -1,3 +1,4 @@
+import { BrandLogo } from "@/components/shared/brand-logo";
 import type { Metadata } from "next";
 import Link from "next/link";
 
@@ -23,23 +24,20 @@ export default async function TrackRepairPage({
   const initialCode = /^REQ-[A-F0-9]{16}$/i.test(rawCode) ? rawCode : "";
 
   return (
-    <main className="min-h-screen bg-muted/30 px-4 py-8 sm:px-6 sm:py-12">
-      <div className="mx-auto max-w-2xl space-y-6">
+    <main className="min-h-screen bg-background px-4 py-6 sm:px-6 sm:py-10">
+      <div className="mx-auto max-w-2xl space-y-8">
         <div className="flex items-center justify-between gap-4">
-          <Link href="/" className="text-xl font-bold tracking-tight">
-            Tracknologia
+          <Link href="/" className="inline-flex shrink-0">
+            <BrandLogo />
           </Link>
-          <span className="rounded-full border border-border bg-background px-3 py-1 text-xs font-medium text-muted-foreground">
-            Public Tracking
+          <span className="text-xs text-muted-foreground">
+            No account needed
           </span>
         </div>
 
-        <section className="rounded-2xl border border-border/80 bg-background p-5 shadow-xs sm:p-7">
-          <p className="text-xs font-semibold uppercase tracking-wide text-primary">
-            Track Repair or Request
-          </p>
-          <h1 className="mt-2 text-3xl font-bold tracking-tight text-foreground sm:text-4xl">
-            See latest progress
+        <section className="py-3">
+          <h1 className="text-3xl font-bold tracking-tight text-foreground sm:text-4xl">
+            Your update, at a glance.
           </h1>
           <p className="mt-3 max-w-xl text-sm leading-relaxed text-muted-foreground sm:text-base">
             Enter the Tracking Code (TRK-...) or Request Reference (REQ-...)
@@ -50,8 +48,8 @@ export default async function TrackRepairPage({
         <TrackingForm initialCode={initialCode} />
 
         <p className="px-2 text-center text-xs leading-relaxed text-muted-foreground">
-          Tracking shows customer-safe progress only. Contact your Repair
-          Provider if you need help with your code or service arrangement.
+          Need help with your code or service arrangement? Contact your Repair
+          Provider.
         </p>
       </div>
     </main>

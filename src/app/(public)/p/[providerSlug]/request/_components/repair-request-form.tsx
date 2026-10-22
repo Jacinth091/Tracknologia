@@ -1,5 +1,7 @@
 "use client";
 
+import { StatusGauge } from "@/components/shared/status-gauge";
+
 import Link from "next/link";
 import { useActionState, useState } from "react";
 
@@ -104,27 +106,32 @@ function RequestReceiptCard({
   };
 
   return (
-    <Card className="border-primary/20 shadow-xs">
-      <CardHeader>
-        <div className="mb-2 inline-flex w-fit items-center gap-1.5 rounded-full bg-primary/10 px-3 py-1 text-xs font-semibold text-primary">
-          <span className="inline-block size-1.5 rounded-full bg-primary" />
-          Request submitted
+    <Card>
+      <CardHeader className="gap-4 sm:flex-row sm:items-center sm:gap-6">
+        <StatusGauge status="SUBMITTED" className="size-20" />
+        <div className="min-w-0 space-y-2">
+          <div
+            data-status="SUBMITTED"
+            className="status-badge mb-2 inline-flex w-fit items-center gap-1.5 rounded-full border px-3 py-1 text-xs font-semibold"
+          >
+            Request submitted
+          </div>
+          <CardTitle role="status" className="text-2xl wrap-anywhere">
+            Request sent to {providerName}
+          </CardTitle>
+          <CardDescription>
+            Provider will review your information before creating an active
+            repair.
+          </CardDescription>
         </div>
-        <CardTitle className="text-2xl">
-          Request sent to {providerName}
-        </CardTitle>
-        <CardDescription>
-          Provider will review your information before creating an active
-          repair.
-        </CardDescription>
       </CardHeader>
       <CardContent className="space-y-6">
-        <div className="flex flex-col gap-3 rounded-2xl border border-border bg-muted/40 p-4 sm:flex-row sm:items-center sm:justify-between">
+        <div className="space-y-4 rounded-xl bg-muted/40 p-4">
           <div>
             <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
               Request Reference Code
             </p>
-            <p className="mt-1 font-mono text-xl font-bold tracking-wider text-foreground">
+            <p className="mt-1 font-mono text-lg font-bold tracking-wide wrap-anywhere text-foreground">
               {referenceCode}
             </p>
           </div>
@@ -465,7 +472,7 @@ export function RepairRequestForm({
                   name="preferredServiceMode"
                   value=""
                   defaultChecked={!state?.values?.preferredServiceMode}
-                  className="mt-1 accent-primary"
+                  className="mt-1 accent-ring"
                   disabled={pending}
                 />
                 <span className="text-sm font-medium text-foreground">
@@ -484,7 +491,7 @@ export function RepairRequestForm({
                     defaultChecked={
                       state?.values?.preferredServiceMode === serviceMode.mode
                     }
-                    className="mt-1 accent-primary"
+                    className="mt-1 accent-ring"
                     disabled={pending}
                   />
                   <span>

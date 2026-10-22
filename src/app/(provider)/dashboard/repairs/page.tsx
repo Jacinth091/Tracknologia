@@ -168,6 +168,7 @@ export default async function RepairsPage({
           return (
             <Link
               key={filter.label}
+              aria-current={active ? "page" : undefined}
               href={repairListHref({
                 status: filter.status,
                 query: options.query,
@@ -199,12 +200,12 @@ export default async function RepairsPage({
           {repairPage.items.map((repair) => (
             <Card key={repair.id} className="flex flex-col">
               <CardHeader className="pb-4">
-                <div className="flex items-start justify-between gap-3">
+                <div className="flex flex-col items-start gap-3 xl:flex-row xl:justify-between">
                   <div className="min-w-0">
                     <p className="font-mono text-xs text-muted-foreground">
                       {repair.ticketNumber}
                     </p>
-                    <CardTitle className="mt-1 truncate text-lg">
+                    <CardTitle className="mt-1 text-lg wrap-anywhere">
                       {deviceLabel(
                         repair.deviceType,
                         repair.brand,
@@ -214,13 +215,13 @@ export default async function RepairsPage({
                   </div>
                   <RepairStatusBadge status={repair.currentStatus} />
                 </div>
-                <CardDescription>
+                <CardDescription className="wrap-anywhere">
                   {repair.customerName} · Updated{" "}
                   {formatUpdatedAt(repair.updatedAt)}
                 </CardDescription>
               </CardHeader>
               <CardContent className="flex flex-1 flex-col gap-4">
-                <p className="line-clamp-3 text-sm text-muted-foreground">
+                <p className="line-clamp-3 text-sm text-muted-foreground wrap-anywhere">
                   {repair.reportedProblem}
                 </p>
                 <div className="flex items-center justify-between gap-3">

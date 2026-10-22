@@ -1,13 +1,5 @@
 import type { RepairStatus } from "@/features/repairs";
-import { cn } from "@/lib/utils";
-
-const STATUS_STYLES: Record<RepairStatus, string> = {
-  IN_PROGRESS: "border-primary/20 bg-primary/10 text-primary",
-  WAITING_FOR_PARTS: "border-amber-700/20 bg-amber-700/10 text-amber-700",
-  AWAITING_APPROVAL: "border-orange-700/20 bg-orange-700/10 text-orange-700",
-  READY: "border-emerald-700/20 bg-emerald-700/10 text-emerald-700",
-  COMPLETED: "border-border bg-muted text-muted-foreground",
-};
+import { StatusGauge } from "@/components/shared/status-gauge";
 
 export function repairStatusLabel(status: RepairStatus) {
   return {
@@ -19,15 +11,26 @@ export function repairStatusLabel(status: RepairStatus) {
   }[status];
 }
 
-export function RepairStatusBadge({ status }: { status: RepairStatus }) {
+export function RepairStatusBadge({
+  status,
+  prominent = false,
+}: {
+  status: RepairStatus;
+  prominent?: boolean;
+}) {
   return (
-    <span
-      className={cn(
-        "inline-flex w-fit rounded-full border px-2.5 py-1 text-[11px] font-semibold",
-        STATUS_STYLES[status],
-      )}
-    >
-      {repairStatusLabel(status)}
+    <span className="inline-flex w-fit shrink-0 items-center gap-2">
+      <StatusGauge
+        status={status}
+        compact={!prominent}
+        className={prominent ? "size-16" : "size-5"}
+      />
+      <span
+        data-status={status}
+        className="status-badge rounded-full border px-2.5 py-1 text-xs font-semibold"
+      >
+        {repairStatusLabel(status)}
+      </span>
     </span>
   );
 }

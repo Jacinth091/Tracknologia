@@ -31,7 +31,7 @@ export function CreateRepairForm({
       <CardHeader>
         <CardTitle>Repair intake</CardTitle>
         <CardDescription>
-          Create an authoritative Repair without requiring a customer Request.
+          Record the customer, device, and reported problem to start a repair.
         </CardDescription>
       </CardHeader>
       <CardContent>
@@ -52,7 +52,12 @@ export function CreateRepairForm({
             disabled={pending}
           />
 
-          <Button type="submit" size="lg" disabled={pending}>
+          <Button
+            type="submit"
+            size="lg"
+            disabled={pending}
+            className="w-full sm:w-auto"
+          >
             {pending ? (
               <span className="flex items-center gap-2">
                 <LoadingSpinner size="sm" /> Creating Repair...

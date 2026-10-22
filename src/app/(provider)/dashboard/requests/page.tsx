@@ -1,3 +1,4 @@
+import { StatusGauge } from "@/components/shared/status-gauge";
 import type { Metadata } from "next";
 import Link from "next/link";
 
@@ -28,12 +29,6 @@ const FILTERS: Array<{ label: string; status?: RepairRequestStatus }> = [
   { label: "Accepted", status: "ACCEPTED" },
   { label: "Declined", status: "DECLINED" },
 ];
-
-const STATUS_STYLES: Record<RepairRequestStatus, string> = {
-  SUBMITTED: "border-primary/20 bg-primary/10 text-primary",
-  ACCEPTED: "border-emerald-700/20 bg-emerald-700/10 text-emerald-700",
-  DECLINED: "border-border bg-muted text-muted-foreground",
-};
 
 function formatSubmittedAt(value: string) {
   return new Intl.DateTimeFormat("en-PH", {
@@ -92,8 +87,7 @@ export default async function RepairRequestsPage({
           Repair Requests
         </h1>
         <p className="mt-1 text-sm text-muted-foreground">
-          Review customer-reported information before creating an authoritative
-          Repair.
+          Review incoming requests and decide which repairs to take on.
         </p>
       </div>
 
@@ -107,6 +101,7 @@ export default async function RepairRequestsPage({
             <Link
               key={filter.label}
               href={href}
+              aria-current={active ? "page" : undefined}
               className={cn(
                 buttonVariants({
                   variant: active ? "default" : "outline",
@@ -134,12 +129,12 @@ export default async function RepairRequestsPage({
           {requestPage.items.map((request) => (
             <Card key={request.id} className="flex flex-col">
               <CardHeader className="pb-4">
-                <div className="flex items-start justify-between gap-3">
+                <div className="flex flex-col items-start gap-3 xl:flex-row xl:justify-between">
                   <div className="min-w-0">
-                    <p className="font-mono text-xs text-muted-foreground">
+                    <p className="font-mono text-xs text-muted-foreground wrap-anywhere">
                       {request.referenceCode}
                     </p>
-                    <CardTitle className="mt-1 truncate text-lg">
+                    <CardTitle className="mt-1 text-lg wrap-anywhere">
                       {deviceLabel(
                         request.deviceType,
                         request.brand,
@@ -147,22 +142,28 @@ export default async function RepairRequestsPage({
                       )}
                     </CardTitle>
                   </div>
-                  <span
-                    className={cn(
-                      "shrink-0 rounded-full border px-2.5 py-1 text-[11px] font-semibold",
-                      STATUS_STYLES[request.status],
-                    )}
-                  >
-                    {request.status}
+                  <span className="inline-flex shrink-0 items-center gap-2">
+                    <StatusGauge
+                      status={request.status}
+                      compact
+                      className="size-5"
+                    />
+                    <span
+                      data-status={request.status}
+                      className="status-badge rounded-full border px-2.5 py-1 text-xs font-semibold"
+                    >
+                      {request.status.charAt(0) +
+                        request.status.slice(1).toLowerCase()}
+                    </span>
                   </span>
                 </div>
-                <CardDescription>
+                <CardDescription className="wrap-anywhere">
                   {request.customerName} ·{" "}
                   {formatSubmittedAt(request.submittedAt)}
                 </CardDescription>
               </CardHeader>
               <CardContent className="flex flex-1 flex-col gap-4">
-                <p className="line-clamp-3 text-sm text-muted-foreground">
+                <p className="line-clamp-3 text-sm text-muted-foreground wrap-anywhere">
                   {request.reportedProblem}
                 </p>
                 <Link

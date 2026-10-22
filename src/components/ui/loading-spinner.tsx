@@ -23,7 +23,7 @@ export function LoadingSpinner({
     <div
       data-slot="loading-spinner"
       className={cn(
-        "inline-block animate-spin rounded-full border-current border-t-transparent text-primary-foreground",
+        "inline-block animate-spin rounded-full border-current border-t-transparent text-current",
         sizeClasses[size],
         className,
       )}

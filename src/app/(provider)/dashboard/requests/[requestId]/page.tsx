@@ -1,3 +1,4 @@
+import { StatusGauge } from "@/components/shared/status-gauge";
 import type { Metadata } from "next";
 import Link from "next/link";
 import { notFound } from "next/navigation";
@@ -12,10 +13,7 @@ import {
 } from "@/components/ui/card";
 import { requireProviderContext } from "@/features/auth";
 import { getProviderServiceModes } from "@/features/providers";
-import {
-  getRepairRequest,
-  type RepairRequestStatus,
-} from "@/features/repair-requests";
+import { getRepairRequest } from "@/features/repair-requests";
 import { cn } from "@/lib/utils";
 import { createClient } from "@/lib/supabase/server";
 
@@ -24,12 +22,6 @@ import { RequestDecisionForm } from "./_components/request-decision-form";
 export const metadata: Metadata = {
   title: "Review Repair Request — Tracknologia",
   description: "Review customer-submitted Repair Request details",
-};
-
-const STATUS_STYLES: Record<RepairRequestStatus, string> = {
-  SUBMITTED: "border-primary/20 bg-primary/10 text-primary",
-  ACCEPTED: "border-primary/20 bg-primary/10 text-primary",
-  DECLINED: "border-border bg-muted text-muted-foreground",
 };
 
 function formatDate(value: string) {
@@ -51,7 +43,7 @@ function DetailValue({
       <dt className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
         {label}
       </dt>
-      <dd className="mt-1 whitespace-pre-wrap text-sm text-foreground">
+      <dd className="mt-1 whitespace-pre-wrap wrap-anywhere text-sm text-foreground">
         {value || "Not provided"}
       </dd>
     </div>
@@ -80,7 +72,7 @@ export default async function RepairRequestDetailPage({
   return (
     <div className="max-w-5xl space-y-6">
       <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
-        <div>
+        <div className="min-w-0">
           <Link
             href="/dashboard/requests"
             className={cn(
@@ -90,26 +82,27 @@ export default async function RepairRequestDetailPage({
           >
             ← Back to Requests
           </Link>
-          <p className="font-mono text-xs text-muted-foreground">
+          <p className="font-mono text-xs text-muted-foreground wrap-anywhere">
             {request.referenceCode}
           </p>
-          <h1 className="mt-1 text-2xl font-bold tracking-tight text-foreground sm:text-3xl">
+          <h1 className="mt-1 text-2xl font-bold tracking-tight text-foreground wrap-anywhere sm:text-3xl">
             {request.brand || request.model
               ? [request.brand, request.model].filter(Boolean).join(" ")
               : request.deviceType}
           </h1>
-          <p className="mt-1 text-sm text-muted-foreground">
+          <p className="mt-1 text-sm text-muted-foreground wrap-anywhere">
             Submitted by {request.customerName} ·{" "}
             {formatDate(request.submittedAt)}
           </p>
         </div>
-        <span
-          className={cn(
-            "w-fit rounded-full border px-3 py-1 text-xs font-semibold",
-            STATUS_STYLES[request.status],
-          )}
-        >
-          {request.status}
+        <span className="inline-flex shrink-0 items-center gap-2">
+          <StatusGauge status={request.status} className="size-16" />
+          <span
+            data-status={request.status}
+            className="status-badge rounded-full border px-2.5 py-1 text-xs font-semibold"
+          >
+            {request.status.charAt(0) + request.status.slice(1).toLowerCase()}
+          </span>
         </span>
       </div>
 
@@ -117,8 +110,7 @@ export default async function RepairRequestDetailPage({
         <CardHeader>
           <CardTitle>Customer-reported information</CardTitle>
           <CardDescription>
-            This is Request intake, not Provider Diagnosis or authoritative
-            Repair data.
+            Review what the customer reported before accepting the request.
           </CardDescription>
         </CardHeader>
         <CardContent className="space-y-6">
@@ -180,7 +172,7 @@ export default async function RepairRequestDetailPage({
             <CardTitle className="text-lg">Request already processed</CardTitle>
             <CardDescription>
               {request.status === "ACCEPTED"
-                ? "Request created one authoritative Repair."
+                ? "This request was accepted and a repair was created."
                 : "Request was declined and no Repair was created."}
               {processedAt ? ` Processed ${formatDate(processedAt)}.` : ""}
             </CardDescription>

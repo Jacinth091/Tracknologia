@@ -29,82 +29,56 @@ export function RegisterForm({ initialInvite }: RegisterFormProps) {
         <div
           role="radiogroup"
           aria-label="Account Role"
-          className="grid grid-cols-1 sm:grid-cols-3 gap-2.5"
+          className="grid grid-cols-1 gap-3 sm:grid-cols-3"
         >
-          {/* Option 1: Independent */}
-          <button
-            type="button"
-            role="radio"
-            aria-checked={intent === "INDEPENDENT"}
-            disabled={isPending}
-            onClick={() => setIntent("INDEPENDENT")}
-            className={cn(
-              "flex flex-col items-start rounded-2xl border p-3.5 text-left transition-all cursor-pointer",
-              intent === "INDEPENDENT"
-                ? "border-primary bg-primary/5 text-foreground ring-2 ring-primary/20 shadow-xs"
-                : "border-border bg-card text-muted-foreground hover:bg-muted/40",
-            )}
-          >
-            <div className="flex items-center gap-2 mb-1">
-              <span className="text-base">🛠️</span>
-              <span className="text-sm font-semibold text-foreground">
-                Independent
+          {(
+            [
+              {
+                value: "INDEPENDENT",
+                label: "Independent",
+                description: "Solo technician or mobile repairer.",
+              },
+              {
+                value: "SHOP",
+                label: "Shop Owner",
+                description: "Storefront or workshop repair business.",
+              },
+              {
+                value: "STAFF",
+                label: "Shop Staff",
+                description: "Joining a shop with an invitation.",
+              },
+            ] as const
+          ).map((option) => (
+            <label
+              key={option.value}
+              className={cn(
+                "flex cursor-pointer items-start gap-3 rounded-xl border p-3.5 transition-colors",
+                intent === option.value
+                  ? "border-ring bg-accent ring-1 ring-ring"
+                  : "border-input bg-card hover:bg-muted/40",
+                isPending && "cursor-not-allowed opacity-50",
+              )}
+            >
+              <input
+                type="radio"
+                name="account-intent"
+                value={option.value}
+                checked={intent === option.value}
+                disabled={isPending}
+                onChange={() => setIntent(option.value)}
+                className="mt-1 size-4 shrink-0 accent-ring"
+              />
+              <span>
+                <span className="block text-sm font-semibold">
+                  {option.label}
+                </span>
+                <span className="mt-1 block text-xs leading-relaxed text-muted-foreground">
+                  {option.description}
+                </span>
               </span>
-            </div>
-            <span className="text-[11px] text-muted-foreground leading-relaxed">
-              Solo technician or mobile repairer.
-            </span>
-          </button>
-
-          {/* Option 2: Shop Owner */}
-          <button
-            type="button"
-            role="radio"
-            aria-checked={intent === "SHOP"}
-            disabled={isPending}
-            onClick={() => setIntent("SHOP")}
-            className={cn(
-              "flex flex-col items-start rounded-2xl border p-3.5 text-left transition-all cursor-pointer",
-              intent === "SHOP"
-                ? "border-primary bg-primary/5 text-foreground ring-2 ring-primary/20 shadow-xs"
-                : "border-border bg-card text-muted-foreground hover:bg-muted/40",
-            )}
-          >
-            <div className="flex items-center gap-2 mb-1">
-              <span className="text-base">🏬</span>
-              <span className="text-sm font-semibold text-foreground">
-                Shop Owner
-              </span>
-            </div>
-            <span className="text-[11px] text-muted-foreground leading-relaxed">
-              Storefront or workshop repair business.
-            </span>
-          </button>
-
-          {/* Option 3: Shop Staff */}
-          <button
-            type="button"
-            role="radio"
-            aria-checked={intent === "STAFF"}
-            disabled={isPending}
-            onClick={() => setIntent("STAFF")}
-            className={cn(
-              "flex flex-col items-start rounded-2xl border p-3.5 text-left transition-all cursor-pointer",
-              intent === "STAFF"
-                ? "border-primary bg-primary/5 text-foreground ring-2 ring-primary/20 shadow-xs"
-                : "border-border bg-card text-muted-foreground hover:bg-muted/40",
-            )}
-          >
-            <div className="flex items-center gap-2 mb-1">
-              <span className="text-base">👥</span>
-              <span className="text-sm font-semibold text-foreground">
-                Shop Staff
-              </span>
-            </div>
-            <span className="text-[11px] text-muted-foreground leading-relaxed">
-              Joining a shop via Owner invite code.
-            </span>
-          </button>
+            </label>
+          ))}
         </div>
       </div>
 
@@ -119,7 +93,7 @@ export function RegisterForm({ initialInvite }: RegisterFormProps) {
         )}
 
         {state?.success && (
-          <div className="rounded-xl border border-primary/20 bg-primary/10 p-3 text-xs text-primary font-medium">
+          <div className="rounded-xl border border-primary/20 bg-primary/10 p-3 text-xs text-foreground font-medium">
             {state.success}
           </div>
         )}

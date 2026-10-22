@@ -90,7 +90,7 @@ function ProviderOperatingFields({
                 type="checkbox"
                 name="serviceModes"
                 value={option.value}
-                className="rounded border-border accent-primary"
+                className="rounded border-border accent-ring"
                 disabled={isPending}
               />
               <span>{option.label}</span>
@@ -123,7 +123,7 @@ function ProviderOperatingFields({
                 type="checkbox"
                 name="supportedDevices"
                 value={device}
-                className="rounded border-border accent-primary"
+                className="rounded border-border accent-ring"
                 disabled={isPending}
               />
               <span>{device}</span>
@@ -136,7 +136,7 @@ function ProviderOperatingFields({
         <input
           type="checkbox"
           name="acceptingRequests"
-          className="mt-0.5 rounded border-border accent-primary"
+          className="mt-0.5 rounded border-border accent-ring"
           defaultChecked
           disabled={isPending}
         />
@@ -475,7 +475,7 @@ export function OnboardingClient({
                 </h4>
                 <p className="text-xs text-muted-foreground">
                   Role:{" "}
-                  <span className="font-semibold text-primary">Staff</span>
+                  <span className="font-semibold text-foreground">Staff</span>
                 </p>
               </div>
             </div>

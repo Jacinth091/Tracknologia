@@ -31,20 +31,28 @@ export default async function DashboardPage() {
   return (
     <div className="max-w-6xl space-y-6">
       {/* Top Header */}
-      <div>
-        <h1 className="text-2xl font-bold tracking-tight sm:text-3xl text-foreground">
-          {context.providerName}
-        </h1>
-        <p className="text-sm text-muted-foreground mt-1 flex items-center gap-2 flex-wrap">
-          <span>{context.email}</span>
-          <span>•</span>
-          <span className="inline-flex items-center rounded-md bg-primary/10 px-2 py-0.5 text-xs font-semibold text-primary">
-            {providerTypeLabel}
-          </span>
-        </p>
+      <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
+        <div className="min-w-0">
+          <h1 className="text-2xl font-bold tracking-tight sm:text-3xl text-foreground wrap-anywhere">
+            {context.providerName}
+          </h1>
+          <p className="text-sm text-muted-foreground mt-1 flex items-center gap-2 flex-wrap">
+            <span className="wrap-anywhere">{context.email}</span>
+            <span>•</span>
+            <span className="inline-flex items-center rounded-md bg-primary/10 px-2 py-0.5 text-xs font-semibold text-foreground">
+              {providerTypeLabel}
+            </span>
+          </p>
+        </div>
+        <Link
+          href="/dashboard/repairs/new"
+          className={cn(buttonVariants(), "min-h-11 w-full sm:w-auto")}
+        >
+          Create Repair
+        </Link>
       </div>
 
-      <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+      <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
         {[
           {
             label: "Active",
@@ -68,8 +76,8 @@ export default async function DashboardPage() {
           },
         ].map((item) => (
           <Link key={item.label} href={item.href}>
-            <Card className="h-full transition-colors hover:border-primary/30">
-              <CardHeader className="pb-3">
+            <Card className="h-full transition-colors hover:border-input">
+              <CardHeader className="p-4 sm:p-6">
                 <CardDescription>{item.label} Repairs</CardDescription>
                 <CardTitle className="text-3xl tabular-nums">
                   {item.count}
@@ -83,25 +91,14 @@ export default async function DashboardPage() {
       <Card>
         <CardHeader>
           <CardTitle className="text-lg font-semibold">
-            Provider Workspace
+            Keep work moving
           </CardTitle>
           <CardDescription>
-            Your provider account has been authenticated and authorized with
-            trusted session context.
+            Review new requests or update the repairs already in your care.
           </CardDescription>
         </CardHeader>
         <CardContent className="space-y-3 text-sm text-muted-foreground">
-          <p>
-            Review incoming Requests, create direct Repairs, and keep active
-            work current through meaningful lifecycle states.
-          </p>
           <div className="flex flex-col gap-2 sm:flex-row">
-            <Link
-              href="/dashboard/repairs/new"
-              className={cn(buttonVariants(), "w-full sm:w-fit")}
-            >
-              Create Repair
-            </Link>
             <Link
               href="/dashboard/repairs"
               className={cn(

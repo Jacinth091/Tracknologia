@@ -42,7 +42,7 @@ function ActionMessage({ state }: { state: RepairActionState | null }) {
   }
   if (state?.success) {
     return (
-      <p className="rounded-xl border border-primary/20 bg-primary/10 p-3 text-sm text-primary">
+      <p className="rounded-xl border border-primary/20 bg-primary/10 p-3 text-sm text-foreground">
         {state.success}
       </p>
     );
@@ -107,9 +107,9 @@ export function RepairDetailForms({
     <div className="space-y-6">
       <Card>
         <CardHeader>
-          <CardTitle>Lifecycle actions</CardTitle>
+          <CardTitle>Repair status</CardTitle>
           <CardDescription>
-            Change status only when the operational state meaningfully changes.
+            Choose the status that reflects what is happening with this repair.
           </CardDescription>
         </CardHeader>
         <CardContent className="space-y-4">
@@ -142,7 +142,7 @@ export function RepairDetailForms({
           ) : null}
           {allowedTransitions.length === 0 ? (
             <p className="text-sm text-muted-foreground">
-              This Repair is completed. Reopening is not supported in the MVP.
+              This repair is completed and cannot be reopened.
             </p>
           ) : null}
         </CardContent>
@@ -193,13 +193,13 @@ export function RepairDetailForms({
         <CardHeader>
           <CardTitle>Edit Repair details</CardTitle>
           <CardDescription>
-            Correct the authoritative snapshot or maintain Provider-authored
-            information. Identity and lifecycle fields remain protected.
+            Update customer and device details, your diagnosis, and private
+            internal notes.
           </CardDescription>
         </CardHeader>
         <CardContent>
           <details>
-            <summary className="cursor-pointer text-sm font-medium text-primary">
+            <summary className="cursor-pointer py-2 text-sm font-medium text-foreground">
               Open edit form
             </summary>
             <form action={detailAction} className="mt-6 space-y-8">

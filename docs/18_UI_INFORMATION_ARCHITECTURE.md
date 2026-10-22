@@ -1,5 +1,63 @@
 # 18 — UI and Information Architecture
 
+## Brand foundation
+
+The approved **Hi-Vis on Paper** identity replaces the previous cool-neutral/teal
+direction. `src/app/globals.css` owns the light and `.dark` palettes:
+
+| Role           | Light                          | Dark            |
+| -------------- | ------------------------------ | --------------- |
+| Background     | Paper `#FBF6E9`                | Ink `#141414`   |
+| Card           | `#FFFDF7`                      | `#1E1D1A`       |
+| Text           | Ink `#141414`                  | Paper `#FBF6E9` |
+| Muted text     | `#6B6455`                      | `#B5AC98`       |
+| Primary action | Yellow `#FFC72C` with Ink text | Same            |
+
+Use primary yellow for fills, with `primary-hover` and `primary-pressed` for
+interaction. Use `text-foreground` for links, notices, and labels; yellow text on
+Paper is not readable. Controls use `border-input`; decorative dividers use
+`border-border`. Focus indicators use the solid `ring` token. Existing Figtree
+body typography and component radii remain in place. `.dark` supports the brand
+palette without introducing a theme switch or preference storage.
+
+`src/components/shared/brand-logo.tsx` contains the supplied vector wordmark from
+`Logo — the charge gauge (final)-html/assets/543f8337850166bf39ba3059bbce9268.svg`.
+It preserves the original path geometry, inherits the theme's foreground, and
+uses a transparent gauge interior so it sits on both Paper and Card surfaces.
+The default height is 26px; never render the wordmark below 18px. Use the standalone
+mark at smaller sizes. Print uses a one-color wordmark. The SVG has one accessible
+name, **Tracknologia**; its decorative charge is not repair progress.
+
+`src/app/icon.svg` preserves the supplied heavier-ring small icon
+(`143b7064aaf47681e242da1af8ac6370.svg`); `favicon.ico` contains 16px and 32px
+renders of it. Next.js discovers both through its file-based metadata convention.
+
+Request and Repair badges share `.status-badge` with their existing status in
+`data-status`. The stylesheet owns the colors for both themes: submitted is blue,
+accepted is a green outline, declined is red, in progress is blue, waiting for
+parts is rust, awaiting approval is purple, READY is Ink on yellow, and completed
+is warm gray. Always retain the text label. Public tracking still resolves an
+accepted Request to its Repair; ACCEPTED remains a Provider Request status.
+
+`src/components/shared/status-gauge.tsx` illustrates the existing named states:
+SUBMITTED has a 15% fill, ACCEPTED 30%, IN_PROGRESS and both waiting states 50%,
+READY 85%, and COMPLETED 100%. These are artwork proportions, never measured
+completion or displayed percentages. DECLINED uses a faded empty ring with a
+slash; a missing lookup result uses a separate dashed empty ring. Adjacent text
+names the state and the gauge is decorative. A standalone gauge requires its
+human-readable `label`. Neither variant exposes progress-bar semantics.
+
+Waiting states hold their fill and pulse gently only when the user has no
+reduced-motion preference. Gauges use already-fetched status fields; they do not
+poll or imply live updates. Compact gauges appear in Provider lists; larger
+gauges appear in details, public tracking, and submitted Request receipts.
+
+The identity covers landing, auth, onboarding, public request/tracking, and the
+Provider workspace. Provider navigation wraps on phones, identifies the current
+section (including detail routes), and retains Shop-only Team access. Shared
+inputs and primary actions have larger phone targets; long device names and
+reference codes wrap. Native account-role radios support keyboard selection.
+
 ## Public customer area
 
 ### Tracknologia landing
@@ -48,6 +106,13 @@ POST-backed form. Success keeps status visible by text as well as color,
 highlights the latest Customer Update, collapses earlier Updates, and labels
 Service Mode without exposing free-form arrangement details. Malformed and
 unknown codes share the same neutral result.
+
+The not-found result uses the dashed gauge; service/rate-limit failures show
+unavailable guidance without assigning a status. Pending lookups hide the prior
+result. Request receipts identify a Request Reference, not a Repair credential.
+Only valid `REQ-` references can prefill from a URL; `TRK-` credentials remain in
+the POST-backed form. Status descriptions and Service Mode handover wording
+continue to come from the Tracking feature.
 
 ## Authenticated Provider area
 

@@ -1,6 +1,7 @@
 "use client";
 
 import { useActionState } from "react";
+import { StatusGauge } from "@/components/shared/status-gauge";
 
 import { Button } from "@/components/ui/button";
 import {
@@ -14,19 +15,8 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { LoadingSpinner } from "@/components/ui/loading-spinner";
 import type { PublicRepairView, TrackingStatus } from "@/features/tracking";
-import { cn } from "@/lib/utils";
 
 import { trackRepairAction, type TrackRepairActionState } from "../actions";
-
-const STATUS_STYLES: Record<TrackingStatus, string> = {
-  IN_PROGRESS: "border-primary/20 bg-primary/10 text-primary",
-  WAITING_FOR_PARTS: "border-amber-700/20 bg-amber-700/10 text-amber-700",
-  AWAITING_APPROVAL: "border-orange-700/20 bg-orange-700/10 text-orange-700",
-  READY: "border-emerald-700/20 bg-emerald-700/10 text-emerald-700",
-  COMPLETED: "border-border bg-muted text-muted-foreground",
-  SUBMITTED: "border-primary/20 bg-primary/10 text-primary",
-  DECLINED: "border-destructive/20 bg-destructive/10 text-destructive",
-};
 
 export function getProgressEmptyMessage(status: TrackingStatus): string {
   if (status === "SUBMITTED") {
@@ -55,77 +45,74 @@ function TrackingResult({ view }: { view: PublicRepairView }) {
 
   return (
     <section aria-live="polite" className="space-y-5">
-      <Card className="overflow-hidden border-primary/20">
-        <CardHeader className="border-b border-border/80 bg-muted/20">
-          <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
-            <div>
-              <p className="text-xs font-semibold uppercase tracking-wide text-primary">
+      <Card className="overflow-hidden">
+        <CardHeader className="border-b border-border">
+          <div className="flex flex-col items-start gap-5 sm:flex-row sm:items-center sm:gap-6">
+            <StatusGauge
+              status={view.currentStatus}
+              className="size-24 sm:size-32"
+            />
+            <div className="min-w-0 space-y-3">
+              <span
+                data-status={view.currentStatus}
+                className="status-badge inline-flex rounded-full border px-3 py-1.5 text-sm font-semibold"
+              >
+                {view.statusLabel}
+              </span>
+              <h2 className="text-2xl font-semibold tracking-tight wrap-anywhere sm:text-3xl">
+                {view.deviceSummary}
+              </h2>
+              <p className="text-sm text-muted-foreground wrap-anywhere">
                 {view.providerDisplayName}
               </p>
-              <CardTitle className="mt-2 text-2xl">
-                {view.deviceSummary}
-              </CardTitle>
+              <p className="text-sm leading-relaxed text-foreground">
+                {view.statusDescription}
+              </p>
             </div>
-            <span
-              className={cn(
-                "inline-flex w-fit rounded-full border px-3 py-1.5 text-xs font-semibold",
-                STATUS_STYLES[view.currentStatus] ??
-                  "border-border bg-muted text-muted-foreground",
-              )}
-            >
-              {view.statusLabel}
-            </span>
           </div>
-          <CardDescription className="pt-2 text-sm text-foreground">
-            {view.statusDescription}
-          </CardDescription>
         </CardHeader>
 
         <CardContent className="space-y-6 pt-6">
-          <div className="grid gap-4 sm:grid-cols-2">
-            <div className="rounded-2xl border border-border/80 bg-background/80 p-4">
-              <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
+          <dl className="grid gap-5 sm:grid-cols-2">
+            <div>
+              <dt className="text-sm text-muted-foreground">
                 Service arrangement
-              </p>
-              <p className="mt-1 text-sm font-semibold text-foreground">
+              </dt>
+              <dd className="mt-1 text-sm font-medium text-foreground">
                 {view.serviceModeLabel ?? "To be arranged with Provider"}
-              </p>
+              </dd>
             </div>
-            <div className="rounded-2xl border border-border/80 bg-background/80 p-4">
-              <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
-                Latest update
-              </p>
-              <p className="mt-1 text-sm font-semibold text-foreground">
+            <div>
+              <dt className="text-sm text-muted-foreground">Latest update</dt>
+              <dd className="mt-1 text-sm font-medium text-foreground">
                 {formatDateTime(view.lastUpdatedAt)}
-              </p>
+              </dd>
             </div>
-          </div>
+          </dl>
 
           {view.handoverMessage && (
-            <div className="rounded-2xl border border-emerald-700/20 bg-emerald-700/10 p-4 text-sm text-emerald-950">
+            <div className="rounded-2xl border border-border bg-accent p-4 text-sm text-accent-foreground">
               <p className="font-semibold">Next steps</p>
               <p className="mt-1">{view.handoverMessage}</p>
             </div>
           )}
 
-          <div className="space-y-3">
-            <h2 className="text-sm font-semibold uppercase tracking-wide text-muted-foreground">
-              Progress updates
-            </h2>
+          <div className="space-y-4 border-t border-border pt-6">
+            <h3 className="text-base font-semibold">Customer updates</h3>
             {latestUpdate ? (
               <div className="space-y-3">
-                <div className="rounded-2xl border border-border/80 bg-muted/20 p-4">
+                <div className="space-y-2">
                   <p className="text-xs font-medium text-muted-foreground">
                     {formatDateTime(latestUpdate.createdAt)}
                   </p>
-                  <p className="mt-1 text-sm text-foreground">
+                  <p className="text-base leading-relaxed whitespace-pre-wrap wrap-anywhere">
                     {latestUpdate.message}
                   </p>
                 </div>
 
                 {earlierUpdates.length > 0 && (
-                  <details className="rounded-2xl border border-border/80 bg-background/80 p-4 text-sm">
-                    <summary className="cursor-pointer font-medium text-foreground">
+                  <details className="border-t border-border pt-3 text-sm">
+                    <summary className="cursor-pointer py-2 font-medium text-foreground">
                       Earlier updates ({earlierUpdates.length})
                     </summary>
                     <div className="mt-3 space-y-3 border-t border-border/80 pt-3">
@@ -137,7 +124,9 @@ function TrackingResult({ view }: { view: PublicRepairView }) {
                           <p className="text-xs text-muted-foreground">
                             {formatDateTime(update.createdAt)}
                           </p>
-                          <p className="text-foreground">{update.message}</p>
+                          <p className="whitespace-pre-wrap wrap-anywhere text-foreground">
+                            {update.message}
+                          </p>
                         </div>
                       ))}
                     </div>
@@ -163,12 +152,13 @@ export function TrackingForm({ initialCode = "" }: { initialCode?: string }) {
   >(trackRepairAction, null);
 
   const errorMessage =
-    state?.outcome === "not-found" || state?.outcome === "unavailable"
+    !pending &&
+    (state?.outcome === "not-found" || state?.outcome === "unavailable")
       ? state.message
       : null;
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-6" aria-busy={pending}>
       <Card>
         <CardHeader>
           <CardTitle className="text-lg">Enter Tracking Code</CardTitle>
@@ -197,21 +187,12 @@ export function TrackingForm({ initialCode = "" }: { initialCode?: string }) {
                 }
                 required
               />
-              {errorMessage && (
-                <p
-                  id="tracking-code-error"
-                  role="alert"
-                  className="text-xs text-destructive"
-                >
-                  {errorMessage}
-                </p>
-              )}
             </div>
 
             <Button
               type="submit"
               disabled={pending}
-              className="w-full sm:w-auto"
+              className="min-h-11 w-full sm:w-auto"
             >
               {pending ? (
                 <>
@@ -226,7 +207,26 @@ export function TrackingForm({ initialCode = "" }: { initialCode?: string }) {
         </CardContent>
       </Card>
 
-      {state?.outcome === "found" && <TrackingResult view={state.view} />}
+      {errorMessage && (
+        <Card role="alert" id="tracking-code-error">
+          <CardContent className="flex flex-col items-start gap-4 pt-6 sm:flex-row sm:items-center">
+            {state?.outcome === "not-found" && <StatusGauge status={null} />}
+            <div className="space-y-2">
+              <h2 className="text-xl font-semibold">
+                {state?.outcome === "not-found"
+                  ? "We couldn't find that code"
+                  : "Tracking unavailable"}
+              </h2>
+              <p className="text-sm leading-relaxed text-muted-foreground">
+                {errorMessage}
+              </p>
+            </div>
+          </CardContent>
+        </Card>
+      )}
+      {!pending && state?.outcome === "found" && (
+        <TrackingResult view={state.view} />
+      )}
     </div>
   );
 }

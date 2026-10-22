@@ -112,8 +112,8 @@ export function RequestDecisionForm({
         <CardHeader>
           <CardTitle>Verify and create Repair</CardTitle>
           <CardDescription>
-            Values below become authoritative Repair snapshot. Correct customer
-            input and add Provider-only intake details before accepting.
+            Check customer and device details, then add your intake notes before
+            accepting.
           </CardDescription>
         </CardHeader>
         <CardContent>
@@ -343,7 +343,7 @@ export function RequestDecisionForm({
                       name="serviceMode"
                       value=""
                       defaultChecked={!preferredModeSupported}
-                      className="mt-1 accent-primary"
+                      className="mt-1 accent-ring"
                       disabled={acceptPending}
                     />
                     <span className="text-sm font-medium">No Service Mode</span>
@@ -361,7 +361,7 @@ export function RequestDecisionForm({
                           preferredModeSupported &&
                           request.preferredServiceMode === mode.mode
                         }
-                        className="mt-1 accent-primary"
+                        className="mt-1 accent-ring"
                         disabled={acceptPending}
                       />
                       <span>

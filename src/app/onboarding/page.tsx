@@ -1,4 +1,6 @@
 import type { Metadata } from "next";
+import Link from "next/link";
+import { BrandLogo } from "@/components/shared/brand-logo";
 import { getUser, getProviderContext } from "@/features/auth";
 import { getInvitationForOnboarding } from "@/features/providers";
 import { createClient } from "@/lib/supabase/server";
@@ -9,7 +11,6 @@ import {
   CardContent,
   CardDescription,
   CardHeader,
-  CardTitle,
 } from "@/components/ui/card";
 import { OnboardingClient } from "./_components/onboarding-client";
 
@@ -62,40 +63,47 @@ export default async function OnboardingPage({
   }
 
   return (
-    <div className="flex min-h-[calc(100vh-4rem)] items-center justify-center p-4">
-      <Card className="w-full max-w-xl shadow-md">
-        <CardHeader className="text-center space-y-1">
-          <CardTitle className="text-xl sm:text-2xl font-bold tracking-tight">
-            {providerType === "SHOP"
-              ? "Set Up Your Repair Shop"
-              : providerType === "INDEPENDENT"
-                ? "Set Up Your Independent Profile"
-                : shopDetails || intent === "STAFF" || inviteToken
-                  ? "Complete Staff Profile"
-                  : "Provider Setup & Onboarding"}
-          </CardTitle>
-          <CardDescription>
-            {providerType === "SHOP"
-              ? "Configure your shop details and storefront location to get started"
-              : providerType === "INDEPENDENT"
-                ? "Configure your repair brand and service area to get started"
-                : shopDetails
-                  ? `Join ${shopDetails.shopName} as shop staff`
-                  : intent === "STAFF" || inviteToken
-                    ? "Complete your staff profile to connect to your repair shop"
-                    : "Choose your operating model to set up your profile or join as shop staff"}
-          </CardDescription>
-        </CardHeader>
-        <CardContent>
-          <OnboardingClient
-            defaultInviteToken={inviteToken}
-            initialProviderType={providerType}
-            initialDisplayName={initialDisplayName}
-            initialEmail={initialEmail}
-            shopDetails={shopDetails}
-          />
-        </CardContent>
-      </Card>
-    </div>
+    <main className="flex min-h-screen items-center justify-center px-4 py-10">
+      <div className="w-full max-w-xl space-y-6">
+        <div className="text-center">
+          <Link href="/" className="inline-block rounded-sm">
+            <BrandLogo className="h-8" />
+          </Link>
+        </div>
+        <Card>
+          <CardHeader className="text-center space-y-1">
+            <h1 className="text-2xl font-bold tracking-tight">
+              {providerType === "SHOP"
+                ? "Set Up Your Repair Shop"
+                : providerType === "INDEPENDENT"
+                  ? "Set Up Your Independent Profile"
+                  : shopDetails || intent === "STAFF" || inviteToken
+                    ? "Complete Staff Profile"
+                    : "Provider Setup & Onboarding"}
+            </h1>
+            <CardDescription>
+              {providerType === "SHOP"
+                ? "Configure your shop details and storefront location to get started"
+                : providerType === "INDEPENDENT"
+                  ? "Configure your repair brand and service area to get started"
+                  : shopDetails
+                    ? `Join ${shopDetails.shopName} as shop staff`
+                    : intent === "STAFF" || inviteToken
+                      ? "Complete your staff profile to connect to your repair shop"
+                      : "Choose your operating model to set up your profile or join as shop staff"}
+            </CardDescription>
+          </CardHeader>
+          <CardContent>
+            <OnboardingClient
+              defaultInviteToken={inviteToken}
+              initialProviderType={providerType}
+              initialDisplayName={initialDisplayName}
+              initialEmail={initialEmail}
+              shopDetails={shopDetails}
+            />
+          </CardContent>
+        </Card>
+      </div>
+    </main>
   );
 }

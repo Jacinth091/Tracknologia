@@ -49,7 +49,7 @@ function DetailValue({
       <dt className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
         {label}
       </dt>
-      <dd className="mt-1 whitespace-pre-wrap text-sm text-foreground">
+      <dd className="mt-1 whitespace-pre-wrap wrap-anywhere text-sm text-foreground">
         {value || "Not provided"}
       </dd>
     </div>
@@ -81,7 +81,7 @@ export default async function RepairDetailPage({
   return (
     <div className="mx-auto max-w-6xl space-y-6">
       <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
-        <div>
+        <div className="min-w-0">
           <Link
             href="/dashboard/repairs"
             className={cn(
@@ -94,22 +94,22 @@ export default async function RepairDetailPage({
           <p className="font-mono text-xs text-muted-foreground">
             {repair.ticketNumber}
           </p>
-          <h1 className="mt-1 text-2xl font-bold tracking-tight sm:text-3xl">
+          <h1 className="mt-1 text-2xl font-bold tracking-tight wrap-anywhere sm:text-3xl">
             {deviceName}
           </h1>
-          <p className="mt-1 text-sm text-muted-foreground">
+          <p className="mt-1 text-sm text-muted-foreground wrap-anywhere">
             {repair.customerName} · Updated {formatDate(repair.updatedAt)}
           </p>
         </div>
-        <RepairStatusBadge status={repair.currentStatus} />
+        <RepairStatusBadge status={repair.currentStatus} prominent />
       </div>
 
       <Card>
         <CardHeader>
           <CardTitle>Repair identity</CardTitle>
           <CardDescription>
-            Ticket is Provider-facing; Tracking Code becomes the public
-            credential in Feature 05.
+            Use the ticket number within your team. Share the Tracking Code with
+            the customer for repair updates.
           </CardDescription>
         </CardHeader>
         <CardContent>

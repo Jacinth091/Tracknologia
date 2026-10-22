@@ -21,7 +21,7 @@ export function ForgotPasswordForm() {
           <div className="flex items-center gap-2 rounded-xl bg-card border border-border/80 px-4 py-2 shadow-md">
             <LoadingSpinner
               size="sm"
-              className="text-primary border-primary border-t-transparent"
+              className="text-foreground border-current border-t-transparent"
             />
             <span className="text-xs font-medium text-foreground">
               Sending reset link...
@@ -38,7 +38,7 @@ export function ForgotPasswordForm() {
         )}
 
         {state?.success && (
-          <div className="rounded-xl border border-primary/20 bg-primary/10 p-3 text-sm text-primary font-medium">
+          <div className="rounded-xl border border-primary/20 bg-primary/10 p-3 text-sm text-foreground font-medium">
             {state.success}
           </div>
         )}

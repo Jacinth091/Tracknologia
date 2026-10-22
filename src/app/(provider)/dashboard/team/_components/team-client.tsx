@@ -114,7 +114,11 @@ export function TeamClient({
                   </p>
                 )}
               </div>
-              <Button type="submit" disabled={isPending}>
+              <Button
+                type="submit"
+                disabled={isPending}
+                className="w-full sm:w-auto"
+              >
                 {isPending ? (
                   <span className="flex items-center gap-2">
                     <LoadingSpinner size="sm" />
@@ -133,7 +137,7 @@ export function TeamClient({
             )}
 
             {state?.reused && (
-              <div className="rounded-xl border border-amber-500/30 bg-amber-500/10 p-3 text-xs font-medium text-amber-600 dark:text-amber-400">
+              <div className="rounded-xl border border-border bg-accent p-3 text-sm font-medium text-accent-foreground">
                 {state.success}
               </div>
             )}
@@ -142,7 +146,7 @@ export function TeamClient({
             {state?.token && state.inviteUrl && (
               <div className="rounded-2xl border border-primary/30 bg-primary/5 p-4 space-y-3">
                 <div className="flex items-center justify-between">
-                  <span className="text-xs font-semibold text-primary">
+                  <span className="text-xs font-semibold text-foreground">
                     {state.emailDeliveryFailed
                       ? "Invitation Created (Email Failed)"
                       : "Invitation Created & Sent!"}
@@ -153,7 +157,7 @@ export function TeamClient({
                 </div>
 
                 {state.emailDeliveryFailed && (
-                  <p className="text-xs text-amber-600 dark:text-amber-400 font-medium">
+                  <p className="text-xs text-foreground font-medium">
                     ⚠️ Email delivery could not be completed. You can copy the
                     invitation link below and share it directly with your staff
                     member.
@@ -193,7 +197,7 @@ export function TeamClient({
       )}
 
       {isOwner && revokeState?.success && (
-        <div className="rounded-xl border border-primary/20 bg-primary/10 p-3 text-xs font-medium text-primary">
+        <div className="rounded-xl border border-primary/20 bg-primary/10 p-3 text-xs font-medium text-foreground">
           Invitation revoked
         </div>
       )}
@@ -205,7 +209,7 @@ export function TeamClient({
       )}
 
       {isOwner && removeState?.success && (
-        <div className="rounded-xl border border-primary/20 bg-primary/10 p-3 text-xs font-medium text-primary">
+        <div className="rounded-xl border border-primary/20 bg-primary/10 p-3 text-xs font-medium text-foreground">
           {removeState.success}
         </div>
       )}
@@ -234,7 +238,7 @@ export function TeamClient({
                   key={inv.id}
                   className="py-3 flex items-center justify-between gap-4"
                 >
-                  <div className="space-y-0.5">
+                  <div className="min-w-0 space-y-0.5 wrap-anywhere">
                     <p className="text-sm font-medium text-foreground">
                       {inv.email}
                     </p>
@@ -283,10 +287,10 @@ export function TeamClient({
               return (
                 <div
                   key={member.membershipId}
-                  className="py-3.5 flex items-center justify-between gap-4"
+                  className="py-4 flex flex-wrap items-center justify-between gap-3"
                 >
-                  <div className="flex items-center gap-3">
-                    <div className="h-9 w-9 rounded-full bg-primary/10 text-primary flex items-center justify-center font-semibold text-sm">
+                  <div className="flex min-w-0 flex-1 basis-48 items-center gap-3">
+                    <div className="h-9 w-9 shrink-0 rounded-full bg-primary/10 text-foreground flex items-center justify-center font-semibold text-sm">
                       {initials}
                     </div>
                     <div className="space-y-0.5">
@@ -312,7 +316,7 @@ export function TeamClient({
                     className={cn(
                       "inline-flex items-center rounded-md px-2.5 py-0.5 text-xs font-semibold shrink-0",
                       member.role === "OWNER"
-                        ? "bg-primary/10 text-primary font-medium"
+                        ? "bg-primary/10 text-foreground font-medium"
                         : "bg-muted text-muted-foreground font-medium",
                     )}
                   >
@@ -324,7 +328,7 @@ export function TeamClient({
                       {confirmingRemovalId === member.membershipId ? (
                         <form
                           action={removeFormAction}
-                          className="flex items-center gap-1"
+                          className="flex flex-wrap items-center gap-2"
                         >
                           <input
                             type="hidden"
