@@ -1,10 +1,19 @@
 "use client";
 
+import { HugeiconsIcon } from "@hugeicons/react";
+import {
+  Alert02Icon,
+  Location01Icon,
+  Message01Icon,
+  SmartPhone01Icon,
+  User02Icon,
+} from "@hugeicons/core-free-icons";
 import { StatusGauge } from "@/components/shared/status-gauge";
 
 import Link from "next/link";
 import { useActionState, useState } from "react";
 
+import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Button, buttonVariants } from "@/components/ui/button";
 import {
   Card,
@@ -227,17 +236,22 @@ export function RepairRequestForm({
   return (
     <form action={formAction} className="space-y-6">
       {state?.error && (
-        <div
-          role="alert"
-          className="rounded-2xl border border-destructive/20 bg-destructive/10 p-4 text-sm font-medium text-destructive"
-        >
-          {state.error}
-        </div>
+        <Alert variant="destructive" role="alert">
+          <HugeiconsIcon icon={Alert02Icon} aria-hidden="true" />
+          <AlertDescription>{state.error}</AlertDescription>
+        </Alert>
       )}
 
       <Card>
         <CardHeader>
-          <CardTitle className="text-lg">Your contact details</CardTitle>
+          <CardTitle className="flex items-center gap-2 text-lg">
+            <HugeiconsIcon
+              icon={User02Icon}
+              aria-hidden="true"
+              className="size-5"
+            />
+            Your contact details
+          </CardTitle>
           <CardDescription>
             Give Provider a reliable way to follow up about Request.
           </CardDescription>
@@ -288,7 +302,14 @@ export function RepairRequestForm({
 
       <Card>
         <CardHeader>
-          <CardTitle className="text-lg">Device details</CardTitle>
+          <CardTitle className="flex items-center gap-2 text-lg">
+            <HugeiconsIcon
+              icon={SmartPhone01Icon}
+              aria-hidden="true"
+              className="size-5"
+            />
+            Device details
+          </CardTitle>
           <CardDescription>
             Device type is required. Add other identifiers when known.
           </CardDescription>
@@ -377,7 +398,14 @@ export function RepairRequestForm({
 
       <Card>
         <CardHeader>
-          <CardTitle className="text-lg">Reported Problem</CardTitle>
+          <CardTitle className="flex items-center gap-2 text-lg">
+            <HugeiconsIcon
+              icon={Message01Icon}
+              aria-hidden="true"
+              className="size-5"
+            />
+            Reported Problem
+          </CardTitle>
           <CardDescription>
             Describe what you observe. Provider will verify technical details.
           </CardDescription>
@@ -459,7 +487,14 @@ export function RepairRequestForm({
       {serviceModes.length > 0 && (
         <Card>
           <CardHeader>
-            <CardTitle className="text-lg">Preferred Service Mode</CardTitle>
+            <CardTitle className="flex items-center gap-2 text-lg">
+              <HugeiconsIcon
+                icon={Location01Icon}
+                aria-hidden="true"
+                className="size-5"
+              />
+              Preferred Service Mode
+            </CardTitle>
             <CardDescription>
               Preference is not final until Provider reviews Request.
             </CardDescription>
