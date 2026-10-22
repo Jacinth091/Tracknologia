@@ -22,7 +22,7 @@ import { createClient } from "@/lib/supabase/server";
 import {
   RepairStatusBadge,
   repairStatusLabel,
-} from "../_components/repair-status-badge";
+} from "../../_components/repair-status-badge";
 import {
   RepairDetailForms,
   RepairLifecycleActions,

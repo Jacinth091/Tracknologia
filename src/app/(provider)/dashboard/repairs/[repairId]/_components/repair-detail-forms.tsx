@@ -28,7 +28,7 @@ import {
   RepairFields,
   type RepairFieldValues,
 } from "../../_components/repair-fields";
-import { repairStatusLabel } from "../../_components/repair-status-badge";
+import { repairStatusLabel } from "../../../_components/repair-status-badge";
 
 function ActionMessage({ state }: { state: RepairActionState | null }) {
   if (state?.error) {

@@ -38,7 +38,7 @@ import {
   EmptyTitle,
 } from "@/components/ui/empty";
 import { cn } from "@/lib/utils";
-import { repairStatusLabel } from "./repairs/_components/repair-status-badge";
+import { repairStatusLabel } from "./_components/repair-status-badge";
 
 export const metadata: Metadata = {
   title: "Dashboard — Tracknologia",
@@ -227,7 +227,10 @@ export default async function DashboardPage() {
           <Empty className="rounded-xl border border-border bg-card p-8">
             <EmptyHeader>
               <EmptyMedia variant="icon">
-                <HugeiconsIcon icon={CheckmarkCircle02Icon} aria-hidden="true" />
+                <HugeiconsIcon
+                  icon={CheckmarkCircle02Icon}
+                  aria-hidden="true"
+                />
               </EmptyMedia>
               <EmptyTitle>You&apos;re all caught up</EmptyTitle>
               <EmptyDescription>
@@ -252,7 +255,10 @@ export default async function DashboardPage() {
         ) : (
           <Card className="overflow-hidden p-0">
             {groups.map((group) => (
-              <div key={group.label} className="border-b border-border last:border-b-0">
+              <div
+                key={group.label}
+                className="border-b border-border last:border-b-0"
+              >
                 <div className="flex items-center justify-between gap-3 bg-muted/40 px-4 py-2 sm:px-5">
                   <p className="font-mono text-xs uppercase tracking-wider text-muted-foreground">
                     {group.label}
@@ -271,7 +277,10 @@ export default async function DashboardPage() {
                         href={row.href}
                         className="flex items-center gap-3 px-4 py-3 transition-colors hover:bg-muted/50 sm:px-5"
                       >
-                        <StatusGauge status={row.status} className="size-5 shrink-0" />
+                        <StatusGauge
+                          status={row.status}
+                          className="size-5 shrink-0"
+                        />
                         <div className="min-w-0 flex-1">
                           <p className="truncate text-sm font-bold text-foreground">
                             {row.title}

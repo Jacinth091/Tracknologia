@@ -28,7 +28,7 @@ import {
 } from "@/features/repairs";
 import { cn } from "@/lib/utils";
 
-import { RepairStatusPill } from "./_components/repair-status-badge";
+import { RepairStatusPill } from "../_components/repair-status-badge";
 
 export const metadata: Metadata = {
   title: "Repairs — Tracknologia",
