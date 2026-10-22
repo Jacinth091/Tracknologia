@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { HugeiconsIcon } from "@hugeicons/react";
 import {
+  ArrowLeft01Icon,
   BellIcon,
   QrCodeIcon,
   SquareLock02Icon,
@@ -87,8 +88,24 @@ export default function AuthLayout({
 
       <div className="flex min-h-screen flex-col justify-center px-4 py-12 lg:px-10 xl:px-16">
         <div className="mx-auto w-full max-w-xl space-y-6">
+          <Link
+            href="/"
+            className="inline-flex w-fit items-center gap-1.5 text-sm text-muted-foreground underline-offset-4 hover:text-foreground hover:underline"
+          >
+            <HugeiconsIcon
+              icon={ArrowLeft01Icon}
+              strokeWidth={2}
+              aria-hidden="true"
+              className="size-4"
+            />
+            Back to home
+          </Link>
           <div className="space-y-1 text-center lg:hidden">
-            <Link href="/" className="inline-block rounded-sm">
+            <Link
+              href="/"
+              className="inline-block rounded-sm"
+              aria-label="Tracknologia home"
+            >
               <BrandLogo className="h-9" />
             </Link>
             <p className="text-sm text-muted-foreground">
