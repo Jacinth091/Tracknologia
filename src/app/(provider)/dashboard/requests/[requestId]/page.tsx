@@ -112,72 +112,75 @@ export default async function RepairRequestDetailPage({
 
       <div className="grid gap-6 lg:grid-cols-[minmax(0,1fr)_20rem] lg:items-start">
         <div className="min-w-0 space-y-6">
-          <Card>
-            <CardHeader>
-              <CardTitle>Customer-reported information</CardTitle>
-              <CardDescription>
-                Review what the customer reported before accepting the request.
-              </CardDescription>
-            </CardHeader>
-            <CardContent className="space-y-6">
-              <dl className="grid gap-5 sm:grid-cols-2 xl:grid-cols-3">
-                <DetailValue label="Customer" value={request.customerName} />
-                <DetailValue label="Phone" value={request.customerPhone} />
-                <DetailValue label="Email" value={request.customerEmail} />
-                <DetailValue label="Device type" value={request.deviceType} />
-                <DetailValue label="Brand" value={request.brand} />
-                <DetailValue label="Model" value={request.model} />
-                <DetailValue
-                  label="Serial number"
-                  value={request.serialNumber}
-                />
-                <DetailValue
-                  label="Color / variant"
-                  value={request.colorVariant}
-                />
-                <DetailValue
-                  label="Specifications"
-                  value={request.deviceSpecs}
-                />
-              </dl>
-              <div className="border-t border-border/80 pt-5">
-                <dl className="grid gap-5 sm:grid-cols-2">
+          {request.status !== "SUBMITTED" && (
+            <Card>
+              <CardHeader>
+                <CardTitle>Customer-reported information</CardTitle>
+                <CardDescription>
+                  Review what the customer reported before accepting the
+                  request.
+                </CardDescription>
+              </CardHeader>
+              <CardContent className="space-y-6">
+                <dl className="grid gap-5 sm:grid-cols-2 xl:grid-cols-3">
+                  <DetailValue label="Customer" value={request.customerName} />
+                  <DetailValue label="Phone" value={request.customerPhone} />
+                  <DetailValue label="Email" value={request.customerEmail} />
+                  <DetailValue label="Device type" value={request.deviceType} />
+                  <DetailValue label="Brand" value={request.brand} />
+                  <DetailValue label="Model" value={request.model} />
                   <DetailValue
-                    label="Reported Problem"
-                    value={request.reportedProblem}
+                    label="Serial number"
+                    value={request.serialNumber}
                   />
                   <DetailValue
-                    label="When it started"
-                    value={request.problemStartedAt}
+                    label="Color / variant"
+                    value={request.colorVariant}
                   />
                   <DetailValue
-                    label="Preceding event"
-                    value={request.precedingEvent}
-                  />
-                  <DetailValue
-                    label="Troubleshooting attempted"
-                    value={request.troubleshootingAttempted}
-                  />
-                  <DetailValue
-                    label="Additional information"
-                    value={request.additionalInformation}
-                  />
-                  <DetailValue
-                    label="Preferred Service Mode"
-                    value={
-                      request.preferredServiceMode
-                        ? request.preferredServiceMode.replaceAll("_", " ")
-                        : null
-                    }
-                  />
-                  <DetailValue
-                    label="Arrangement details"
-                    value={request.serviceModeDetails}
+                    label="Specifications"
+                    value={request.deviceSpecs}
                   />
                 </dl>
-              </div>
-            </CardContent>
-          </Card>
+                <div className="border-t border-border/80 pt-5">
+                  <dl className="grid gap-5 sm:grid-cols-2">
+                    <DetailValue
+                      label="Reported Problem"
+                      value={request.reportedProblem}
+                    />
+                    <DetailValue
+                      label="When it started"
+                      value={request.problemStartedAt}
+                    />
+                    <DetailValue
+                      label="Preceding event"
+                      value={request.precedingEvent}
+                    />
+                    <DetailValue
+                      label="Troubleshooting attempted"
+                      value={request.troubleshootingAttempted}
+                    />
+                    <DetailValue
+                      label="Additional information"
+                      value={request.additionalInformation}
+                    />
+                    <DetailValue
+                      label="Preferred Service Mode"
+                      value={
+                        request.preferredServiceMode
+                          ? request.preferredServiceMode.replaceAll("_", " ")
+                          : null
+                      }
+                    />
+                    <DetailValue
+                      label="Arrangement details"
+                      value={request.serviceModeDetails}
+                    />
+                  </dl>
+                </div>
+              </CardContent>
+            </Card>
+          )}
 
           {request.status === "SUBMITTED" ? (
             <RequestDecisionForm

@@ -169,6 +169,42 @@ export function RequestDecisionForm({
                 value={request.reportedProblem}
               />
             </div>
+            <div className="sm:col-span-2">
+              <SummaryValue
+                label="When it started"
+                value={request.problemStartedAt}
+              />
+            </div>
+            <div className="sm:col-span-2">
+              <SummaryValue
+                label="Preceding event"
+                value={request.precedingEvent}
+              />
+            </div>
+            <div className="sm:col-span-2">
+              <SummaryValue
+                label="Troubleshooting attempted"
+                value={request.troubleshootingAttempted}
+              />
+            </div>
+            <div className="sm:col-span-2">
+              <SummaryValue
+                label="Additional information"
+                value={request.additionalInformation}
+              />
+            </div>
+            <SummaryValue
+              label="Preferred Service Mode"
+              value={
+                request.preferredServiceMode
+                  ? request.preferredServiceMode.replaceAll("_", " ")
+                  : null
+              }
+            />
+            <SummaryValue
+              label="Arrangement details"
+              value={request.serviceModeDetails}
+            />
           </dl>
         </CardContent>
       </Card>
