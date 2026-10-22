@@ -1,5 +1,7 @@
 "use client";
 
+import { HugeiconsIcon } from "@hugeicons/react";
+import { Copy01Icon, Tick02Icon } from "@hugeicons/core-free-icons";
 import type { RefObject } from "react";
 import { useState } from "react";
 
@@ -10,11 +12,13 @@ export function CopyButton({
   targetRef,
   label = "Copy",
   copiedLabel = "Copied",
+  iconOnly = false,
 }: {
   text: string;
   targetRef?: RefObject<HTMLElement | null>;
   label?: string;
   copiedLabel?: string;
+  iconOnly?: boolean;
 }) {
   const [copied, setCopied] = useState(false);
 
@@ -49,6 +53,31 @@ export function CopyButton({
       }
     }
     selectTarget();
+  }
+
+  if (iconOnly) {
+    return (
+      <span className="inline-flex items-center">
+        <Button
+          type="button"
+          variant="ghost"
+          size="icon-xs"
+          onClick={copy}
+          aria-label={label}
+          className="text-muted-foreground"
+        >
+          <HugeiconsIcon
+            icon={copied ? Tick02Icon : Copy01Icon}
+            strokeWidth={2}
+            aria-hidden="true"
+            className="size-3.5"
+          />
+        </Button>
+        <span aria-live="polite" className="sr-only">
+          {copied ? copiedLabel : ""}
+        </span>
+      </span>
+    );
   }
 
   return (

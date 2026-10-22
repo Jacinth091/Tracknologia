@@ -2,6 +2,7 @@
 
 import { useActionState } from "react";
 
+import { CopyButton } from "@/components/shared/copy-button";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
 import {
@@ -77,17 +78,31 @@ export function RequestDecisionForm({
             <p className="text-xs uppercase tracking-wide text-muted-foreground">
               Ticket Number
             </p>
-            <p className="mt-1 font-mono font-semibold">
-              {acceptState.acceptedRepair.ticketNumber}
-            </p>
+            <div className="mt-1 flex items-center gap-1">
+              <p className="min-w-0 break-all font-mono font-semibold">
+                {acceptState.acceptedRepair.ticketNumber}
+              </p>
+              <CopyButton
+                iconOnly
+                text={acceptState.acceptedRepair.ticketNumber}
+                label="Copy ticket number"
+              />
+            </div>
           </div>
           <div className="rounded-2xl border border-border bg-muted/40 p-4">
             <p className="text-xs uppercase tracking-wide text-muted-foreground">
               Tracking Code
             </p>
-            <p className="mt-1 break-all font-mono font-semibold">
-              {acceptState.acceptedRepair.trackingCode}
-            </p>
+            <div className="mt-1 flex items-center gap-1">
+              <p className="min-w-0 break-all font-mono font-semibold">
+                {acceptState.acceptedRepair.trackingCode}
+              </p>
+              <CopyButton
+                iconOnly
+                text={acceptState.acceptedRepair.trackingCode}
+                label="Copy tracking code"
+              />
+            </div>
           </div>
         </CardContent>
       </Card>

@@ -8,6 +8,7 @@ import {
   SmartPhone01Icon,
   User02Icon,
 } from "@hugeicons/core-free-icons";
+import { CopyButton } from "@/components/shared/copy-button";
 import { StatusGauge } from "@/components/shared/status-gauge";
 
 import Link from "next/link";
@@ -140,9 +141,16 @@ function RequestReceiptCard({
             <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
               Request Reference Code
             </p>
-            <p className="mt-1 font-mono text-lg font-bold tracking-wide wrap-anywhere text-foreground">
-              {referenceCode}
-            </p>
+            <div className="mt-1 flex items-center gap-1">
+              <p className="min-w-0 font-mono text-lg font-bold tracking-wide wrap-anywhere text-foreground">
+                {referenceCode}
+              </p>
+              <CopyButton
+                iconOnly
+                text={referenceCode}
+                label="Copy request reference"
+              />
+            </div>
           </div>
 
           <div className="flex flex-col gap-2 sm:flex-row">

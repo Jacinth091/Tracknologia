@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 
+import { CopyButton } from "@/components/shared/copy-button";
 import { buttonVariants } from "@/components/ui/button";
 import {
   Card,
@@ -44,11 +45,15 @@ function DetailValue({
   label,
   value,
   mono = false,
+  copyLabel,
 }: {
   label: string;
   value?: string | null;
   mono?: boolean;
+  copyLabel?: string;
 }) {
+  const copyable = Boolean(value && copyLabel);
+
   return (
     <div>
       <dt className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
@@ -58,9 +63,15 @@ function DetailValue({
         className={cn(
           "mt-1 whitespace-pre-wrap wrap-anywhere text-sm text-foreground",
           mono && "font-mono font-semibold",
+          copyable && "flex items-center gap-1",
         )}
       >
-        {value || "Not provided"}
+        <span className={copyable ? "min-w-0" : undefined}>
+          {value || "Not provided"}
+        </span>
+        {value && copyLabel ? (
+          <CopyButton iconOnly text={value} label={copyLabel} />
+        ) : null}
       </dd>
     </div>
   );
@@ -318,11 +329,13 @@ export default async function RepairDetailPage({
                   label="Ticket Number"
                   value={repair.ticketNumber}
                   mono
+                  copyLabel="Copy ticket number"
                 />
                 <DetailValue
                   label="Tracking Code"
                   value={repair.trackingCode}
                   mono
+                  copyLabel="Copy tracking code"
                 />
               </dl>
               <RepairLifecycleActions
