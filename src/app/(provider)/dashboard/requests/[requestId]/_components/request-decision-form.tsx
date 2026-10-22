@@ -22,7 +22,6 @@ import type { RepairRequestDetail } from "@/features/repair-requests";
 import {
   acceptRepairRequestAction,
   declineRepairRequestAction,
-  type RepairRequestActionState,
 } from "../../actions";
 
 const SERVICE_MODE_LABELS = {
@@ -32,15 +31,23 @@ const SERVICE_MODE_LABELS = {
   OTHER: "Other arrangement",
 } as const;
 
-function FieldError({
-  field,
-  state,
+function SummaryValue({
+  label,
+  value,
 }: {
-  field: string;
-  state: RepairRequestActionState | null;
+  label: string;
+  value?: string | null;
 }) {
-  const message = state?.fieldErrors?.[field];
-  return message ? <p className="text-xs text-destructive">{message}</p> : null;
+  return (
+    <div>
+      <dt className="text-xs font-medium tracking-wide text-muted-foreground uppercase">
+        {label}
+      </dt>
+      <dd className="mt-1 text-sm whitespace-pre-wrap wrap-anywhere text-foreground">
+        {value || "Not provided"}
+      </dd>
+    </div>
+  );
 }
 
 interface RequestDecisionFormProps {
@@ -75,11 +82,11 @@ export function RequestDecisionForm({
         </CardHeader>
         <CardContent className="grid gap-3 sm:grid-cols-2">
           <div className="rounded-2xl border border-border bg-muted/40 p-4">
-            <p className="text-xs uppercase tracking-wide text-muted-foreground">
+            <p className="text-xs tracking-wide text-muted-foreground uppercase">
               Ticket Number
             </p>
             <div className="mt-1 flex items-center gap-1">
-              <p className="min-w-0 break-all font-mono font-semibold">
+              <p className="min-w-0 font-mono font-semibold break-all">
                 {acceptState.acceptedRepair.ticketNumber}
               </p>
               <CopyButton
@@ -90,11 +97,11 @@ export function RequestDecisionForm({
             </div>
           </div>
           <div className="rounded-2xl border border-border bg-muted/40 p-4">
-            <p className="text-xs uppercase tracking-wide text-muted-foreground">
+            <p className="text-xs tracking-wide text-muted-foreground uppercase">
               Tracking Code
             </p>
             <div className="mt-1 flex items-center gap-1">
-              <p className="min-w-0 break-all font-mono font-semibold">
+              <p className="min-w-0 font-mono font-semibold break-all">
                 {acceptState.acceptedRepair.trackingCode}
               </p>
               <CopyButton
@@ -124,12 +131,53 @@ export function RequestDecisionForm({
 
   return (
     <div className="space-y-6">
+      <Card>
+        <CardHeader>
+          <CardTitle>Customer request (read-only)</CardTitle>
+          <CardDescription>
+            Details can be edited on the Repair after you accept.
+          </CardDescription>
+        </CardHeader>
+        <CardContent>
+          <dl className="grid gap-4 sm:grid-cols-2">
+            <SummaryValue label="Customer name" value={request.customerName} />
+            <SummaryValue
+              label="Customer phone"
+              value={request.customerPhone}
+            />
+            <SummaryValue
+              label="Customer email"
+              value={request.customerEmail}
+            />
+            <SummaryValue label="Device type" value={request.deviceType} />
+            <SummaryValue label="Brand" value={request.brand} />
+            <SummaryValue label="Model" value={request.model} />
+            <SummaryValue label="Serial number" value={request.serialNumber} />
+            <SummaryValue
+              label="Color or variant"
+              value={request.colorVariant}
+            />
+            <div className="sm:col-span-2">
+              <SummaryValue
+                label="Device specifications"
+                value={request.deviceSpecs}
+              />
+            </div>
+            <div className="sm:col-span-2">
+              <SummaryValue
+                label="Reported Problem"
+                value={request.reportedProblem}
+              />
+            </div>
+          </dl>
+        </CardContent>
+      </Card>
+
       <Card className="border-primary/20">
         <CardHeader>
-          <CardTitle>Verify and create Repair</CardTitle>
+          <CardTitle>Your decision</CardTitle>
           <CardDescription>
-            Check customer and device details, then add your intake notes before
-            accepting.
+            Choose the Service Mode and add Internal Notes before accepting.
           </CardDescription>
         </CardHeader>
         <CardContent>
@@ -141,203 +189,6 @@ export function RequestDecisionForm({
                 <AlertDescription>{acceptState.error}</AlertDescription>
               </Alert>
             )}
-
-            <section className="space-y-4">
-              <div>
-                <h3 className="font-semibold text-foreground">
-                  Verified customer and device
-                </h3>
-                <p className="text-xs text-muted-foreground">
-                  Review customer-reported values before they become Repair
-                  data.
-                </p>
-              </div>
-              <div className="grid gap-4 sm:grid-cols-2">
-                <div className="space-y-2">
-                  <Label htmlFor="customerName">Customer name *</Label>
-                  <Input
-                    id="customerName"
-                    name="customerName"
-                    defaultValue={request.customerName}
-                    maxLength={120}
-                    required
-                    disabled={acceptPending}
-                  />
-                  <FieldError field="customerName" state={acceptState} />
-                </div>
-                <div className="space-y-2">
-                  <Label htmlFor="customerPhone">Customer phone *</Label>
-                  <Input
-                    id="customerPhone"
-                    name="customerPhone"
-                    type="tel"
-                    defaultValue={request.customerPhone}
-                    maxLength={40}
-                    required
-                    disabled={acceptPending}
-                  />
-                  <FieldError field="customerPhone" state={acceptState} />
-                </div>
-                <div className="space-y-2 sm:col-span-2">
-                  <Label htmlFor="customerEmail">Customer email</Label>
-                  <Input
-                    id="customerEmail"
-                    name="customerEmail"
-                    type="email"
-                    defaultValue={request.customerEmail ?? ""}
-                    maxLength={254}
-                    disabled={acceptPending}
-                  />
-                  <FieldError field="customerEmail" state={acceptState} />
-                </div>
-                <div className="space-y-2">
-                  <Label htmlFor="deviceType">Device type *</Label>
-                  <Input
-                    id="deviceType"
-                    name="deviceType"
-                    defaultValue={request.deviceType}
-                    maxLength={80}
-                    required
-                    disabled={acceptPending}
-                  />
-                  <FieldError field="deviceType" state={acceptState} />
-                </div>
-                <div className="space-y-2">
-                  <Label htmlFor="brand">Brand</Label>
-                  <Input
-                    id="brand"
-                    name="brand"
-                    defaultValue={request.brand ?? ""}
-                    maxLength={80}
-                    disabled={acceptPending}
-                  />
-                  <FieldError field="brand" state={acceptState} />
-                </div>
-                <div className="space-y-2">
-                  <Label htmlFor="model">Model</Label>
-                  <Input
-                    id="model"
-                    name="model"
-                    defaultValue={request.model ?? ""}
-                    maxLength={80}
-                    disabled={acceptPending}
-                  />
-                  <FieldError field="model" state={acceptState} />
-                </div>
-                <div className="space-y-2">
-                  <Label htmlFor="serialNumber">Serial number</Label>
-                  <Input
-                    id="serialNumber"
-                    name="serialNumber"
-                    defaultValue={request.serialNumber ?? ""}
-                    maxLength={120}
-                    disabled={acceptPending}
-                  />
-                  <FieldError field="serialNumber" state={acceptState} />
-                </div>
-                <div className="space-y-2">
-                  <Label htmlFor="colorVariant">Color or variant</Label>
-                  <Input
-                    id="colorVariant"
-                    name="colorVariant"
-                    defaultValue={request.colorVariant ?? ""}
-                    maxLength={80}
-                    disabled={acceptPending}
-                  />
-                  <FieldError field="colorVariant" state={acceptState} />
-                </div>
-                <div className="space-y-2 sm:col-span-2">
-                  <Label htmlFor="deviceSpecs">Device specifications</Label>
-                  <Textarea
-                    id="deviceSpecs"
-                    name="deviceSpecs"
-                    defaultValue={request.deviceSpecs ?? ""}
-                    maxLength={1000}
-                    disabled={acceptPending}
-                  />
-                  <FieldError field="deviceSpecs" state={acceptState} />
-                </div>
-                <div className="space-y-2 sm:col-span-2">
-                  <Label htmlFor="reportedProblem">Reported Problem *</Label>
-                  <Textarea
-                    id="reportedProblem"
-                    name="reportedProblem"
-                    defaultValue={request.reportedProblem}
-                    maxLength={2000}
-                    required
-                    disabled={acceptPending}
-                  />
-                  <FieldError field="reportedProblem" state={acceptState} />
-                </div>
-              </div>
-            </section>
-
-            <section className="space-y-4 rounded-2xl border border-border/80 bg-muted/30 p-4 sm:p-5">
-              <div>
-                <h3 className="font-semibold text-foreground">
-                  Provider intake information
-                </h3>
-                <p className="text-xs text-muted-foreground">
-                  Technical and internal fields remain Provider-private.
-                </p>
-              </div>
-              <div className="grid gap-4 sm:grid-cols-2">
-                <div className="space-y-2">
-                  <Label htmlFor="physicalCondition">Physical condition</Label>
-                  <Textarea
-                    id="physicalCondition"
-                    name="physicalCondition"
-                    maxLength={2000}
-                    disabled={acceptPending}
-                  />
-                  <FieldError field="physicalCondition" state={acceptState} />
-                </div>
-                <div className="space-y-2">
-                  <Label htmlFor="accessoriesReceived">
-                    Accessories received
-                  </Label>
-                  <Textarea
-                    id="accessoriesReceived"
-                    name="accessoriesReceived"
-                    maxLength={1000}
-                    disabled={acceptPending}
-                  />
-                  <FieldError field="accessoriesReceived" state={acceptState} />
-                </div>
-                <div className="space-y-2 sm:col-span-2">
-                  <Label htmlFor="initialObservation">
-                    Initial observation
-                  </Label>
-                  <Textarea
-                    id="initialObservation"
-                    name="initialObservation"
-                    maxLength={2000}
-                    disabled={acceptPending}
-                  />
-                  <FieldError field="initialObservation" state={acceptState} />
-                </div>
-                <div className="space-y-2 sm:col-span-2">
-                  <Label htmlFor="diagnosis">Diagnosis</Label>
-                  <Textarea
-                    id="diagnosis"
-                    name="diagnosis"
-                    maxLength={2000}
-                    disabled={acceptPending}
-                  />
-                  <FieldError field="diagnosis" state={acceptState} />
-                </div>
-                <div className="space-y-2 sm:col-span-2">
-                  <Label htmlFor="internalNotes">Internal Notes</Label>
-                  <Textarea
-                    id="internalNotes"
-                    name="internalNotes"
-                    maxLength={4000}
-                    disabled={acceptPending}
-                  />
-                  <FieldError field="internalNotes" state={acceptState} />
-                </div>
-              </div>
-            </section>
 
             <section className="space-y-4">
               <div>
@@ -391,12 +242,14 @@ export function RequestDecisionForm({
                   ))}
                 </div>
               ) : (
-                <p className="rounded-xl border border-border bg-muted/30 p-3 text-sm text-muted-foreground">
-                  Provider has no configured Service Modes. Repair can be
-                  created without one.
-                </p>
+                <>
+                  <input type="hidden" name="serviceMode" value="" />
+                  <p className="rounded-xl border border-border bg-muted/30 p-3 text-sm text-muted-foreground">
+                    Provider has no configured Service Modes. Repair can be
+                    created without one.
+                  </p>
+                </>
               )}
-              <FieldError field="serviceMode" state={acceptState} />
               <div className="space-y-2">
                 <Label htmlFor="serviceModeDetails">Arrangement details</Label>
                 <Input
@@ -410,8 +263,20 @@ export function RequestDecisionForm({
                   maxLength={240}
                   disabled={acceptPending}
                 />
-                <FieldError field="serviceModeDetails" state={acceptState} />
               </div>
+            </section>
+
+            <section className="space-y-2">
+              <Label htmlFor="internalNotes">Internal Notes</Label>
+              <p className="text-xs text-muted-foreground">
+                Private to your team. Never shown to the customer.
+              </p>
+              <Textarea
+                id="internalNotes"
+                name="internalNotes"
+                maxLength={4000}
+                disabled={acceptPending}
+              />
             </section>
 
             <Button type="submit" size="lg" disabled={acceptPending}>

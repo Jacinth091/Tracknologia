@@ -39,7 +39,7 @@ export function CreateRepairForm({
             aria-hidden="true"
             className="size-5"
           />
-          Repair intake
+          New Repair — intake details
         </CardTitle>
         <CardDescription>
           Record the customer, device, and reported problem to start a repair.
