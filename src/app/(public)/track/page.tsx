@@ -1,4 +1,6 @@
 import { BrandLogo } from "@/components/shared/brand-logo";
+import { StatusGauge } from "@/components/shared/status-gauge";
+import { Card } from "@/components/ui/card";
 import type { Metadata } from "next";
 import Link from "next/link";
 
@@ -9,6 +11,42 @@ export const metadata: Metadata = {
   description:
     "Check customer-safe repair status and updates using your Tracking Code or Request Reference.",
 };
+
+const CODE_HELP = [
+  {
+    code: "TRK-…",
+    title: "Tracking Code",
+    text: "From your provider when your repair is created.",
+  },
+  {
+    code: "REQ-…",
+    title: "Request Reference",
+    text: "Shown after you send a repair request.",
+  },
+] as const;
+
+const STATUS_GUIDE = [
+  {
+    status: "SUBMITTED",
+    label: "Request sent",
+    text: "Your request is with the provider.",
+  },
+  {
+    status: "IN_PROGRESS",
+    label: "Being repaired",
+    text: "A technician is working on your device.",
+  },
+  {
+    status: "READY",
+    label: "Ready",
+    text: "Your device is fixed and ready for handover.",
+  },
+  {
+    status: "COMPLETED",
+    label: "Returned to you",
+    text: "This repair is complete.",
+  },
+] as const;
 
 export default async function TrackRepairPage({
   searchParams,
@@ -39,20 +77,55 @@ export default async function TrackRepairPage({
         </div>
       </header>
 
-      <main className="flex-1 px-4 py-6 sm:px-6 sm:py-10">
-        <div className="mx-auto max-w-2xl space-y-8">
-          <section className="py-3">
-            <h1 className="text-3xl font-bold tracking-tight text-foreground sm:text-4xl">
-              Your update, at a glance.
-            </h1>
-            <p className="mt-3 max-w-xl text-sm leading-relaxed text-muted-foreground sm:text-base">
-              Enter the Tracking Code (TRK-...) or Request Reference (REQ-...)
-              provided by your Repair Provider. No account or sign-in is
-              required.
-            </p>
+      <main className="flex-1">
+        <TrackingForm initialCode={initialCode} />
+
+        <div className="mx-auto max-w-2xl space-y-10 px-4 py-10 sm:px-6 sm:py-12">
+          <section aria-labelledby="code-help">
+            <h2
+              id="code-help"
+              className="text-lg font-bold tracking-tight text-foreground"
+            >
+              Where&apos;s my code?
+            </h2>
+            <div className="mt-4 grid gap-3 sm:grid-cols-2">
+              {CODE_HELP.map((item) => (
+                <Card key={item.code} className="p-4">
+                  <p className="font-mono text-sm tracking-widest text-muted-foreground uppercase">
+                    {item.code}
+                  </p>
+                  <h3 className="mt-2 text-sm font-semibold text-foreground">
+                    {item.title}
+                  </h3>
+                  <p className="mt-1 text-sm leading-relaxed text-muted-foreground">
+                    {item.text}
+                  </p>
+                </Card>
+              ))}
+            </div>
           </section>
 
-          <TrackingForm initialCode={initialCode} />
+          <section aria-labelledby="status-guide">
+            <h2
+              id="status-guide"
+              className="text-lg font-bold tracking-tight text-foreground"
+            >
+              What each status means
+            </h2>
+            <div className="mt-4 grid grid-cols-2 gap-3 sm:grid-cols-4">
+              {STATUS_GUIDE.map((item) => (
+                <Card key={item.status} className="p-4">
+                  <StatusGauge status={item.status} className="size-12" />
+                  <p className="mt-3 text-sm font-semibold text-foreground">
+                    {item.label}
+                  </p>
+                  <p className="mt-1 text-xs leading-relaxed text-muted-foreground">
+                    {item.text}
+                  </p>
+                </Card>
+              ))}
+            </div>
+          </section>
 
           <p className="px-2 text-center text-xs leading-relaxed text-muted-foreground">
             No account needed. Need help with your code or service arrangement?

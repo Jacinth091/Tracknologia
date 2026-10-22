@@ -6,18 +6,13 @@ import { Search01Icon } from "@hugeicons/core-free-icons";
 import { StatusGauge } from "@/components/shared/status-gauge";
 
 import { Button } from "@/components/ui/button";
-import {
-  Card,
-  CardContent,
-  CardDescription,
-  CardHeader,
-  CardTitle,
-} from "@/components/ui/card";
+import { Card, CardContent, CardHeader } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { LoadingSpinner } from "@/components/ui/loading-spinner";
 import { Skeleton } from "@/components/ui/skeleton";
 import type { PublicRepairView, TrackingStatus } from "@/features/tracking";
+import { cn } from "@/lib/utils";
 
 import { trackRepairAction, type TrackRepairActionState } from "../actions";
 
@@ -188,91 +183,132 @@ export function TrackingForm({ initialCode = "" }: { initialCode?: string }) {
       ? state.message
       : null;
 
+  const hasOutcome = pending || state !== null;
+
   return (
-    <div className="space-y-6" aria-busy={pending}>
-      <Card>
-        <CardHeader>
-          <CardTitle className="text-lg">Enter Tracking Code</CardTitle>
-          <CardDescription>
-            Enter your Tracking Code (<span className="font-mono">TRK-</span>)
-            or Request Reference Code (<span className="font-mono">REQ-</span>).
-          </CardDescription>
-        </CardHeader>
-        <CardContent>
-          <form action={formAction} className="space-y-4">
-            <div className="space-y-2">
-              <Label htmlFor="trackingCode">Tracking Code / Request Code</Label>
-              <div className="relative">
-                <HugeiconsIcon
-                  icon={Search01Icon}
-                  aria-hidden="true"
-                  className="pointer-events-none absolute top-1/2 left-3 size-4 -translate-y-1/2 text-muted-foreground"
+    <div aria-busy={pending}>
+      <section className="bg-foreground text-background">
+        <div
+          className={cn(
+            "mx-auto max-w-2xl px-4 sm:px-6",
+            hasOutcome ? "py-6 sm:py-8" : "py-10 sm:py-14",
+          )}
+        >
+          <div className="flex flex-col gap-6 sm:flex-row sm:items-center sm:justify-between">
+            <div className="min-w-0 max-w-xl">
+              <p className="font-mono text-xs font-medium tracking-widest text-background/60 uppercase">
+                Track a repair
+              </p>
+              <h1
+                className={cn(
+                  "mt-3 font-extrabold tracking-tight text-balance",
+                  hasOutcome ? "text-2xl sm:text-3xl" : "text-4xl sm:text-5xl",
+                )}
+              >
+                Your update, at a glance.
+              </h1>
+              {!hasOutcome && (
+                <p className="mt-3 text-sm leading-relaxed text-background/70 sm:text-base">
+                  Enter the Tracking Code from your Provider, or the Request
+                  Reference you received after sending a request. No account
+                  needed.
+                </p>
+              )}
+            </div>
+            {!hasOutcome && (
+              <StatusGauge
+                status={null}
+                className="size-20 shrink-0 self-start text-background/85 sm:size-28 sm:self-auto"
+              />
+            )}
+          </div>
+
+          <Card className="mt-6 p-4 text-foreground shadow-lg sm:p-5">
+            <form
+              action={formAction}
+              className="flex flex-col gap-3 sm:flex-row sm:items-end"
+            >
+              <div className="min-w-0 flex-1 space-y-2">
+                <Label htmlFor="trackingCode">
+                  Tracking Code / Request Code
+                </Label>
+                <div className="relative">
+                  <HugeiconsIcon
+                    icon={Search01Icon}
+                    aria-hidden="true"
+                    className="pointer-events-none absolute top-1/2 left-3 size-4 -translate-y-1/2 text-muted-foreground"
+                  />
+                  <Input
+                    id="trackingCode"
+                    name="trackingCode"
+                    autoComplete="off"
+                    autoCapitalize="characters"
+                    spellCheck={false}
+                    maxLength={32}
+                    defaultValue={initialCode}
+                    placeholder="TRK-… or REQ-…"
+                    className="h-12 pl-9 font-mono text-base tracking-wide uppercase placeholder:normal-case"
+                    aria-invalid={Boolean(errorMessage)}
+                    aria-describedby={
+                      errorMessage ? "tracking-code-error" : undefined
+                    }
+                    required
+                  />
+                </div>
+              </div>
+
+              <Button
+                type="submit"
+                disabled={pending}
+                className="min-h-12 w-full sm:w-auto"
+              >
+                {pending ? (
+                  <>
+                    <LoadingSpinner className="size-4" />
+                    <span>Looking up...</span>
+                  </>
+                ) : (
+                  "Track Status"
+                )}
+              </Button>
+            </form>
+          </Card>
+        </div>
+      </section>
+
+      {(pending || errorMessage || state?.outcome === "found") && (
+        <div className="mx-auto max-w-2xl space-y-6 px-4 pt-6 sm:px-6 sm:pt-8">
+          {pending && <TicketSkeleton />}
+
+          {errorMessage && (
+            <div
+              role="alert"
+              id="tracking-code-error"
+              className="flex flex-col items-start gap-5 rounded-xl bg-foreground p-6 text-background sm:flex-row sm:items-center sm:p-8"
+            >
+              {state?.outcome === "not-found" && (
+                <StatusGauge
+                  status={null}
+                  className="size-22 shrink-0 text-background"
                 />
-                <Input
-                  id="trackingCode"
-                  name="trackingCode"
-                  autoComplete="off"
-                  autoCapitalize="characters"
-                  spellCheck={false}
-                  maxLength={32}
-                  defaultValue={initialCode}
-                  placeholder="TRK-… or REQ-…"
-                  className="h-11 pl-9 font-mono tracking-wide uppercase placeholder:normal-case"
-                  aria-invalid={Boolean(errorMessage)}
-                  aria-describedby={
-                    errorMessage ? "tracking-code-error" : undefined
-                  }
-                  required
-                />
+              )}
+              <div className="space-y-2">
+                <h2 className="text-xl font-bold">
+                  {state?.outcome === "not-found"
+                    ? "We couldn't find that code"
+                    : "Tracking unavailable"}
+                </h2>
+                <p className="text-sm leading-relaxed text-background/75">
+                  {errorMessage}
+                </p>
               </div>
             </div>
-
-            <Button
-              type="submit"
-              disabled={pending}
-              className="min-h-11 w-full sm:w-auto"
-            >
-              {pending ? (
-                <>
-                  <LoadingSpinner className="size-4" />
-                  <span>Looking up...</span>
-                </>
-              ) : (
-                "Track Status"
-              )}
-            </Button>
-          </form>
-        </CardContent>
-      </Card>
-
-      {pending && <TicketSkeleton />}
-
-      {errorMessage && (
-        <div
-          role="alert"
-          id="tracking-code-error"
-          className="flex flex-col items-start gap-5 rounded-xl bg-foreground p-6 text-background sm:flex-row sm:items-center sm:p-8"
-        >
-          {state?.outcome === "not-found" && (
-            <StatusGauge
-              status={null}
-              className="size-22 shrink-0 text-background"
-            />
           )}
-          <div className="space-y-2">
-            <h2 className="text-xl font-bold">
-              {state?.outcome === "not-found"
-                ? "We couldn't find that code"
-                : "Tracking unavailable"}
-            </h2>
-            <p className="text-sm leading-relaxed text-background/75">
-              {errorMessage}
-            </p>
-          </div>
+
+          {!pending && state?.outcome === "found" && (
+            <TrackingResult view={state.view} />
+          )}
         </div>
-      )}
-      {!pending && state?.outcome === "found" && (
-        <TrackingResult view={state.view} />
       )}
     </div>
   );
