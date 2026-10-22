@@ -38,10 +38,173 @@ function formatDateTime(value: string) {
   }).format(date);
 }
 
+const DEVICE_SUMMARY_SEPARATOR = " · ";
+
+function splitDeviceSummary(summary: string) {
+  const separatorIndex = summary.lastIndexOf(DEVICE_SUMMARY_SEPARATOR);
+  if (separatorIndex === -1) {
+    return { deviceType: summary, brandModel: null };
+  }
+
+  const brandModel = summary.slice(0, separatorIndex).trim();
+  const deviceType = summary
+    .slice(separatorIndex + DEVICE_SUMMARY_SEPARATOR.length)
+    .trim();
+
+  if (!brandModel || !deviceType) {
+    return { deviceType: summary, brandModel: null };
+  }
+
+  return { deviceType, brandModel };
+}
+
+function formatRelativeTime(value: string) {
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) {
+    return null;
+  }
+
+  const formatter = new Intl.RelativeTimeFormat(undefined, { numeric: "auto" });
+  const diffMinutes = Math.round((date.getTime() - Date.now()) / 60_000);
+
+  if (Math.abs(diffMinutes) < 60) {
+    return formatter.format(diffMinutes, "minute");
+  }
+
+  const diffHours = Math.round(diffMinutes / 60);
+  if (Math.abs(diffHours) < 24) {
+    return formatter.format(diffHours, "hour");
+  }
+
+  const diffDays = Math.round(diffHours / 24);
+  if (Math.abs(diffDays) < 30) {
+    return formatter.format(diffDays, "day");
+  }
+
+  const diffMonths = Math.round(diffDays / 30);
+  if (Math.abs(diffMonths) < 12) {
+    return formatter.format(diffMonths, "month");
+  }
+
+  return formatter.format(Math.round(diffMonths / 12), "year");
+}
+
+type JourneyStep = {
+  key: string;
+  label: string;
+};
+
+const REQUEST_STEP: JourneyStep = { key: "request", label: "Request sent" };
+const REPAIR_STEP: JourneyStep = { key: "repair", label: "Being repaired" };
+const READY_STEP: JourneyStep = { key: "ready", label: "Ready" };
+const HANDOVER_STEP: JourneyStep = {
+  key: "handover",
+  label: "Returned to you",
+};
+
+function getJourney(view: PublicRepairView): {
+  steps: JourneyStep[];
+  currentIndex: number;
+} {
+  if (view.currentStatus === "DECLINED") {
+    return {
+      steps: [REQUEST_STEP, { key: "declined", label: "Request declined" }],
+      currentIndex: 1,
+    };
+  }
+
+  const includesRequest = view.trackingType === "REQUEST";
+  const steps: JourneyStep[] = includesRequest
+    ? [REQUEST_STEP, REPAIR_STEP, READY_STEP, HANDOVER_STEP]
+    : [REPAIR_STEP, READY_STEP, HANDOVER_STEP];
+  const repairIndex = includesRequest ? 1 : 0;
+
+  if (view.currentStatus === "WAITING_FOR_PARTS") {
+    steps[repairIndex] = { key: "repair", label: "Waiting for a part" };
+  } else if (view.currentStatus === "AWAITING_APPROVAL") {
+    steps[repairIndex] = { key: "repair", label: "Awaiting your approval" };
+  }
+
+  let currentIndex = repairIndex;
+  if (view.currentStatus === "SUBMITTED") {
+    currentIndex = 0;
+  } else if (view.currentStatus === "READY") {
+    currentIndex = repairIndex + 1;
+  } else if (view.currentStatus === "COMPLETED") {
+    currentIndex = repairIndex + 2;
+  }
+
+  return { steps, currentIndex };
+}
+
+function Detail({ label, value }: { label: string; value: string }) {
+  return (
+    <div>
+      <dt className="text-sm text-muted-foreground">{label}</dt>
+      <dd className="mt-1 text-sm font-medium break-words text-foreground">
+        {value}
+      </dd>
+    </div>
+  );
+}
+
+function JourneyTimeline({ view }: { view: PublicRepairView }) {
+  const { steps, currentIndex } = getJourney(view);
+
+  return (
+    <div className="space-y-3 border-t border-border pt-6">
+      <h3 className="text-base font-semibold">Repair journey</h3>
+      <ol className="space-y-4 border-l border-border pl-4">
+        {steps.map((step, index) => {
+          const isCurrent = index === currentIndex;
+          const isComplete = index < currentIndex;
+
+          return (
+            <li
+              key={step.key}
+              aria-current={isCurrent ? "step" : undefined}
+              className="relative"
+            >
+              <span
+                aria-hidden="true"
+                className={cn(
+                  "absolute top-1.5 -left-[21px] size-2.5 rounded-full",
+                  isCurrent && "bg-primary ring-4 ring-primary/15",
+                  isComplete && "bg-foreground",
+                  !isCurrent &&
+                    !isComplete &&
+                    "border border-border bg-background",
+                )}
+              />
+              <p
+                className={cn(
+                  "text-sm",
+                  isCurrent && "font-semibold text-foreground",
+                  isComplete && "font-medium text-foreground",
+                  !isCurrent && !isComplete && "text-muted-foreground",
+                )}
+              >
+                {step.label}
+              </p>
+            </li>
+          );
+        })}
+      </ol>
+    </div>
+  );
+}
+
 function TrackingResult({ view }: { view: PublicRepairView }) {
   const [latestUpdate, ...earlierUpdates] = view.customerUpdates;
   const eyebrow =
     view.trackingType === "REQUEST" ? "Repair request" : "Customer tracking";
+  const { deviceType, brandModel } = splitDeviceSummary(view.deviceSummary);
+  const relativeLastUpdate = formatRelativeTime(view.lastUpdatedAt);
+  const lastUpdate = relativeLastUpdate
+    ? `${relativeLastUpdate} · ${formatDateTime(view.lastUpdatedAt)}`
+    : formatDateTime(view.lastUpdatedAt);
+  const codeType =
+    view.trackingType === "REQUEST" ? "Request reference" : "Tracking code";
 
   return (
     <section aria-live="polite">
@@ -69,42 +232,48 @@ function TrackingResult({ view }: { view: PublicRepairView }) {
                 )}
               </h2>
               <p className="line-clamp-2 text-base leading-snug font-bold break-words text-foreground">
-                {view.deviceSummary}
+                Your {deviceType}
               </p>
-              <p className="text-sm break-words text-muted-foreground">
-                {view.providerDisplayName}
+              {brandModel ? (
+                <p className="line-clamp-2 text-sm leading-snug font-medium break-words text-foreground">
+                  {brandModel}
+                </p>
+              ) : null}
+              <p className="line-clamp-2 text-sm break-words text-muted-foreground">
+                At {view.providerDisplayName}
               </p>
             </div>
           </div>
-          <p className="text-sm leading-relaxed text-foreground">
-            {view.statusDescription}
-          </p>
         </CardHeader>
 
         <CardContent className="space-y-6 pt-6">
           <dl className="grid gap-5 sm:grid-cols-2">
-            <div>
-              <dt className="text-sm text-muted-foreground">
-                Service arrangement
-              </dt>
-              <dd className="mt-1 text-sm font-medium text-foreground">
-                {view.serviceModeLabel ?? "To be arranged with Provider"}
-              </dd>
-            </div>
-            <div>
-              <dt className="text-sm text-muted-foreground">Latest update</dt>
-              <dd className="mt-1 text-sm font-medium text-foreground">
-                {formatDateTime(view.lastUpdatedAt)}
-              </dd>
-            </div>
+            <Detail label="Device" value={deviceType || "Not provided"} />
+            <Detail
+              label="Brand & model"
+              value={brandModel ?? "Not provided"}
+            />
+            <Detail
+              label="Service arrangement"
+              value={view.serviceModeLabel ?? "Not provided"}
+            />
+            <Detail label="Last update" value={lastUpdate} />
+            <Detail label="Code type" value={codeType} />
           </dl>
 
-          {view.handoverMessage && (
-            <div className="rounded-2xl border border-border bg-accent p-4 text-sm text-accent-foreground">
-              <p className="font-semibold">Next steps</p>
-              <p className="mt-1">{view.handoverMessage}</p>
-            </div>
-          )}
+          <JourneyTimeline view={view} />
+
+          <div className="rounded-xl border border-border bg-muted/50 p-4">
+            <p className="font-semibold">What happens next</p>
+            <p className="mt-1 text-sm leading-relaxed text-foreground">
+              {view.statusDescription}
+            </p>
+            {view.handoverMessage ? (
+              <p className="mt-2 text-sm leading-relaxed text-foreground">
+                {view.handoverMessage}
+              </p>
+            ) : null}
+          </div>
 
           <div className="space-y-4 border-t border-border pt-6">
             <h3 className="text-base font-semibold">Customer updates</h3>
