@@ -15,6 +15,7 @@ import {
   removeStaffAction,
   revokeStaffAction,
 } from "../actions";
+import { CopyButton } from "@/components/shared/copy-button";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { Badge } from "@/components/ui/badge";
@@ -37,8 +38,6 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { LoadingSpinner } from "@/components/ui/loading-spinner";
 import type { ProviderInvitation, TeamMember } from "@/features/providers";
-
-import { CopyButton } from "../../_components/copy-button";
 
 interface TeamClientProps {
   isOwner: boolean;

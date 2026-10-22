@@ -11,7 +11,7 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
-import { CopyButton } from "./copy-button";
+import { CopyButton } from "@/components/shared/copy-button";
 
 export function RequestLinkCard({
   url,
