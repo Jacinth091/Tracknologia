@@ -158,7 +158,9 @@
 }
 
 /* On a yellow primary button the pie is ink-tinted so it shows on the fill. */
-.bg-primary[data-slot="button"] [data-slot="loading-spinner"] .gauge-charge-pie {
+.bg-primary[data-slot="button"]
+  [data-slot="loading-spinner"]
+  .gauge-charge-pie {
   stroke: var(--primary-foreground);
   stroke-opacity: 0.45;
 }

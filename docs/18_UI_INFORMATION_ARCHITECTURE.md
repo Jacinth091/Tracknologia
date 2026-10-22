@@ -5,13 +5,13 @@
 The approved **Hi-Vis on Paper** identity replaces the previous cool-neutral/teal
 direction. `src/app/globals.css` owns the light and `.dark` palettes:
 
-| Role           | Light                          | Dark            |
-| -------------- | ------------------------------ | --------------- |
+| Role           | Light                                                         | Dark            |
+| -------------- | ------------------------------------------------------------- | --------------- |
 | Background     | Soft Paper `#FAF8F3` (brand Paper `#FBF6E9` is the reference) | Ink `#141414`   |
-| Card           | `#FFFFFF`                      | `#1E1D1A`       |
-| Text           | Ink `#141414`                  | Paper `#FBF6E9` |
-| Muted text     | `#6B6455`                      | `#B5AC98`       |
-| Primary action | Yellow `#FFC72C` with Ink text | Same            |
+| Card           | `#FFFFFF`                                                     | `#1E1D1A`       |
+| Text           | Ink `#141414`                                                 | Paper `#FBF6E9` |
+| Muted text     | `#6B6455`                                                     | `#B5AC98`       |
+| Primary action | Yellow `#FFC72C` with Ink text                                | Same            |
 
 Use primary yellow for fills, with `primary-hover` and `primary-pressed` for
 interaction. Yellow is never text on Paper: links, notices, and labels use
