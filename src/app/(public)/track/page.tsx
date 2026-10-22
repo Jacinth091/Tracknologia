@@ -7,7 +7,7 @@ import Link from "next/link";
 import { TrackingForm } from "./_components/tracking-form";
 
 export const metadata: Metadata = {
-  title: "Track Repair or Request — Tracknologia",
+  title: "Track your repair — Tracknologia",
   description:
     "Check customer-safe repair status and updates using your Tracking Code or Request Reference.",
 };

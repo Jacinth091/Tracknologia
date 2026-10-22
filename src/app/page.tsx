@@ -128,7 +128,7 @@ export default function Home() {
                     "min-h-12 px-6",
                   )}
                 >
-                  Track Repair or Request
+                  Track your repair
                 </Link>
                 <Link
                   href="/register"
@@ -141,7 +141,8 @@ export default function Home() {
                 </Link>
               </div>
               <p className="mt-4 text-sm text-background/70">
-                Customers can track without an account.
+                Use the TRK- tracking code or REQ- request reference from your
+                provider. No account needed.
               </p>
             </div>
 
@@ -196,6 +197,9 @@ export default function Home() {
               </li>
             ))}
           </ol>
+          <p className="mt-6 text-sm text-muted-foreground">
+            Need a repair? Ask your provider for their request link.
+          </p>
         </section>
 
         <section
