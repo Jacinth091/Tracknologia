@@ -38,6 +38,7 @@ import {
   EmptyTitle,
 } from "@/components/ui/empty";
 import { cn } from "@/lib/utils";
+import { PageHeader } from "../_components/page-header";
 import { repairStatusLabel } from "../_components/repair-status-badge";
 
 export const metadata: Metadata = {
@@ -163,27 +164,25 @@ export default async function DashboardPage() {
 
   return (
     <div className="space-y-8">
-      <div className="flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
-        <div className="min-w-0">
-          <p className="font-mono text-xs font-medium uppercase tracking-widest text-muted-foreground">
-            Dashboard
-          </p>
-          <h1 className="mt-1 text-3xl font-extrabold tracking-tight text-foreground wrap-anywhere sm:text-4xl">
-            {context.providerName}
-          </h1>
-          <div className="mt-2 flex flex-wrap items-center gap-2 text-sm text-muted-foreground">
+      <PageHeader
+        eyebrow="Dashboard"
+        title={context.providerName}
+        description={
+          <span className="flex flex-wrap items-center gap-2">
             <Badge variant="secondary">{providerTypeLabel}</Badge>
             <span className="wrap-anywhere">{context.email}</span>
-          </div>
-        </div>
-        <Link
-          href="/dashboard/repairs/new"
-          className={cn(buttonVariants(), "min-h-11 w-full gap-2 sm:w-auto")}
-        >
-          <HugeiconsIcon icon={Add01Icon} aria-hidden="true" />
-          Create Repair
-        </Link>
-      </div>
+          </span>
+        }
+        actions={
+          <Link
+            href="/dashboard/repairs/new"
+            className={cn(buttonVariants(), "min-h-11 w-full gap-2 sm:w-auto")}
+          >
+            <HugeiconsIcon icon={Add01Icon} aria-hidden="true" />
+            Create Repair
+          </Link>
+        }
+      />
 
       <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
         {tiles.map((tile) => (

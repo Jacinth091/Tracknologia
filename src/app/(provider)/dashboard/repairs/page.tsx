@@ -28,6 +28,7 @@ import {
 } from "@/features/repairs";
 import { cn } from "@/lib/utils";
 
+import { PageHeader } from "../_components/page-header";
 import { RepairStatusPill } from "../_components/repair-status-badge";
 
 export const metadata: Metadata = {
@@ -114,22 +115,19 @@ export default async function RepairsPage({
 
   return (
     <div className="space-y-6">
-      <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
-        <div>
-          <h1 className="text-2xl font-bold tracking-tight sm:text-3xl">
-            Repairs
-          </h1>
-          <p className="mt-1 text-sm text-muted-foreground">
-            Manage accepted work from intake through completion.
-          </p>
-        </div>
-        <Link
-          href="/dashboard/repairs/new"
-          className={cn(buttonVariants(), "w-full sm:w-fit")}
-        >
-          Create Repair
-        </Link>
-      </div>
+      <PageHeader
+        eyebrow="Repair work"
+        title="Repairs"
+        description="Manage accepted work from intake through completion."
+        actions={
+          <Link
+            href="/dashboard/repairs/new"
+            className={cn(buttonVariants(), "w-full sm:w-fit")}
+          >
+            Create Repair
+          </Link>
+        }
+      />
 
       <form
         method="get"

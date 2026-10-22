@@ -21,6 +21,8 @@ import {
 } from "@/features/repair-requests";
 import { cn } from "@/lib/utils";
 
+import { PageHeader } from "../_components/page-header";
+
 export const metadata: Metadata = {
   title: "Repair Requests — Tracknologia",
   description: "Review customer-submitted Repair Requests",
@@ -85,14 +87,11 @@ export default async function RepairRequestsPage({
 
   return (
     <div className="space-y-6">
-      <div>
-        <h1 className="text-2xl font-bold tracking-tight text-foreground sm:text-3xl">
-          Repair Requests
-        </h1>
-        <p className="mt-1 text-sm text-muted-foreground">
-          Review incoming requests and decide which repairs to take on.
-        </p>
-      </div>
+      <PageHeader
+        eyebrow="Customer intake"
+        title="Repair Requests"
+        description="Review incoming requests and decide which repairs to take on."
+      />
 
       <nav
         aria-label="Request status filters"
