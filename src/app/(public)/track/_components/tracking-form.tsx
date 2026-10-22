@@ -1,6 +1,8 @@
 "use client";
 
 import { useActionState } from "react";
+import { HugeiconsIcon } from "@hugeicons/react";
+import { Search01Icon } from "@hugeicons/core-free-icons";
 import { StatusGauge } from "@/components/shared/status-gauge";
 
 import { Button } from "@/components/ui/button";
@@ -14,6 +16,7 @@ import {
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { LoadingSpinner } from "@/components/ui/loading-spinner";
+import { Skeleton } from "@/components/ui/skeleton";
 import type { PublicRepairView, TrackingStatus } from "@/features/tracking";
 
 import { trackRepairAction, type TrackRepairActionState } from "../actions";
@@ -42,34 +45,45 @@ function formatDateTime(value: string) {
 
 function TrackingResult({ view }: { view: PublicRepairView }) {
   const [latestUpdate, ...earlierUpdates] = view.customerUpdates;
+  const eyebrow =
+    view.trackingType === "REQUEST" ? "Repair request" : "Customer tracking";
 
   return (
-    <section aria-live="polite" className="space-y-5">
+    <section aria-live="polite">
       <Card className="overflow-hidden">
-        <CardHeader className="border-b border-border">
+        <CardHeader className="gap-5 border-b border-border">
+          <p className="font-mono text-xs tracking-widest text-muted-foreground uppercase break-all">
+            {eyebrow} · {view.trackingCode}
+          </p>
           <div className="flex flex-col items-start gap-5 sm:flex-row sm:items-center sm:gap-6">
             <StatusGauge
               status={view.currentStatus}
-              className="size-24 sm:size-32"
+              className="size-22 shrink-0"
             />
-            <div className="min-w-0 space-y-3">
-              <span
-                data-status={view.currentStatus}
-                className="status-badge inline-flex rounded-full border px-3 py-1.5 text-sm font-semibold"
-              >
-                {view.statusLabel}
-              </span>
-              <h2 className="text-2xl font-semibold tracking-tight wrap-anywhere sm:text-3xl">
-                {view.deviceSummary}
+            <div className="min-w-0 space-y-2">
+              <h2 className="text-3xl leading-tight font-extrabold tracking-tight sm:text-4xl">
+                {view.currentStatus === "READY" ? (
+                  <span
+                    data-status={view.currentStatus}
+                    className="status-badge rounded-md px-2"
+                  >
+                    {view.statusLabel}
+                  </span>
+                ) : (
+                  view.statusLabel
+                )}
               </h2>
-              <p className="text-sm text-muted-foreground wrap-anywhere">
-                {view.providerDisplayName}
+              <p className="line-clamp-2 text-base leading-snug font-bold break-words text-foreground">
+                {view.deviceSummary}
               </p>
-              <p className="text-sm leading-relaxed text-foreground">
-                {view.statusDescription}
+              <p className="text-sm break-words text-muted-foreground">
+                {view.providerDisplayName}
               </p>
             </div>
           </div>
+          <p className="text-sm leading-relaxed text-foreground">
+            {view.statusDescription}
+          </p>
         </CardHeader>
 
         <CardContent className="space-y-6 pt-6">
@@ -145,6 +159,23 @@ function TrackingResult({ view }: { view: PublicRepairView }) {
   );
 }
 
+function TicketSkeleton() {
+  return (
+    <Card aria-hidden="true" className="space-y-6 p-6">
+      <Skeleton className="h-3 w-48" />
+      <div className="flex flex-col items-start gap-5 sm:flex-row sm:items-center">
+        <Skeleton className="size-22 shrink-0 rounded-full" />
+        <div className="w-full space-y-3">
+          <Skeleton className="h-9 w-40" />
+          <Skeleton className="h-4 w-3/4" />
+          <Skeleton className="h-4 w-1/3" />
+        </div>
+      </div>
+      <Skeleton className="h-16 w-full" />
+    </Card>
+  );
+}
+
 export function TrackingForm({ initialCode = "" }: { initialCode?: string }) {
   const [state, formAction, pending] = useActionState<
     TrackRepairActionState,
@@ -171,22 +202,29 @@ export function TrackingForm({ initialCode = "" }: { initialCode?: string }) {
           <form action={formAction} className="space-y-4">
             <div className="space-y-2">
               <Label htmlFor="trackingCode">Tracking Code / Request Code</Label>
-              <Input
-                id="trackingCode"
-                name="trackingCode"
-                autoComplete="off"
-                autoCapitalize="characters"
-                spellCheck={false}
-                maxLength={32}
-                defaultValue={initialCode}
-                placeholder="e.g. TRK-0123... or REQ-0123..."
-                className="h-11 font-mono uppercase tracking-wide"
-                aria-invalid={Boolean(errorMessage)}
-                aria-describedby={
-                  errorMessage ? "tracking-code-error" : undefined
-                }
-                required
-              />
+              <div className="relative">
+                <HugeiconsIcon
+                  icon={Search01Icon}
+                  aria-hidden="true"
+                  className="pointer-events-none absolute top-1/2 left-3 size-4 -translate-y-1/2 text-muted-foreground"
+                />
+                <Input
+                  id="trackingCode"
+                  name="trackingCode"
+                  autoComplete="off"
+                  autoCapitalize="characters"
+                  spellCheck={false}
+                  maxLength={32}
+                  defaultValue={initialCode}
+                  placeholder="TRK-… or REQ-…"
+                  className="h-11 pl-9 font-mono tracking-wide uppercase placeholder:normal-case"
+                  aria-invalid={Boolean(errorMessage)}
+                  aria-describedby={
+                    errorMessage ? "tracking-code-error" : undefined
+                  }
+                  required
+                />
+              </div>
             </div>
 
             <Button
@@ -207,22 +245,31 @@ export function TrackingForm({ initialCode = "" }: { initialCode?: string }) {
         </CardContent>
       </Card>
 
+      {pending && <TicketSkeleton />}
+
       {errorMessage && (
-        <Card role="alert" id="tracking-code-error">
-          <CardContent className="flex flex-col items-start gap-4 pt-6 sm:flex-row sm:items-center">
-            {state?.outcome === "not-found" && <StatusGauge status={null} />}
-            <div className="space-y-2">
-              <h2 className="text-xl font-semibold">
-                {state?.outcome === "not-found"
-                  ? "We couldn't find that code"
-                  : "Tracking unavailable"}
-              </h2>
-              <p className="text-sm leading-relaxed text-muted-foreground">
-                {errorMessage}
-              </p>
-            </div>
-          </CardContent>
-        </Card>
+        <div
+          role="alert"
+          id="tracking-code-error"
+          className="flex flex-col items-start gap-5 rounded-xl bg-foreground p-6 text-background sm:flex-row sm:items-center sm:p-8"
+        >
+          {state?.outcome === "not-found" && (
+            <StatusGauge
+              status={null}
+              className="size-22 shrink-0 text-background"
+            />
+          )}
+          <div className="space-y-2">
+            <h2 className="text-xl font-bold">
+              {state?.outcome === "not-found"
+                ? "We couldn't find that code"
+                : "Tracking unavailable"}
+            </h2>
+            <p className="text-sm leading-relaxed text-background/75">
+              {errorMessage}
+            </p>
+          </div>
+        </div>
       )}
       {!pending && state?.outcome === "found" && (
         <TrackingResult view={state.view} />

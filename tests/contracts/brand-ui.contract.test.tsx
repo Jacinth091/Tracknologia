@@ -169,7 +169,8 @@ describe("customer tracking", () => {
     expect(html).toMatch(
       /<details[^>]*>.*Earlier customer update.*<\/details>/,
     );
-    expect(html).not.toContain(view.trackingCode);
+    // The Tracking Code appears once, in the ticket eyebrow, and nowhere else.
+    expect(html.split(view.trackingCode)).toHaveLength(2);
     expect(html).not.toContain("ACCEPTED");
   });
 
