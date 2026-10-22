@@ -9,7 +9,7 @@ import {
   type AcceptRepairRequestDecision,
 } from "@/features/repair-requests";
 
-export interface RepairRequestActionState {
+interface RepairRequestActionState {
   error?: string;
   success?: string;
   acceptedRepair?: {
