@@ -1,5 +1,7 @@
 import type { Metadata } from "next";
 import Link from "next/link";
+import { HugeiconsIcon } from "@hugeicons/react";
+import { CheckmarkCircle02Icon } from "@hugeicons/core-free-icons";
 import {
   Card,
   CardContent,
@@ -18,26 +20,18 @@ export const metadata: Metadata = {
 
 export default function ConfirmedPage() {
   return (
-    <Card className="text-center border-primary/20 shadow-sm">
+    <Card className="border-primary/20 text-center shadow-sm">
       <CardHeader className="pb-4">
-        <div className="mx-auto mb-3 flex h-14 w-14 items-center justify-center rounded-full bg-primary/10 border border-primary/20 text-foreground">
-          <svg
-            xmlns="http://www.w3.org/2000/svg"
-            className="h-7 w-7"
-            fill="none"
-            viewBox="0 0 24 24"
-            stroke="currentColor"
-            strokeWidth="2.5"
-          >
-            <path
-              strokeLinecap="round"
-              strokeLinejoin="round"
-              d="M5 13l4 4L19 7"
-            />
-          </svg>
+        <div className="mx-auto mb-3 flex size-14 items-center justify-center rounded-full border border-primary/20 bg-primary/10 text-foreground">
+          <HugeiconsIcon
+            icon={CheckmarkCircle02Icon}
+            strokeWidth={1.8}
+            className="size-7"
+            aria-hidden="true"
+          />
         </div>
         <CardTitle className="text-2xl font-bold">Email Confirmed!</CardTitle>
-        <CardDescription className="text-base text-muted-foreground mt-1">
+        <CardDescription className="mt-1 text-base text-muted-foreground">
           Your email has been verified successfully.
         </CardDescription>
       </CardHeader>
@@ -50,7 +44,7 @@ export default function ConfirmedPage() {
           href="/onboarding"
           className={cn(buttonVariants({ size: "lg" }), "w-full")}
         >
-          Continue to Onboarding & Dashboard →
+          Continue to Onboarding &amp; Dashboard →
         </Link>
       </CardContent>
       <CardFooter className="justify-center border-t border-border/50 pt-4 text-xs text-muted-foreground">

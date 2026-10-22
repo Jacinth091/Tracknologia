@@ -28,11 +28,14 @@ export default async function TeamPage() {
 
   return (
     <div className="space-y-6 max-w-4xl">
-      <div>
-        <h1 className="text-2xl font-bold tracking-tight sm:text-3xl text-foreground">
-          Team & Staff Management
+      <div className="space-y-1.5">
+        <p className="font-mono text-[11px] uppercase tracking-[0.16em] text-muted-foreground">
+          Team
+        </p>
+        <h1 className="text-2xl font-bold tracking-tight text-foreground sm:text-3xl">
+          Team &amp; Staff Management
         </h1>
-        <p className="text-sm text-muted-foreground mt-1">
+        <p className="text-sm text-muted-foreground">
           Manage staff members, invitations, and workshop access for{" "}
           {context.providerName}
         </p>

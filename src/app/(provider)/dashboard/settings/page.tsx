@@ -30,11 +30,14 @@ export default async function ProviderSettingsPage() {
 
   return (
     <div className="max-w-4xl space-y-6">
-      <div>
+      <div className="space-y-1.5">
+        <p className="font-mono text-[11px] uppercase tracking-[0.16em] text-muted-foreground">
+          Provider
+        </p>
         <h1 className="text-2xl font-bold tracking-tight text-foreground sm:text-3xl">
           Provider Settings
         </h1>
-        <p className="mt-1 text-sm text-muted-foreground">
+        <p className="text-sm text-muted-foreground">
           Manage your personal identity and the operating details customers can
           use to understand this Provider.
         </p>

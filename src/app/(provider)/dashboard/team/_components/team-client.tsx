@@ -1,14 +1,24 @@
 "use client";
 
 import { useActionState, useState } from "react";
+import { HugeiconsIcon } from "@hugeicons/react";
+import {
+  AlertCircleIcon,
+  CheckmarkCircle02Icon,
+  Mail01Icon,
+  UserAdd01Icon,
+  UserGroupIcon,
+} from "@hugeicons/core-free-icons";
+
 import {
   inviteStaffAction,
   removeStaffAction,
   revokeStaffAction,
 } from "../actions";
+import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
+import { Avatar, AvatarFallback } from "@/components/ui/avatar";
+import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
 import {
   Card,
   CardContent,
@@ -16,8 +26,16 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
+import {
+  Empty,
+  EmptyDescription,
+  EmptyHeader,
+  EmptyMedia,
+  EmptyTitle,
+} from "@/components/ui/empty";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
 import { LoadingSpinner } from "@/components/ui/loading-spinner";
-import { cn } from "@/lib/utils";
 import type { ProviderInvitation, TeamMember } from "@/features/providers";
 
 interface TeamClientProps {
@@ -53,23 +71,31 @@ export function TeamClient({
   if (!isShop) {
     return (
       <Card>
-        <CardHeader>
-          <CardTitle>Independent Provider Team</CardTitle>
-          <CardDescription>
-            Independent repairers operate independently and manage repairs
-            directly.
-          </CardDescription>
-        </CardHeader>
-        <CardContent className="space-y-2 text-sm text-muted-foreground">
-          <p>
-            Staff invitations and multi-member teams are designed for{" "}
-            <strong>Repair Shops</strong>. Independent Providers remain
-            single-member workspaces in the current product model.
-          </p>
+        <CardContent className="pt-6">
+          <Empty className="border">
+            <EmptyMedia variant="icon">
+              <HugeiconsIcon
+                icon={UserGroupIcon}
+                strokeWidth={1.8}
+                aria-hidden="true"
+              />
+            </EmptyMedia>
+            <EmptyHeader>
+              <EmptyTitle>Independent Provider Team</EmptyTitle>
+              <EmptyDescription>
+                Independent repairers operate independently and manage repairs
+                directly. Staff invitations and multi-member teams are designed
+                for Repair Shops — Independent Providers remain single-member
+                workspaces in the current product model.
+              </EmptyDescription>
+            </EmptyHeader>
+          </Empty>
         </CardContent>
       </Card>
     );
   }
+
+  const staffMembers = members.filter((member) => member.role === "STAFF");
 
   const handleCopy = (text: string) => {
     navigator.clipboard.writeText(text);
@@ -83,7 +109,13 @@ export function TeamClient({
       {isOwner && (
         <Card>
           <CardHeader>
-            <CardTitle className="text-lg font-semibold">
+            <CardTitle className="flex items-center gap-2.5 text-lg font-semibold">
+              <HugeiconsIcon
+                icon={UserAdd01Icon}
+                strokeWidth={1.8}
+                className="size-4 text-muted-foreground"
+                aria-hidden="true"
+              />
               Invite Staff
             </CardTitle>
             <CardDescription>
@@ -94,7 +126,7 @@ export function TeamClient({
           <CardContent className="space-y-4">
             <form
               action={formAction}
-              className="flex flex-col sm:flex-row gap-3"
+              className="flex flex-col gap-3 sm:flex-row"
             >
               <div className="flex-1 space-y-1">
                 <Label htmlFor="staff-email" className="sr-only">
@@ -131,37 +163,61 @@ export function TeamClient({
             </form>
 
             {state?.error && (
-              <div className="rounded-xl border border-destructive/20 bg-destructive/10 p-3 text-xs text-destructive font-medium">
-                {state.error}
-              </div>
+              <Alert variant="destructive">
+                <HugeiconsIcon
+                  icon={AlertCircleIcon}
+                  strokeWidth={1.8}
+                  className="size-4"
+                  aria-hidden="true"
+                />
+                <AlertTitle>Could not create the invitation</AlertTitle>
+                <AlertDescription>{state.error}</AlertDescription>
+              </Alert>
             )}
 
             {state?.reused && (
-              <div className="rounded-xl border border-border bg-accent p-3 text-sm font-medium text-accent-foreground">
-                {state.success}
-              </div>
+              <Alert role="status">
+                <HugeiconsIcon
+                  icon={Mail01Icon}
+                  strokeWidth={1.8}
+                  className="size-4 text-primary"
+                  aria-hidden="true"
+                />
+                <AlertTitle>Invitation already pending</AlertTitle>
+                <AlertDescription>{state.success}</AlertDescription>
+              </Alert>
             )}
 
             {/* Generated Invite Box (Displayed strictly once at creation time) */}
             {state?.token && state.inviteUrl && (
-              <div className="rounded-2xl border border-primary/30 bg-primary/5 p-4 space-y-3">
-                <div className="flex items-center justify-between">
+              <div className="space-y-3 rounded-lg border border-foreground/15 bg-primary/10 p-4">
+                <div className="flex items-center justify-between gap-2">
                   <span className="text-xs font-semibold text-foreground">
                     {state.emailDeliveryFailed
                       ? "Invitation Created (Email Failed)"
                       : "Invitation Created & Sent!"}
                   </span>
-                  <span className="text-[11px] text-muted-foreground">
-                    Valid for 7 days
+                  <span className="font-mono text-[11px] uppercase tracking-wide text-muted-foreground">
+                    Valid 7 days
                   </span>
                 </div>
 
                 {state.emailDeliveryFailed && (
-                  <p className="text-xs text-foreground font-medium">
-                    ⚠️ Email delivery could not be completed. You can copy the
-                    invitation link below and share it directly with your staff
-                    member.
-                  </p>
+                  <Alert variant="destructive">
+                    <HugeiconsIcon
+                      icon={AlertCircleIcon}
+                      strokeWidth={1.8}
+                      className="size-4"
+                      aria-hidden="true"
+                    />
+                    <AlertTitle>
+                      Email delivery could not be completed
+                    </AlertTitle>
+                    <AlertDescription>
+                      Copy the invitation link below and share it directly with
+                      your staff member.
+                    </AlertDescription>
+                  </Alert>
                 )}
 
                 <div className="flex items-center gap-2">
@@ -186,7 +242,7 @@ export function TeamClient({
 
                 <div className="flex items-center gap-2 text-xs text-muted-foreground">
                   <span>Invite Code:</span>
-                  <code className="bg-background px-2 py-0.5 rounded border border-border font-mono font-medium text-foreground">
+                  <code className="rounded border border-border bg-background px-2 py-0.5 font-mono font-medium text-foreground">
                     {state.token}
                   </code>
                 </div>
@@ -197,34 +253,67 @@ export function TeamClient({
       )}
 
       {isOwner && revokeState?.success && (
-        <div className="rounded-xl border border-primary/20 bg-primary/10 p-3 text-xs font-medium text-foreground">
-          Invitation revoked
-        </div>
+        <Alert role="status">
+          <HugeiconsIcon
+            icon={CheckmarkCircle02Icon}
+            strokeWidth={1.8}
+            className="size-4 text-primary"
+            aria-hidden="true"
+          />
+          <AlertTitle>Invitation revoked</AlertTitle>
+        </Alert>
       )}
 
       {isOwner && revokeState?.error && (
-        <div className="rounded-xl border border-destructive/20 bg-destructive/10 p-3 text-xs font-medium text-destructive">
-          Unable to revoke invitation
-        </div>
+        <Alert variant="destructive">
+          <HugeiconsIcon
+            icon={AlertCircleIcon}
+            strokeWidth={1.8}
+            className="size-4"
+            aria-hidden="true"
+          />
+          <AlertTitle>Unable to revoke invitation</AlertTitle>
+          <AlertDescription>{revokeState.error}</AlertDescription>
+        </Alert>
       )}
 
       {isOwner && removeState?.success && (
-        <div className="rounded-xl border border-primary/20 bg-primary/10 p-3 text-xs font-medium text-foreground">
-          {removeState.success}
-        </div>
+        <Alert role="status">
+          <HugeiconsIcon
+            icon={CheckmarkCircle02Icon}
+            strokeWidth={1.8}
+            className="size-4 text-primary"
+            aria-hidden="true"
+          />
+          <AlertTitle>Access revoked</AlertTitle>
+          <AlertDescription>{removeState.success}</AlertDescription>
+        </Alert>
       )}
 
       {isOwner && removeState?.error && (
-        <div className="rounded-xl border border-destructive/20 bg-destructive/10 p-3 text-xs font-medium text-destructive">
-          {removeState.error}
-        </div>
+        <Alert variant="destructive">
+          <HugeiconsIcon
+            icon={AlertCircleIcon}
+            strokeWidth={1.8}
+            className="size-4"
+            aria-hidden="true"
+          />
+          <AlertTitle>Unable to remove staff</AlertTitle>
+          <AlertDescription>{removeState.error}</AlertDescription>
+        </Alert>
       )}
 
       {/* 2. Pending Invitations (No credentials / hashes displayed) */}
       {isOwner && invitations.length > 0 && (
         <Card>
           <CardHeader>
-            <CardTitle className="text-lg font-semibold">
+            <CardTitle className="flex items-center gap-2.5 text-lg font-semibold">
+              <HugeiconsIcon
+                icon={Mail01Icon}
+                strokeWidth={1.8}
+                className="size-4 text-muted-foreground"
+                aria-hidden="true"
+              />
               Pending Staff Invitations
             </CardTitle>
             <CardDescription>
@@ -236,13 +325,13 @@ export function TeamClient({
               {invitations.map((inv) => (
                 <div
                   key={inv.id}
-                  className="py-3 flex items-center justify-between gap-4"
+                  className="flex items-center justify-between gap-4 py-3"
                 >
                   <div className="min-w-0 space-y-0.5 wrap-anywhere">
                     <p className="text-sm font-medium text-foreground">
                       {inv.email}
                     </p>
-                    <p className="text-xs text-muted-foreground">
+                    <p className="font-mono text-[11px] text-muted-foreground">
                       Sent {new Date(inv.createdAt).toLocaleDateString()} •
                       Expires {new Date(inv.expiresAt).toLocaleDateString()}
                     </p>
@@ -271,7 +360,13 @@ export function TeamClient({
       {/* 3. Active Team Members */}
       <Card>
         <CardHeader>
-          <CardTitle className="text-lg font-semibold">
+          <CardTitle className="flex items-center gap-2.5 text-lg font-semibold">
+            <HugeiconsIcon
+              icon={UserGroupIcon}
+              strokeWidth={1.8}
+              className="size-4 text-muted-foreground"
+              aria-hidden="true"
+            />
             Team Members ({members.length})
           </CardTitle>
           <CardDescription>
@@ -287,23 +382,34 @@ export function TeamClient({
               return (
                 <div
                   key={member.membershipId}
-                  className="py-4 flex flex-wrap items-center justify-between gap-3"
+                  className="flex flex-wrap items-center justify-between gap-3 py-4"
                 >
                   <div className="flex min-w-0 flex-1 basis-48 items-center gap-3">
-                    <div className="h-9 w-9 shrink-0 rounded-full bg-primary/10 text-foreground flex items-center justify-center font-semibold text-sm">
-                      {initials}
-                    </div>
-                    <div className="space-y-0.5">
+                    <Avatar size="lg">
+                      <AvatarFallback className="bg-foreground text-xs font-semibold text-background">
+                        {initials}
+                      </AvatarFallback>
+                    </Avatar>
+                    <div className="min-w-0 space-y-1">
                       <div className="flex items-center gap-2">
-                        <span className="text-sm font-semibold text-foreground">
+                        <span className="truncate text-sm font-semibold text-foreground">
                           {displayName}
                         </span>
+                        <Badge
+                          variant={
+                            member.role === "OWNER" ? "default" : "outline"
+                          }
+                        >
+                          {member.role === "OWNER" ? "Shop Owner" : "Staff"}
+                        </Badge>
                       </div>
-                      <div className="text-xs text-muted-foreground flex items-center gap-2 flex-wrap">
+                      <div className="flex flex-wrap items-center gap-2 font-mono text-[11px] text-muted-foreground">
                         {member.contactPhone && (
-                          <span>{member.contactPhone}</span>
+                          <>
+                            <span>{member.contactPhone}</span>
+                            <span>•</span>
+                          </>
                         )}
-                        {member.contactPhone && <span>•</span>}
                         <span>
                           Joined{" "}
                           {new Date(member.createdAt).toLocaleDateString()}
@@ -311,17 +417,6 @@ export function TeamClient({
                       </div>
                     </div>
                   </div>
-
-                  <span
-                    className={cn(
-                      "inline-flex items-center rounded-md px-2.5 py-0.5 text-xs font-semibold shrink-0",
-                      member.role === "OWNER"
-                        ? "bg-primary/10 text-foreground font-medium"
-                        : "bg-muted text-muted-foreground font-medium",
-                    )}
-                  >
-                    {member.role === "OWNER" ? "Shop Owner" : "Staff"}
-                  </span>
 
                   {isOwner && member.role === "STAFF" && (
                     <div className="shrink-0">
@@ -377,6 +472,25 @@ export function TeamClient({
               );
             })}
           </div>
+
+          {staffMembers.length === 0 && (
+            <Empty className="mt-2 border">
+              <EmptyMedia variant="icon">
+                <HugeiconsIcon
+                  icon={UserGroupIcon}
+                  strokeWidth={1.8}
+                  aria-hidden="true"
+                />
+              </EmptyMedia>
+              <EmptyHeader>
+                <EmptyTitle>No staff members yet</EmptyTitle>
+                <EmptyDescription>
+                  Invite a teammate to share repairs, updates and handovers with
+                  your shop.
+                </EmptyDescription>
+              </EmptyHeader>
+            </Empty>
+          )}
         </CardContent>
       </Card>
     </div>

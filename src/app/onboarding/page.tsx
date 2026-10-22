@@ -63,15 +63,18 @@ export default async function OnboardingPage({
   }
 
   return (
-    <main className="flex min-h-screen items-center justify-center px-4 py-10">
+    <main className="flex min-h-screen items-center justify-center bg-muted/30 px-4 py-10">
       <div className="w-full max-w-xl space-y-6">
-        <div className="text-center">
+        <div className="flex justify-center">
           <Link href="/" className="inline-block rounded-sm">
             <BrandLogo className="h-8" />
           </Link>
         </div>
         <Card>
-          <CardHeader className="text-center space-y-1">
+          <CardHeader className="space-y-2 text-center">
+            <p className="font-mono text-[11px] uppercase tracking-[0.16em] text-muted-foreground">
+              Provider setup
+            </p>
             <h1 className="text-2xl font-bold tracking-tight">
               {providerType === "SHOP"
                 ? "Set Up Your Repair Shop"

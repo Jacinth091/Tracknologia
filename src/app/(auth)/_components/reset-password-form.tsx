@@ -1,7 +1,11 @@
 "use client";
 
 import { useActionState } from "react";
+import { HugeiconsIcon } from "@hugeicons/react";
+import { AlertCircleIcon } from "@hugeicons/core-free-icons";
+
 import { updatePasswordAction } from "../actions";
+import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
 import { PasswordInput } from "@/components/ui/password-input";
 import { Label } from "@/components/ui/label";
@@ -15,13 +19,12 @@ export function ResetPasswordForm() {
 
   return (
     <div className="relative">
-      {/* Loading Overlay */}
       {isPending && (
-        <div className="absolute inset-0 z-20 flex flex-col items-center justify-center rounded-2xl bg-background/60 backdrop-blur-[1px] transition-all">
-          <div className="flex items-center gap-2 rounded-xl bg-card border border-border/80 px-4 py-2 shadow-md">
+        <div className="absolute inset-0 z-20 flex flex-col items-center justify-center bg-background/60 backdrop-blur-[1px] transition-all">
+          <div className="flex items-center gap-2 rounded-lg border border-border bg-card px-4 py-2 shadow-md">
             <LoadingSpinner
               size="sm"
-              className="text-foreground border-current border-t-transparent"
+              className="border-current border-t-transparent text-foreground"
             />
             <span className="text-xs font-medium text-foreground">
               Updating your password...
@@ -32,9 +35,16 @@ export function ResetPasswordForm() {
 
       <form action={formAction} className="space-y-4">
         {state?.error && (
-          <div className="rounded-xl border border-destructive/20 bg-destructive/10 p-3 text-sm text-destructive font-medium">
-            {state.error}
-          </div>
+          <Alert variant="destructive">
+            <HugeiconsIcon
+              icon={AlertCircleIcon}
+              strokeWidth={1.8}
+              className="size-4"
+              aria-hidden="true"
+            />
+            <AlertTitle>Could not update the password</AlertTitle>
+            <AlertDescription>{state.error}</AlertDescription>
+          </Alert>
         )}
 
         <div className="space-y-2">

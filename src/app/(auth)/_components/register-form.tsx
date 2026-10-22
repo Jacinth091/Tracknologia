@@ -1,7 +1,19 @@
 "use client";
 
 import { useActionState, useState } from "react";
+import { HugeiconsIcon } from "@hugeicons/react";
+import {
+  AlertCircleIcon,
+  CheckmarkCircle02Icon,
+  Store01Icon,
+  Ticket01Icon,
+  UserGroupIcon,
+  UserIcon,
+  Wrench01Icon,
+} from "@hugeicons/core-free-icons";
+
 import { registerAction } from "../actions";
+import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { PasswordInput } from "@/components/ui/password-input";
@@ -13,6 +25,27 @@ interface RegisterFormProps {
   initialInvite?: string;
 }
 
+const INTENT_OPTIONS = [
+  {
+    value: "INDEPENDENT",
+    label: "Independent",
+    description: "Solo technician or mobile repairer.",
+    icon: Wrench01Icon,
+  },
+  {
+    value: "SHOP",
+    label: "Shop Owner",
+    description: "Storefront or workshop repair business.",
+    icon: Store01Icon,
+  },
+  {
+    value: "STAFF",
+    label: "Shop Staff",
+    description: "Joining a shop with an invitation.",
+    icon: UserGroupIcon,
+  },
+] as const;
+
 export function RegisterForm({ initialInvite }: RegisterFormProps) {
   const [intent, setIntent] = useState<"INDEPENDENT" | "SHOP" | "STAFF">(
     initialInvite ? "STAFF" : "INDEPENDENT",
@@ -21,93 +54,123 @@ export function RegisterForm({ initialInvite }: RegisterFormProps) {
 
   return (
     <div className="space-y-6">
-      {/* Step 1: Select Intent / Role */}
-      <div className="space-y-2">
-        <Label className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">
-          What are you signing up as?
-        </Label>
+      <div className="space-y-2.5">
+        <div className="flex items-center gap-2">
+          <HugeiconsIcon
+            icon={UserIcon}
+            strokeWidth={1.8}
+            className="size-4 text-muted-foreground"
+            aria-hidden="true"
+          />
+          <Label className="font-mono text-[11px] font-medium uppercase tracking-[0.14em] text-muted-foreground">
+            What are you signing up as?
+          </Label>
+        </div>
         <div
           role="radiogroup"
           aria-label="Account Role"
           className="grid grid-cols-1 gap-3 sm:grid-cols-3"
         >
-          {(
-            [
-              {
-                value: "INDEPENDENT",
-                label: "Independent",
-                description: "Solo technician or mobile repairer.",
-              },
-              {
-                value: "SHOP",
-                label: "Shop Owner",
-                description: "Storefront or workshop repair business.",
-              },
-              {
-                value: "STAFF",
-                label: "Shop Staff",
-                description: "Joining a shop with an invitation.",
-              },
-            ] as const
-          ).map((option) => (
-            <label
-              key={option.value}
-              className={cn(
-                "flex cursor-pointer items-start gap-3 rounded-xl border p-3.5 transition-colors",
-                intent === option.value
-                  ? "border-ring bg-accent ring-1 ring-ring"
-                  : "border-input bg-card hover:bg-muted/40",
-                isPending && "cursor-not-allowed opacity-50",
-              )}
-            >
-              <input
-                type="radio"
-                name="account-intent"
-                value={option.value}
-                checked={intent === option.value}
-                disabled={isPending}
-                onChange={() => setIntent(option.value)}
-                className="mt-1 size-4 shrink-0 accent-ring"
-              />
-              <span>
-                <span className="block text-sm font-semibold">
-                  {option.label}
+          {INTENT_OPTIONS.map((option) => {
+            const selected = intent === option.value;
+
+            return (
+              <label
+                key={option.value}
+                className={cn(
+                  "flex cursor-pointer flex-col gap-3 rounded-lg border p-3.5 transition-colors",
+                  selected
+                    ? "border-foreground bg-muted/60 ring-1 ring-foreground"
+                    : "border-input bg-card hover:border-foreground/40 hover:bg-muted/30",
+                  isPending && "cursor-not-allowed opacity-50",
+                )}
+              >
+                <span className="flex items-center justify-between">
+                  <span
+                    className={cn(
+                      "inline-flex size-8 items-center justify-center rounded-md border",
+                      selected
+                        ? "border-foreground/20 bg-background text-foreground"
+                        : "border-border bg-muted text-muted-foreground",
+                    )}
+                  >
+                    <HugeiconsIcon
+                      icon={option.icon}
+                      strokeWidth={1.8}
+                      className="size-4"
+                      aria-hidden="true"
+                    />
+                  </span>
+                  <input
+                    type="radio"
+                    name="account-intent"
+                    value={option.value}
+                    checked={selected}
+                    disabled={isPending}
+                    onChange={() => setIntent(option.value)}
+                    className="size-4 shrink-0 accent-foreground"
+                  />
                 </span>
-                <span className="mt-1 block text-xs leading-relaxed text-muted-foreground">
-                  {option.description}
+                <span>
+                  <span className="block text-sm font-semibold">
+                    {option.label}
+                  </span>
+                  <span className="mt-1 block text-xs leading-relaxed text-muted-foreground">
+                    {option.description}
+                  </span>
                 </span>
-              </span>
-            </label>
-          ))}
+              </label>
+            );
+          })}
         </div>
       </div>
 
-      {/* Step 2: Account Creation Form */}
       <form action={formAction} className="space-y-4">
         <input type="hidden" name="intent" value={intent} />
 
         {state?.error && !state.fieldErrors && (
-          <div className="rounded-xl border border-destructive/20 bg-destructive/10 p-3 text-xs text-destructive font-medium">
-            {state.error}
-          </div>
+          <Alert variant="destructive">
+            <HugeiconsIcon
+              icon={AlertCircleIcon}
+              strokeWidth={1.8}
+              className="size-4"
+              aria-hidden="true"
+            />
+            <AlertTitle>Could not create the account</AlertTitle>
+            <AlertDescription>{state.error}</AlertDescription>
+          </Alert>
         )}
 
         {state?.success && (
-          <div className="rounded-xl border border-primary/20 bg-primary/10 p-3 text-xs text-foreground font-medium">
-            {state.success}
-          </div>
+          <Alert>
+            <HugeiconsIcon
+              icon={CheckmarkCircle02Icon}
+              strokeWidth={1.8}
+              className="size-4 text-primary"
+              aria-hidden="true"
+            />
+            <AlertTitle>Account created</AlertTitle>
+            <AlertDescription>{state.success}</AlertDescription>
+          </Alert>
         )}
 
-        {/* Staff-Specific Invitation Code Field */}
         {intent === "STAFF" && (
-          <div className="rounded-2xl border border-primary/20 bg-primary/5 p-4 space-y-3">
-            <div className="space-y-1">
-              <Label
-                htmlFor="inviteToken"
-                className="text-xs font-semibold text-foreground"
-              >
-                Shop Invitation Code *
-              </Label>
+          <div className="space-y-3 rounded-lg border border-foreground/15 bg-muted/50 p-4">
+            <div className="space-y-1.5">
+              <div className="flex items-center gap-2">
+                <HugeiconsIcon
+                  icon={Ticket01Icon}
+                  strokeWidth={1.8}
+                  className="size-4 text-muted-foreground"
+                  aria-hidden="true"
+                />
+                <Label
+                  htmlFor="inviteToken"
+                  className="text-xs font-semibold text-foreground"
+                >
+                  Shop Invitation Code *
+                </Label>
+              </div>
               <Input
                 id="inviteToken"
                 name="inviteToken"
@@ -123,7 +186,7 @@ export function RegisterForm({ initialInvite }: RegisterFormProps) {
                 </p>
               )}
             </div>
-            <p className="text-[11px] text-muted-foreground">
+            <p className="text-[11px] leading-relaxed text-muted-foreground">
               Don&apos;t have an invite code? Ask your Shop Owner to generate an
               invite from their dashboard.
             </p>
@@ -154,7 +217,7 @@ export function RegisterForm({ initialInvite }: RegisterFormProps) {
           )}
         </div>
 
-        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
           <div className="space-y-2">
             <Label htmlFor="password">Password *</Label>
             <PasswordInput
@@ -203,7 +266,7 @@ export function RegisterForm({ initialInvite }: RegisterFormProps) {
           )}
         </Button>
 
-        <p className="text-[11px] text-muted-foreground text-center pt-1">
+        <p className="pt-1 text-center text-[11px] text-muted-foreground">
           {intent === "STAFF"
             ? "Your staff account will be linked to your shop upon registration."
             : "Next step: configure your provider details in onboarding."}
