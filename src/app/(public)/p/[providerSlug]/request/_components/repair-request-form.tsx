@@ -12,7 +12,7 @@ import { CopyButton } from "@/components/shared/copy-button";
 import { StatusGauge } from "@/components/shared/status-gauge";
 
 import Link from "next/link";
-import { useActionState, useState } from "react";
+import { useActionState } from "react";
 
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Button, buttonVariants } from "@/components/ui/button";
@@ -42,36 +42,6 @@ const SERVICE_MODE_LABELS = {
   OTHER: "Other arrangement",
 } as const;
 
-async function copyTextToClipboard(text: string): Promise<boolean> {
-  if (typeof navigator !== "undefined" && navigator.clipboard?.writeText) {
-    try {
-      await navigator.clipboard.writeText(text);
-      return true;
-    } catch {
-      // Fall through to fallback
-    }
-  }
-
-  if (typeof document !== "undefined") {
-    try {
-      const textarea = document.createElement("textarea");
-      textarea.value = text;
-      textarea.setAttribute("readonly", "");
-      textarea.style.position = "absolute";
-      textarea.style.left = "-9999px";
-      document.body.appendChild(textarea);
-      textarea.select();
-      const success = document.execCommand("copy");
-      document.body.removeChild(textarea);
-      return Boolean(success);
-    } catch {
-      return false;
-    }
-  }
-
-  return false;
-}
-
 function FieldError({
   field,
   state,
@@ -90,30 +60,8 @@ function RequestReceiptCard({
   referenceCode: string;
   providerName: string;
 }) {
-  const [copiedCode, setCopiedCode] = useState(false);
-  const [copiedLink, setCopiedLink] = useState(false);
-
-  const handleCopyCode = async () => {
-    const success = await copyTextToClipboard(referenceCode);
-    if (success) {
-      setCopiedCode(true);
-      setTimeout(() => setCopiedCode(false), 2500);
-    }
-  };
-
-  const handleCopyLink = async () => {
-    const origin =
-      typeof window !== "undefined"
-        ? window.location.origin
-        : "https://tracknologia.com";
-    const trackUrl = `${origin}/track?code=${encodeURIComponent(referenceCode)}`;
-
-    const success = await copyTextToClipboard(trackUrl);
-    if (success) {
-      setCopiedLink(true);
-      setTimeout(() => setCopiedLink(false), 2500);
-    }
-  };
+  const origin = typeof window === "undefined" ? "" : window.location.origin;
+  const trackUrl = `${origin}/track?code=${encodeURIComponent(referenceCode)}`;
 
   return (
     <Card>
@@ -154,26 +102,11 @@ function RequestReceiptCard({
           </div>
 
           <div className="flex flex-col gap-2 sm:flex-row">
-            <Button
-              type="button"
-              variant={copiedCode ? "default" : "outline"}
-              size="sm"
-              onClick={handleCopyCode}
-              aria-label="Copy reference code to clipboard"
-              className="w-full shrink-0 sm:w-auto"
-            >
-              {copiedCode ? "Copied code" : "Copy code"}
-            </Button>
-            <Button
-              type="button"
-              variant={copiedLink ? "default" : "outline"}
-              size="sm"
-              onClick={handleCopyLink}
-              aria-label="Copy direct tracking link to clipboard"
-              className="w-full shrink-0 sm:w-auto"
-            >
-              {copiedLink ? "Copied link" : "Copy link"}
-            </Button>
+            <CopyButton
+              text={trackUrl}
+              label="Copy link"
+              copiedLabel="Copied link"
+            />
           </div>
         </div>
 
