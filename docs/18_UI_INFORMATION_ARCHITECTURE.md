@@ -191,18 +191,23 @@ Actions:
 
 ### Accept & Create Repair
 
-Pre-fill request information but allow Provider verification/correction.
+While a Request is `SUBMITTED`, show everything the customer sent (customer and
+device details, Reported Problem, and the Request-only context such as when it
+started) **read-only**, once. The Provider's decision is the only input:
 
-Separate:
+- Service Mode and arrangement details
+- private Internal Notes
 
-- Customer/Device data
-- Reported Problem
-- Provider intake observations
-- private technical fields
+The Repair snapshot is built server-side from the stored Request, so
+browser-submitted customer or device values are never used. Customer and device
+details, intake observations and Diagnosis are corrected or added afterwards on
+the resulting Repair ("Edit Repair details").
 
 ### Direct Create Repair
 
-Use the same final Repair-input model without a Request prerequisite.
+Use the same final Repair-input model without a Request prerequisite. Here the
+Provider enters and can edit every intake field, because there is no
+customer-submitted Request.
 
 ## Device input design
 
