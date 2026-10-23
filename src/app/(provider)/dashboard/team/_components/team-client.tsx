@@ -178,7 +178,7 @@ export function TeamClient({
                   <HugeiconsIcon
                     icon={Mail01Icon}
                     strokeWidth={1.8}
-                    className="size-4 text-primary"
+                    className="size-4 text-foreground"
                     aria-hidden="true"
                   />
                   <AlertTitle>Invitation already pending</AlertTitle>
@@ -250,7 +250,7 @@ export function TeamClient({
             <HugeiconsIcon
               icon={CheckmarkCircle02Icon}
               strokeWidth={1.8}
-              className="size-4 text-primary"
+              className="size-4 text-foreground"
               aria-hidden="true"
             />
             <AlertTitle>Invitation revoked</AlertTitle>
@@ -275,7 +275,7 @@ export function TeamClient({
             <HugeiconsIcon
               icon={CheckmarkCircle02Icon}
               strokeWidth={1.8}
-              className="size-4 text-primary"
+              className="size-4 text-foreground"
               aria-hidden="true"
             />
             <AlertTitle>Access revoked</AlertTitle>

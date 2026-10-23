@@ -146,7 +146,7 @@ export function RegisterForm({ initialInvite }: RegisterFormProps) {
             <HugeiconsIcon
               icon={CheckmarkCircle02Icon}
               strokeWidth={1.8}
-              className="size-4 text-primary"
+              className="size-4 text-foreground"
               aria-hidden="true"
             />
             <AlertTitle>Account created</AlertTitle>

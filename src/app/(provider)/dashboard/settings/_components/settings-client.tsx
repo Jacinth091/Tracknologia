@@ -93,7 +93,7 @@ function ActionMessage({ state }: { state: SettingsActionState | null }) {
         <HugeiconsIcon
           icon={CheckmarkCircle02Icon}
           strokeWidth={1.8}
-          className="size-4 text-primary"
+          className="size-4 text-foreground"
           aria-hidden="true"
         />
         <AlertTitle>Saved</AlertTitle>
