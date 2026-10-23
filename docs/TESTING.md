@@ -20,9 +20,13 @@ High-value examples:
 - the Tracking action returns before an unresolved deferred Analytics task;
 - Analytics failure does not log the credential/database detail.
 
-### Component tests — React Testing Library
+### Rendered UI contracts — Vitest
 
-Use for interactive UI behavior where rendering adds value.
+`tests/contracts/brand-ui.contract.test.tsx` uses the installed React DOM server
+renderer to check status illustrations, accessible names, current navigation,
+tracking outcomes and URL prefill, Request receipts, and native account radios.
+It supplies action results at the rendering seam; it does not exercise browser
+events, real Server Action transport, responsive layout, or computed styles.
 
 Avoid testing implementation details or Tailwind class strings unless they are functionally significant.
 

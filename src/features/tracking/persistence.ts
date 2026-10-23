@@ -26,6 +26,11 @@ export async function lookupPublicRepairRecord(
 
   const parsed = publicRepairProjectionSchema.safeParse(row);
   if (!parsed.success) {
+    // Paths and codes only: issue messages and row values stay out of logs.
+    const issues = parsed.error.issues
+      .map((issue) => `${issue.path.join(".")}:${issue.code}`)
+      .join(", ");
+    console.error(`Public Tracking projection is invalid: ${issues}`);
     throw new Error("Public Tracking projection is invalid");
   }
 

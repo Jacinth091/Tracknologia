@@ -1,14 +1,23 @@
 import type { Metadata } from "next";
 import Link from "next/link";
-
-import { Button, buttonVariants } from "@/components/ui/button";
+import { HugeiconsIcon } from "@hugeicons/react";
 import {
-  Card,
-  CardContent,
-  CardDescription,
-  CardHeader,
-  CardTitle,
-} from "@/components/ui/card";
+  ArrowRight01Icon,
+  Search01Icon,
+  Wrench01Icon,
+} from "@hugeicons/core-free-icons";
+
+import { StatusGauge } from "@/components/shared/status-gauge";
+import { Button, buttonVariants } from "@/components/ui/button";
+import { Card } from "@/components/ui/card";
+import {
+  Empty,
+  EmptyContent,
+  EmptyDescription,
+  EmptyHeader,
+  EmptyMedia,
+  EmptyTitle,
+} from "@/components/ui/empty";
 import { Input } from "@/components/ui/input";
 import {
   listRepairs,
@@ -19,12 +28,15 @@ import {
 } from "@/features/repairs";
 import { cn } from "@/lib/utils";
 
-import { RepairStatusBadge } from "./_components/repair-status-badge";
+import { PageHeader } from "../_components/page-header";
+import { RepairStatusPill } from "../_components/repair-status-badge";
 
 export const metadata: Metadata = {
   title: "Repairs — Tracknologia",
   description: "Manage active and completed Repairs",
 };
+
+const PAGE_SIZE = 25;
 
 const FILTERS: Array<{ label: string; status?: RepairListStatus }> = [
   { label: "All" },
@@ -102,32 +114,36 @@ export default async function RepairsPage({
     ? optionsResult.data
     : { status, page: 1, query: undefined };
   const repairPage = await listRepairs(options);
+  const rangeStart = (repairPage.page - 1) * PAGE_SIZE + 1;
+  const rangeEnd = rangeStart + repairPage.items.length - 1;
 
   return (
     <div className="space-y-6">
-      <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
-        <div>
-          <h1 className="text-2xl font-bold tracking-tight sm:text-3xl">
-            Repairs
-          </h1>
-          <p className="mt-1 text-sm text-muted-foreground">
-            Manage accepted work from intake through completion.
-          </p>
-        </div>
-        <Link
-          href="/dashboard/repairs/new"
-          className={cn(buttonVariants(), "w-full sm:w-fit")}
-        >
-          Create Repair
-        </Link>
-      </div>
+      <PageHeader
+        eyebrow="Repair work"
+        title="Repairs"
+        description="Manage accepted work from intake through completion."
+        actions={
+          <Link
+            href="/dashboard/repairs/new"
+            className={cn(buttonVariants(), "w-full sm:w-fit")}
+          >
+            Create Repair
+          </Link>
+        }
+      />
 
       <form
         method="get"
-        className="flex flex-col gap-2 rounded-2xl border border-border bg-card p-3 sm:flex-row sm:items-start"
+        className="flex flex-col gap-2 rounded-xl border border-border bg-card p-3 sm:flex-row sm:items-start"
       >
         {status ? <input type="hidden" name="status" value={status} /> : null}
-        <div className="min-w-0 flex-1 space-y-1.5">
+        <div className="relative min-w-0 flex-1 space-y-1.5">
+          <HugeiconsIcon
+            icon={Search01Icon}
+            aria-hidden="true"
+            className="pointer-events-none absolute top-1/2 left-3 size-4 -translate-y-1/2 text-muted-foreground"
+          />
           <Input
             type="search"
             name="q"
@@ -137,6 +153,7 @@ export default async function RepairsPage({
             aria-label="Search Repairs"
             aria-invalid={Boolean(searchError)}
             aria-describedby={searchError ? "repair-search-error" : undefined}
+            className="pl-9"
           />
           {searchError ? (
             <p
@@ -148,103 +165,118 @@ export default async function RepairsPage({
             </p>
           ) : null}
         </div>
-        <Button type="submit" variant="outline">
-          Search
-        </Button>
-        {queryCandidate ? (
-          <Link
-            href={repairListHref({ status })}
-            className={cn(buttonVariants({ variant: "ghost" }), "sm:w-fit")}
-          >
-            Clear
-          </Link>
-        ) : null}
+        <div className="flex gap-2">
+          <Button type="submit" variant="outline">
+            Search
+          </Button>
+          {queryCandidate ? (
+            <Link
+              href={repairListHref({ status })}
+              className={cn(buttonVariants({ variant: "ghost" }))}
+            >
+              Clear
+            </Link>
+          ) : null}
+        </div>
       </form>
 
-      <div className="flex flex-wrap gap-2" aria-label="Repair status filters">
+      <nav
+        aria-label="Repair status filters"
+        className="-mx-4 flex gap-1 overflow-x-auto border-b border-border px-4 sm:mx-0 sm:px-0"
+      >
         {FILTERS.map((filter) => {
           const active =
             filter.status === status || (!filter.status && !status);
           return (
             <Link
               key={filter.label}
+              aria-current={active ? "page" : undefined}
               href={repairListHref({
                 status: filter.status,
                 query: options.query,
               })}
               className={cn(
-                buttonVariants({
-                  variant: active ? "default" : "outline",
-                  size: "sm",
-                }),
+                "relative shrink-0 px-3 py-2.5 text-sm font-medium whitespace-nowrap transition-colors",
+                active
+                  ? "text-foreground after:absolute after:inset-x-3 after:bottom-0 after:h-0.5 after:bg-primary"
+                  : "text-muted-foreground hover:text-foreground",
               )}
             >
               {filter.label}
             </Link>
           );
         })}
-      </div>
+      </nav>
 
       {repairPage.items.length === 0 ? (
-        <Card>
-          <CardHeader>
-            <CardTitle className="text-lg">No matching Repairs</CardTitle>
-            <CardDescription>
+        <Empty className="rounded-xl border border-border bg-card p-8">
+          <EmptyHeader>
+            <EmptyMedia variant="icon">
+              <HugeiconsIcon icon={Wrench01Icon} aria-hidden="true" />
+            </EmptyMedia>
+            <EmptyTitle>No matching Repairs</EmptyTitle>
+            <EmptyDescription>
               Create a direct Repair or accept a customer Repair Request.
-            </CardDescription>
-          </CardHeader>
-        </Card>
+            </EmptyDescription>
+          </EmptyHeader>
+          <EmptyContent>
+            <Link href="/dashboard/repairs/new" className={buttonVariants()}>
+              Create Repair
+            </Link>
+          </EmptyContent>
+        </Empty>
       ) : (
-        <div className="grid gap-4 lg:grid-cols-2">
-          {repairPage.items.map((repair) => (
-            <Card key={repair.id} className="flex flex-col">
-              <CardHeader className="pb-4">
-                <div className="flex items-start justify-between gap-3">
-                  <div className="min-w-0">
-                    <p className="font-mono text-xs text-muted-foreground">
-                      {repair.ticketNumber}
-                    </p>
-                    <CardTitle className="mt-1 truncate text-lg">
-                      {deviceLabel(
-                        repair.deviceType,
-                        repair.brand,
-                        repair.model,
-                      )}
-                    </CardTitle>
-                  </div>
-                  <RepairStatusBadge status={repair.currentStatus} />
-                </div>
-                <CardDescription>
-                  {repair.customerName} · Updated{" "}
-                  {formatUpdatedAt(repair.updatedAt)}
-                </CardDescription>
-              </CardHeader>
-              <CardContent className="flex flex-1 flex-col gap-4">
-                <p className="line-clamp-3 text-sm text-muted-foreground">
-                  {repair.reportedProblem}
-                </p>
-                <div className="flex items-center justify-between gap-3">
-                  <span className="text-xs text-muted-foreground">
-                    {repair.origin === "CUSTOMER_REQUEST"
-                      ? "Customer Request"
-                      : "Provider-created"}
-                  </span>
+        <Card className="overflow-hidden p-0">
+          <ul className="divide-y divide-border">
+            {repairPage.items.map((repair) => {
+              const device = deviceLabel(
+                repair.deviceType,
+                repair.brand,
+                repair.model,
+              );
+              return (
+                <li key={repair.id}>
                   <Link
                     href={`/dashboard/repairs/${repair.id}`}
-                    className={cn(
-                      buttonVariants({ variant: "outline", size: "sm" }),
-                    )}
+                    aria-label={`Open Repair: ${device}`}
+                    className="flex items-center gap-3 px-4 py-3 transition-colors hover:bg-muted/50 sm:px-5 sm:py-3.5"
                   >
-                    Open Repair
+                    <StatusGauge
+                      status={repair.currentStatus}
+                      className="size-7 shrink-0"
+                    />
+                    <div className="min-w-0 flex-1">
+                      <p className="line-clamp-1 text-sm font-bold break-words text-foreground">
+                        {device}
+                        <span className="font-normal text-muted-foreground">
+                          {" · "}
+                          {repair.reportedProblem}
+                        </span>
+                      </p>
+                      <p className="mt-0.5 truncate font-mono text-xs text-muted-foreground">
+                        {repair.ticketNumber} · {repair.customerName} · Updated{" "}
+                        {formatUpdatedAt(repair.updatedAt)}
+                      </p>
+                    </div>
+                    <div className="flex shrink-0 items-center gap-2">
+                      <RepairStatusPill status={repair.currentStatus} />
+                      <HugeiconsIcon
+                        icon={ArrowRight01Icon}
+                        aria-hidden="true"
+                        className="size-4 text-muted-foreground"
+                      />
+                    </div>
                   </Link>
-                </div>
-              </CardContent>
-            </Card>
-          ))}
-        </div>
+                </li>
+              );
+            })}
+          </ul>
+        </Card>
       )}
 
-      {repairPage.hasPrevious || repairPage.hasNext ? (
+      {repairPage.items.length > 0 ||
+      repairPage.hasPrevious ||
+      repairPage.hasNext ? (
         <nav
           className="flex items-center justify-between gap-3"
           aria-label="Repair pagination"
@@ -275,7 +307,10 @@ export default async function RepairsPage({
             </span>
           )}
           <span className="text-sm tabular-nums text-muted-foreground">
-            Page {repairPage.page}
+            Page {repairPage.page} ·{" "}
+            {repairPage.items.length > 0
+              ? `Showing ${rangeStart}–${rangeEnd}`
+              : "No results"}
           </span>
           {repairPage.hasNext ? (
             <Link

@@ -7,6 +7,7 @@ import { getProviderServiceModes } from "@/features/providers";
 import { cn } from "@/lib/utils";
 import { createClient } from "@/lib/supabase/server";
 
+import { PageHeader } from "../../_components/page-header";
 import { CreateRepairForm } from "./_components/create-repair-form";
 
 export const metadata: Metadata = {
@@ -34,12 +35,11 @@ export default async function NewRepairPage() {
         >
           ← Back to Repairs
         </Link>
-        <h1 className="text-2xl font-bold tracking-tight sm:text-3xl">
-          Create Repair
-        </h1>
-        <p className="mt-1 text-sm text-muted-foreground">
-          Use this for walk-in, meetup, home-service, or other direct intake.
-        </p>
+        <PageHeader
+          eyebrow="Direct intake"
+          title="Create Repair"
+          description="Use this for walk-in, meetup, home-service, or other direct intake."
+        />
       </div>
 
       <CreateRepairForm serviceModes={serviceModes} />
