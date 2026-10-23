@@ -191,7 +191,9 @@ export default async function RepairRequestsPage({
         </Card>
       )}
 
-      {requestPage.items.length > 0 ? (
+      {requestPage.items.length > 0 ||
+      requestPage.hasPrevious ||
+      requestPage.hasNext ? (
         <nav
           className="flex items-center justify-between gap-3"
           aria-label="Repair Request pagination"
@@ -219,7 +221,10 @@ export default async function RepairRequestsPage({
           )}
 
           <span className="text-sm tabular-nums text-muted-foreground">
-            Page {requestPage.page} · Showing {rangeStart}–{rangeEnd}
+            Page {requestPage.page} ·{" "}
+            {requestPage.items.length > 0
+              ? `Showing ${rangeStart}–${rangeEnd}`
+              : "No results"}
           </span>
 
           {requestPage.hasNext ? (

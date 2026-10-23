@@ -7,6 +7,10 @@ import { RegisterForm } from "@/app/(auth)/_components/register-form";
 import { RepairRequestForm } from "@/app/(public)/p/[providerSlug]/request/_components/repair-request-form";
 import { TrackingForm } from "@/app/(public)/track/_components/tracking-form";
 import TrackRepairPage from "@/app/(public)/track/page";
+import RepairsPage from "@/app/(provider)/dashboard/repairs/page";
+import RepairRequestsPage from "@/app/(provider)/dashboard/requests/page";
+import { listRepairRequests } from "@/features/repair-requests";
+import { listRepairs } from "@/features/repairs";
 import type { PublicRepairView } from "@/features/tracking";
 
 const { actionState, pathname } = vi.hoisted(() => ({
@@ -26,6 +30,14 @@ vi.mock("@/app/(auth)/actions", () => ({
 vi.mock("@/app/(public)/track/actions", () => ({ trackRepairAction: vi.fn() }));
 vi.mock("@/app/(public)/p/[providerSlug]/request/actions", () => ({
   submitRepairRequestAction: vi.fn(),
+}));
+vi.mock("@/features/repairs", async (importOriginal) => ({
+  ...(await importOriginal<typeof import("@/features/repairs")>()),
+  listRepairs: vi.fn(),
+}));
+vi.mock("@/features/repair-requests", async (importOriginal) => ({
+  ...(await importOriginal<typeof import("@/features/repair-requests")>()),
+  listRepairRequests: vi.fn(),
 }));
 
 beforeEach(() => {
@@ -263,4 +275,37 @@ describe("entry forms", () => {
       expect(html).toContain(`name="intent" value="${intent}"`);
     },
   );
+});
+
+describe("list pagination", () => {
+  const emptyLaterPage = {
+    items: [],
+    page: 3,
+    hasPrevious: true,
+    hasNext: false,
+  };
+
+  it("keeps Previous on an empty later page of Repairs", async () => {
+    vi.mocked(listRepairs).mockResolvedValue(emptyLaterPage);
+    const html = renderToStaticMarkup(
+      await RepairsPage({ searchParams: Promise.resolve({ page: "3" }) }),
+    );
+    expect(html).toMatch(
+      /<a[^>]*href="\/dashboard\/repairs\?page=2"[^>]*>Previous<\/a>/,
+    );
+    expect(html).toContain("No results");
+  });
+
+  it("keeps Previous on an empty later page of Repair Requests", async () => {
+    vi.mocked(listRepairRequests).mockResolvedValue(emptyLaterPage);
+    const html = renderToStaticMarkup(
+      await RepairRequestsPage({
+        searchParams: Promise.resolve({ page: "3" }),
+      }),
+    );
+    expect(html).toMatch(
+      /<a[^>]*href="\/dashboard\/requests\?page=2"[^>]*>Previous<\/a>/,
+    );
+    expect(html).toContain("No results");
+  });
 });
