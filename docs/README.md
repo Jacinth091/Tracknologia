@@ -12,6 +12,7 @@ This directory contains the repository-facing engineering documentation for Trac
 | [DATABASE.md](DATABASE.md)         | Initial MVP relational model and invariants                    |
 | [SECURITY.md](SECURITY.md)         | Authentication, authorization, RLS and public-surface security |
 | [TESTING.md](TESTING.md)           | Unit/module, component and E2E testing strategy                |
+| [OPERATIONS.md](OPERATIONS.md)     | Post-deployment monitoring, incident severity and hotfix flow  |
 
 ## Domain documentation
 
