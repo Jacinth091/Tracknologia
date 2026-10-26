@@ -145,7 +145,9 @@ test.describe("E2E-02 Customer Request", () => {
       await expect(
         trackerPage.getByText("Screen cracked", { exact: true }),
       ).toBeVisible();
-      await expect(trackerPage.getByText("Received", { exact: true })).toBeVisible();
+      await expect(
+        trackerPage.getByText("Received", { exact: true }),
+      ).toBeVisible();
       // The public projection must never expose Provider-internal notes.
       await expect(trackerPage.getByText(internalMarker)).not.toBeVisible();
       await trackerContext.close();

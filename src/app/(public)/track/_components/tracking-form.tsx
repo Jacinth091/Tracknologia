@@ -238,10 +238,7 @@ function TrackingResult({ view }: { view: PublicRepairView }) {
               value={view.serviceModeLabel ?? "Not provided"}
             />
             <Detail label="Last update" value={lastUpdate} />
-            <Detail
-              label="Received"
-              value={formatDateTime(view.submittedAt)}
-            />
+            <Detail label="Received" value={formatDateTime(view.submittedAt)} />
             <Detail label="Code type" value={codeType} />
           </dl>
 
