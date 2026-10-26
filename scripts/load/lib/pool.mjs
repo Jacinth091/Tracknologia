@@ -26,6 +26,7 @@ export async function runBurst({ concurrency, durationMs, rampMs = 0, task }) {
             ok: outcome.ok !== false,
             denied: Boolean(outcome.denied),
             kind: outcome.kind ?? "ok",
+            error: outcome.error ?? null,
           });
         } catch (error) {
           results.push({

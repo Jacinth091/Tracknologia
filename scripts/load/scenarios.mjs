@@ -205,9 +205,20 @@ export function createRaceSameRequest(ctx) {
     const row = Array.isArray(submitRes.data)
       ? submitRes.data[0]
       : submitRes.data;
-    const requestId = row?.id;
-    if (submitRes.error || !requestId)
+    const referenceCode = row?.reference_code;
+    if (submitRes.error || !referenceCode)
       return { ok: false, error: submitRes.error?.message ?? "no request id" };
+
+    // submit_repair_request returns the public reference_code only; resolve
+    // the durable id through the service role before racing on it.
+    const lookup = await ctx.service
+      .from("repair_requests")
+      .select("id")
+      .eq("reference_code", referenceCode)
+      .single();
+    const requestId = lookup.error ? undefined : lookup.data?.id;
+    if (!requestId)
+      return { ok: false, error: lookup.error?.message ?? "no request row" };
 
     // Concurrent accept + decline on the same Request: exactly one durable
     // outcome; the loser must observe REQUEST_ALREADY_PROCESSED.
