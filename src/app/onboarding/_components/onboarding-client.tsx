@@ -1,11 +1,23 @@
 "use client";
 
 import { useActionState, useState } from "react";
+import { HugeiconsIcon } from "@hugeicons/react";
+import {
+  AlertCircleIcon,
+  DeliveryTruck01Icon,
+  MapPinIcon,
+  SmartPhone01Icon,
+  Store01Icon,
+  UserGroupIcon,
+  Wrench01Icon,
+} from "@hugeicons/core-free-icons";
+
 import {
   onboardIndependentAction,
   onboardShopAction,
   acceptStaffInviteAction,
 } from "../actions";
+import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -29,6 +41,60 @@ const SERVICE_MODE_OPTIONS = [
   { value: "HOME_SERVICE", label: "Home service" },
   { value: "OTHER", label: "Other arrangement" },
 ] as const;
+
+function CheckChip({
+  name,
+  value,
+  label,
+  disabled,
+}: {
+  name: string;
+  value: string;
+  label: string;
+  disabled: boolean;
+}) {
+  return (
+    <label className="flex cursor-pointer items-center gap-2 rounded-lg border border-input bg-card px-2.5 py-2 text-xs font-medium text-muted-foreground transition-colors has-[:checked]:border-foreground has-[:checked]:bg-muted has-[:checked]:text-foreground has-[:disabled]:cursor-not-allowed has-[:disabled]:opacity-50">
+      <input
+        type="checkbox"
+        name={name}
+        value={value}
+        className="size-3.5 rounded border-border accent-foreground"
+        disabled={disabled}
+      />
+      <span>{label}</span>
+    </label>
+  );
+}
+
+function FlowHeader({
+  icon,
+  title,
+  description,
+}: {
+  icon: typeof Wrench01Icon;
+  title: string;
+  description: string;
+}) {
+  return (
+    <div className="flex items-start gap-3 rounded-lg border border-border bg-muted/40 p-4">
+      <span className="inline-flex size-9 shrink-0 items-center justify-center rounded-lg border border-border bg-background text-foreground">
+        <HugeiconsIcon
+          icon={icon}
+          strokeWidth={1.8}
+          className="size-4"
+          aria-hidden="true"
+        />
+      </span>
+      <div className="space-y-1">
+        <h3 className="text-sm font-semibold text-foreground">{title}</h3>
+        <p className="text-xs leading-relaxed text-muted-foreground">
+          {description}
+        </p>
+      </div>
+    </div>
+  );
+}
 
 function ProviderOperatingFields({
   prefix,
@@ -77,24 +143,24 @@ function ProviderOperatingFields({
       </div>
 
       <fieldset className="space-y-2">
-        <legend className="text-sm font-medium text-foreground">
+        <legend className="flex items-center gap-2 text-sm font-medium text-foreground">
+          <HugeiconsIcon
+            icon={DeliveryTruck01Icon}
+            strokeWidth={1.8}
+            className="size-4 text-muted-foreground"
+            aria-hidden="true"
+          />
           Supported Service Modes
         </legend>
         <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
           {SERVICE_MODE_OPTIONS.map((option) => (
-            <label
+            <CheckChip
               key={option.value}
-              className="flex cursor-pointer items-center gap-2 rounded-xl border border-border/70 p-2 text-xs font-medium text-muted-foreground hover:bg-muted/40"
-            >
-              <input
-                type="checkbox"
-                name="serviceModes"
-                value={option.value}
-                className="rounded border-border accent-primary"
-                disabled={isPending}
-              />
-              <span>{option.label}</span>
-            </label>
+              name="serviceModes"
+              value={option.value}
+              label={option.label}
+              disabled={isPending}
+            />
           ))}
         </div>
         <Input
@@ -110,33 +176,33 @@ function ProviderOperatingFields({
       </fieldset>
 
       <fieldset className="space-y-2">
-        <legend className="text-sm font-medium text-foreground">
+        <legend className="flex items-center gap-2 text-sm font-medium text-foreground">
+          <HugeiconsIcon
+            icon={SmartPhone01Icon}
+            strokeWidth={1.8}
+            className="size-4 text-muted-foreground"
+            aria-hidden="true"
+          />
           Supported Device Categories
         </legend>
         <div className="grid grid-cols-2 gap-2 sm:grid-cols-3">
           {DEVICE_OPTIONS.map((device) => (
-            <label
+            <CheckChip
               key={device}
-              className="flex cursor-pointer items-center gap-2 rounded-xl border border-border/70 p-2 text-xs font-medium text-muted-foreground hover:bg-muted/40"
-            >
-              <input
-                type="checkbox"
-                name="supportedDevices"
-                value={device}
-                className="rounded border-border accent-primary"
-                disabled={isPending}
-              />
-              <span>{device}</span>
-            </label>
+              name="supportedDevices"
+              value={device}
+              label={device}
+              disabled={isPending}
+            />
           ))}
         </div>
       </fieldset>
 
-      <label className="flex cursor-pointer items-start gap-3 rounded-xl border border-border/70 p-3">
+      <label className="flex cursor-pointer items-start gap-3 rounded-lg border border-input bg-card p-3 has-[:checked]:border-foreground/40">
         <input
           type="checkbox"
           name="acceptingRequests"
-          className="mt-0.5 rounded border-border accent-primary"
+          className="mt-0.5 size-4 rounded border-border accent-foreground"
           defaultChecked
           disabled={isPending}
         />
@@ -193,73 +259,54 @@ export function OnboardingClient({
 
   return (
     <div className="space-y-6">
-      {/* Only show tab switcher if the user did not register as a specific account type */}
+      {/* Only show flow switcher if the user did not register as a specific account type */}
       {!lockedType && (
-        <div className="grid grid-cols-3 gap-2 p-1 bg-muted/60 rounded-2xl border border-border/80">
-          <button
-            type="button"
-            onClick={() => setSelectedType("INDEPENDENT")}
-            disabled={isPending}
-            className={cn(
-              "rounded-xl py-2.5 px-3 text-xs font-semibold transition-all cursor-pointer",
-              selectedType === "INDEPENDENT"
-                ? "bg-background text-foreground shadow-xs ring-1 ring-border/50"
-                : "text-muted-foreground hover:text-foreground",
-            )}
-          >
-            Independent
-          </button>
-
-          <button
-            type="button"
-            onClick={() => setSelectedType("SHOP")}
-            disabled={isPending}
-            className={cn(
-              "rounded-xl py-2.5 px-3 text-xs font-semibold transition-all cursor-pointer",
-              selectedType === "SHOP"
-                ? "bg-background text-foreground shadow-xs ring-1 ring-border/50"
-                : "text-muted-foreground hover:text-foreground",
-            )}
-          >
-            Repair Shop
-          </button>
-
-          <button
-            type="button"
-            onClick={() => setSelectedType("STAFF")}
-            disabled={isPending}
-            className={cn(
-              "rounded-xl py-2.5 px-3 text-xs font-semibold transition-all cursor-pointer",
-              selectedType === "STAFF"
-                ? "bg-background text-foreground shadow-xs ring-1 ring-border/50"
-                : "text-muted-foreground hover:text-foreground",
-            )}
-          >
-            Shop Staff (Invite)
-          </button>
+        <div className="grid grid-cols-3 gap-1 rounded-lg border border-border bg-muted/50 p-1">
+          {(
+            [
+              { value: "INDEPENDENT", label: "Independent" },
+              { value: "SHOP", label: "Repair Shop" },
+              { value: "STAFF", label: "Shop Staff (Invite)" },
+            ] as const
+          ).map((option) => (
+            <button
+              key={option.value}
+              type="button"
+              onClick={() => setSelectedType(option.value)}
+              disabled={isPending}
+              className={cn(
+                "cursor-pointer rounded-md px-3 py-2.5 text-xs font-semibold transition-colors disabled:cursor-not-allowed disabled:opacity-50",
+                selectedType === option.value
+                  ? "bg-foreground text-background shadow-xs"
+                  : "text-muted-foreground hover:text-foreground",
+              )}
+            >
+              {option.label}
+            </button>
+          ))}
         </div>
       )}
 
       {/* 1. Independent Repairer Sole Onboarding */}
       {currentFlow === "INDEPENDENT" && (
         <form action={indAction} className="space-y-4">
-          <div className="rounded-2xl border border-border/80 bg-muted/30 p-4 space-y-1">
-            <div className="flex items-center gap-2">
-              <span className="text-base">🛠️</span>
-              <h3 className="text-sm font-semibold text-foreground">
-                Independent Repairer Profile
-              </h3>
-            </div>
-            <p className="text-xs text-muted-foreground">
-              Confirm your person identity, repair brand, contact info, and
-              service coverage. No physical storefront address required.
-            </p>
-          </div>
+          <FlowHeader
+            icon={Wrench01Icon}
+            title="Independent Repairer Profile"
+            description="Confirm your person identity, repair brand, contact info, and service coverage. No physical storefront address required."
+          />
 
           {indState?.error && (
-            <div className="rounded-xl border border-destructive/20 bg-destructive/10 p-3 text-xs text-destructive font-medium">
-              {indState.error}
-            </div>
+            <Alert variant="destructive">
+              <HugeiconsIcon
+                icon={AlertCircleIcon}
+                strokeWidth={1.8}
+                className="size-4"
+                aria-hidden="true"
+              />
+              <AlertTitle>Could not complete setup</AlertTitle>
+              <AlertDescription>{indState.error}</AlertDescription>
+            </Alert>
           )}
 
           <div className="space-y-2">
@@ -306,7 +353,7 @@ export function OnboardingClient({
             )}
           </div>
 
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
             <div className="space-y-2">
               <Label htmlFor="ind-email">Contact Email</Label>
               <Input
@@ -352,23 +399,23 @@ export function OnboardingClient({
       {/* 2. Repair Shop Owner Sole Onboarding */}
       {currentFlow === "SHOP" && (
         <form action={shopAction} className="space-y-4">
-          <div className="rounded-2xl border border-border/80 bg-muted/30 p-4 space-y-1">
-            <div className="flex items-center gap-2">
-              <span className="text-base">🏬</span>
-              <h3 className="text-sm font-semibold text-foreground">
-                Repair Shop Profile
-              </h3>
-            </div>
-            <p className="text-xs text-muted-foreground">
-              Configure your owner identity, shop information, and public
-              storefront location to start managing repairs and staff.
-            </p>
-          </div>
+          <FlowHeader
+            icon={Store01Icon}
+            title="Repair Shop Profile"
+            description="Configure your owner identity, shop information, and public storefront location to start managing repairs and staff."
+          />
 
           {shopState?.error && (
-            <div className="rounded-xl border border-destructive/20 bg-destructive/10 p-3 text-xs text-destructive font-medium">
-              {shopState.error}
-            </div>
+            <Alert variant="destructive">
+              <HugeiconsIcon
+                icon={AlertCircleIcon}
+                strokeWidth={1.8}
+                className="size-4"
+                aria-hidden="true"
+              />
+              <AlertTitle>Could not register the shop</AlertTitle>
+              <AlertDescription>{shopState.error}</AlertDescription>
+            </Alert>
           )}
 
           <div className="space-y-2">
@@ -415,7 +462,7 @@ export function OnboardingClient({
             )}
           </div>
 
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
             <div className="space-y-2">
               <Label htmlFor="shop-email">Shop Contact Email</Label>
               <Input
@@ -466,22 +513,34 @@ export function OnboardingClient({
           )}
 
           {/* Shop Connection Card */}
-          <div className="rounded-2xl border border-primary/20 bg-primary/5 p-4 space-y-2">
-            <div className="flex items-center gap-2">
-              <span className="text-xl">🏬</span>
+          <div className="space-y-2 rounded-lg border border-border bg-muted/40 p-4">
+            <div className="flex items-center gap-3">
+              <span className="inline-flex size-9 shrink-0 items-center justify-center rounded-lg border border-border bg-background text-foreground">
+                <HugeiconsIcon
+                  icon={UserGroupIcon}
+                  strokeWidth={1.8}
+                  className="size-4"
+                  aria-hidden="true"
+                />
+              </span>
               <div>
                 <h4 className="text-sm font-semibold text-foreground">
                   {shopDetails?.shopName || "Repair Shop Invitation"}
                 </h4>
                 <p className="text-xs text-muted-foreground">
                   Role:{" "}
-                  <span className="font-semibold text-primary">Staff</span>
+                  <span className="font-semibold text-foreground">Staff</span>
                 </p>
               </div>
             </div>
             {(shopDetails?.publicAddress || shopDetails?.serviceArea) && (
-              <p className="text-xs text-muted-foreground pt-1">
-                📍{" "}
+              <p className="flex items-start gap-1.5 pt-1 text-xs text-muted-foreground">
+                <HugeiconsIcon
+                  icon={MapPinIcon}
+                  strokeWidth={1.8}
+                  className="mt-0.5 size-3.5 shrink-0"
+                  aria-hidden="true"
+                />
                 {[shopDetails.publicAddress, shopDetails.serviceArea]
                   .filter(Boolean)
                   .join(" • ")}
@@ -490,9 +549,16 @@ export function OnboardingClient({
           </div>
 
           {staffState?.error && (
-            <div className="rounded-xl border border-destructive/20 bg-destructive/10 p-3 text-xs text-destructive font-medium">
-              {staffState.error}
-            </div>
+            <Alert variant="destructive">
+              <HugeiconsIcon
+                icon={AlertCircleIcon}
+                strokeWidth={1.8}
+                className="size-4"
+                aria-hidden="true"
+              />
+              <AlertTitle>Could not join the shop</AlertTitle>
+              <AlertDescription>{staffState.error}</AlertDescription>
+            </Alert>
           )}
 
           {/* If token was not prefilled, show input */}

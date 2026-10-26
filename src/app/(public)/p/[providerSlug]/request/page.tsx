@@ -1,3 +1,4 @@
+import { BrandLogo } from "@/components/shared/brand-logo";
 import type { Metadata } from "next";
 import Link from "next/link";
 
@@ -29,8 +30,8 @@ export default async function PublicRepairRequestPage({
     return (
       <main className="min-h-screen bg-muted/30 px-4 py-12 sm:px-6">
         <div className="mx-auto max-w-xl space-y-6">
-          <Link href="/" className="text-xl font-bold tracking-tight">
-            Tracknologia
+          <Link href="/" className="inline-flex shrink-0">
+            <BrandLogo />
           </Link>
           <Card>
             <CardHeader>
@@ -52,22 +53,19 @@ export default async function PublicRepairRequestPage({
   }
 
   return (
-    <main className="min-h-screen bg-muted/30 px-4 py-8 sm:px-6 sm:py-12">
+    <main className="min-h-screen bg-background px-4 py-6 sm:px-6 sm:py-10">
       <div className="mx-auto max-w-3xl space-y-6">
         <div className="flex items-center justify-between gap-4">
-          <Link href="/" className="text-xl font-bold tracking-tight">
-            Tracknologia
+          <Link href="/" className="inline-flex shrink-0">
+            <BrandLogo />
           </Link>
           <span className="rounded-full border border-border bg-background px-3 py-1 text-xs font-medium text-muted-foreground">
             Public Request
           </span>
         </div>
 
-        <section className="rounded-2xl border border-border/80 bg-background p-5 shadow-xs sm:p-6">
-          <p className="text-xs font-semibold uppercase tracking-wide text-primary">
-            Repair Provider
-          </p>
-          <h1 className="mt-2 text-2xl font-bold tracking-tight text-foreground sm:text-3xl">
+        <section className="py-4">
+          <h1 className="text-2xl font-bold tracking-tight text-foreground wrap-anywhere sm:text-3xl">
             Request repair service from {provider.displayName}
           </h1>
           {provider.description && (

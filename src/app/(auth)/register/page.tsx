@@ -1,5 +1,7 @@
 import type { Metadata } from "next";
 import Link from "next/link";
+import { HugeiconsIcon } from "@hugeicons/react";
+import { UserAdd01Icon } from "@hugeicons/core-free-icons";
 import {
   Card,
   CardContent,
@@ -25,8 +27,16 @@ export default async function RegisterPage({
 
   return (
     <Card className="w-full shadow-md">
-      <CardHeader className="text-center space-y-1 pb-4">
-        <CardTitle className="text-2xl font-bold tracking-tight">
+      <CardHeader className="space-y-1 pb-4 text-center">
+        <CardTitle className="flex items-center justify-center gap-2.5 text-2xl font-bold tracking-tight">
+          <span className="inline-flex size-9 shrink-0 items-center justify-center rounded-lg border border-border bg-muted">
+            <HugeiconsIcon
+              icon={UserAdd01Icon}
+              strokeWidth={1.8}
+              className="size-4.5"
+              aria-hidden="true"
+            />
+          </span>
           Get Started with Tracknologia
         </CardTitle>
         <CardDescription className="text-sm">

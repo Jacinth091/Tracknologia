@@ -34,7 +34,7 @@ test.describe("E2E-04 Independent Repairer", () => {
       // Registration redirects into onboarding because no Provider exists yet.
       await page.waitForURL(/\/onboarding/, { timeout: 20_000 });
       await expect(
-        page.getByText("Set Up Your Independent Profile"),
+        page.getByRole("heading", { name: "Set Up Your Independent Profile" }),
       ).toBeVisible();
 
       // 2. The Independent flow has no mandatory shop address.

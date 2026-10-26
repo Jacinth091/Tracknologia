@@ -98,7 +98,7 @@ test.describe("E2E-02 Customer Request", () => {
       await page
         .getByRole("button", { name: "Accept & Create Repair" })
         .click();
-      await expect(page.getByText("ACCEPTED", { exact: true })).toBeVisible({
+      await expect(page.getByText("Accepted", { exact: true })).toBeVisible({
         timeout: 15_000,
       });
       page.off("request", captureAcceptRequest);

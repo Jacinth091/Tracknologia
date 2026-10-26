@@ -1,5 +1,7 @@
 import type { Metadata } from "next";
 import Link from "next/link";
+import { HugeiconsIcon } from "@hugeicons/react";
+import { LockPasswordIcon } from "@hugeicons/core-free-icons";
 import {
   Card,
   CardContent,
@@ -19,7 +21,17 @@ export default function ResetPasswordPage() {
   return (
     <Card>
       <CardHeader>
-        <CardTitle>Set New Password</CardTitle>
+        <CardTitle className="flex items-center gap-2.5">
+          <span className="inline-flex size-8 shrink-0 items-center justify-center rounded-lg border border-border bg-muted">
+            <HugeiconsIcon
+              icon={LockPasswordIcon}
+              strokeWidth={1.8}
+              className="size-4"
+              aria-hidden="true"
+            />
+          </span>
+          Set New Password
+        </CardTitle>
         <CardDescription>
           Enter and confirm your new secure password
         </CardDescription>
