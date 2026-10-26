@@ -133,6 +133,8 @@ beforeEach(() => {
             customer_updates: [],
             tracking_type: "REPAIR",
             reference_code: TRACKING_CODE,
+            reported_problem: "The screen no longer turns on",
+            submitted_at: "2026-08-28T23:00:00.000Z",
           },
         ],
         error: null,
