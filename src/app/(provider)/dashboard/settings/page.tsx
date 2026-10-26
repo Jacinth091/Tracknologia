@@ -6,8 +6,10 @@ import {
   getProviderServiceModes,
   getProviderUserProfile,
 } from "@/features/providers";
+import { getAppOrigin } from "@/lib/config/server";
 import { createClient } from "@/lib/supabase/server";
 
+import { PageHeader } from "../_components/page-header";
 import { SettingsClient } from "./_components/settings-client";
 
 export const metadata: Metadata = {
@@ -29,22 +31,19 @@ export default async function ProviderSettingsPage() {
   }
 
   return (
-    <div className="max-w-4xl space-y-6">
-      <div>
-        <h1 className="text-2xl font-bold tracking-tight text-foreground sm:text-3xl">
-          Provider Settings
-        </h1>
-        <p className="mt-1 text-sm text-muted-foreground">
-          Manage your personal identity and the operating details customers can
-          use to understand this Provider.
-        </p>
-      </div>
+    <div className="space-y-6">
+      <PageHeader
+        eyebrow="Provider"
+        title="Provider Settings"
+        description="Manage your personal identity and the operating details customers can use to understand this Provider."
+      />
 
       <SettingsClient
         provider={provider}
         personalProfile={personalProfile}
         serviceModes={serviceModes}
         canManageProvider={context.role === "OWNER"}
+        requestLinkUrl={`${getAppOrigin()}/p/${provider.slug}/request`}
       />
     </div>
   );

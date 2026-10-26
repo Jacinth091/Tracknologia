@@ -2,6 +2,10 @@
 
 import { useActionState } from "react";
 
+import { HugeiconsIcon } from "@hugeicons/react";
+import { Wrench01Icon } from "@hugeicons/core-free-icons";
+
+import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
 import {
   Card,
@@ -29,20 +33,24 @@ export function CreateRepairForm({
   return (
     <Card>
       <CardHeader>
-        <CardTitle>Repair intake</CardTitle>
+        <CardTitle className="flex items-center gap-2">
+          <HugeiconsIcon
+            icon={Wrench01Icon}
+            aria-hidden="true"
+            className="size-5"
+          />
+          New Repair — intake details
+        </CardTitle>
         <CardDescription>
-          Create an authoritative Repair without requiring a customer Request.
+          Record the customer, device, and reported problem to start a repair.
         </CardDescription>
       </CardHeader>
       <CardContent>
         <form action={action} className="space-y-8">
           {state?.error ? (
-            <div
-              className="rounded-xl border border-destructive/20 bg-destructive/10 p-3 text-sm text-destructive"
-              role="alert"
-            >
-              {state.error}
-            </div>
+            <Alert variant="destructive" role="alert">
+              <AlertDescription>{state.error}</AlertDescription>
+            </Alert>
           ) : null}
 
           <RepairFields
@@ -52,7 +60,12 @@ export function CreateRepairForm({
             disabled={pending}
           />
 
-          <Button type="submit" size="lg" disabled={pending}>
+          <Button
+            type="submit"
+            size="lg"
+            disabled={pending}
+            className="w-full sm:w-auto"
+          >
             {pending ? (
               <span className="flex items-center gap-2">
                 <LoadingSpinner size="sm" /> Creating Repair...

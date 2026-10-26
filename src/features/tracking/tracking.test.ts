@@ -62,6 +62,8 @@ describe("Tracking lookup", () => {
     expect(result).toEqual({
       providerDisplayName: "Jacinth Device Care",
       deviceSummary: "Lenovo IdeaPad 3 · Laptop",
+      deviceType: "Laptop",
+      brandModel: "Lenovo IdeaPad 3",
       currentStatus: "IN_PROGRESS",
       statusLabel: "In progress",
       statusDescription: "Provider is actively working on your repair.",
@@ -108,6 +110,8 @@ describe("Tracking lookup", () => {
     expect(result).toEqual({
       providerDisplayName: "Jacinth Device Care",
       deviceSummary: "Lenovo IdeaPad 3 · Laptop",
+      deviceType: "Laptop",
+      brandModel: "Lenovo IdeaPad 3",
       currentStatus: "SUBMITTED",
       statusLabel: "Request Submitted",
       statusDescription:
@@ -123,6 +127,25 @@ describe("Tracking lookup", () => {
       submittedAt: "2026-08-24T01:00:00.000Z",
     });
   });
+
+  it.each([
+    ["Lenovo", "IdeaPad 3", "Lenovo IdeaPad 3"],
+    ["Lenovo", null, "Lenovo"],
+    [null, "IdeaPad 3", "IdeaPad 3"],
+    [null, null, null],
+  ])(
+    "exposes device type and brand/model separately (brand %s, model %s)",
+    async (brand, model, brandModel) => {
+      const { client } = trackingClient(publicProjectionRow({ brand, model }));
+
+      const result = await lookupRepairByTrackingCode(TRACKING_CODE, client);
+
+      expect(result).toMatchObject({
+        deviceType: "Laptop",
+        brandModel,
+      });
+    },
+  );
 
   it("fails closed when persistence returns invalid or corrupt projection schema", async () => {
     // Missing required fields

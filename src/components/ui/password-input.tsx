@@ -54,7 +54,7 @@ function PasswordInput({
         type={showPassword ? "text" : "password"}
         data-slot="input"
         className={cn(
-          "h-9 w-full min-w-0 rounded-xl border border-border bg-background pl-3 pr-10 py-1 text-sm shadow-xs transition-[color,box-shadow] outline-none placeholder:text-muted-foreground focus-visible:border-ring focus-visible:ring-[3px] focus-visible:ring-ring/50 disabled:pointer-events-none disabled:cursor-not-allowed disabled:opacity-50 aria-invalid:border-destructive aria-invalid:ring-[3px] aria-invalid:ring-destructive/20 dark:aria-invalid:ring-destructive/40 [&::-ms-reveal]:hidden [&::-webkit-credentials-auto-fill-button]:hidden",
+          "h-11 sm:h-9 w-full min-w-0 rounded-lg border border-input bg-card pl-3 pr-10 py-1 text-base sm:text-sm shadow-xs transition-[color,box-shadow] outline-none placeholder:text-muted-foreground focus-visible:border-ring focus-visible:ring-[3px] focus-visible:ring-ring disabled:pointer-events-none disabled:cursor-not-allowed disabled:opacity-50 aria-invalid:border-destructive aria-invalid:ring-[3px] aria-invalid:ring-destructive/20 dark:aria-invalid:ring-destructive/40 [&::-ms-reveal]:hidden [&::-webkit-credentials-auto-fill-button]:hidden",
           className,
         )}
         {...props}

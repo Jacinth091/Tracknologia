@@ -11,6 +11,8 @@ export interface PublicCustomerUpdate {
 export interface PublicRepairView {
   providerDisplayName: string;
   deviceSummary: string;
+  deviceType: string;
+  brandModel: string | null;
   currentStatus: TrackingStatus;
   statusLabel: string;
   statusDescription: string;

@@ -7,7 +7,7 @@ import { getPublicProvider } from "@/features/providers";
 import {
   createRepairFromRequest,
   RepairError,
-  requestOriginRepairSchema,
+  type RequestOriginRepairInput,
 } from "@/features/repairs";
 import { createClient } from "@/lib/supabase/server";
 import { createPublicOperationClient } from "@/lib/supabase/service";
@@ -18,20 +18,49 @@ import {
   submitRepairRequestRecord,
 } from "./persistence";
 import {
+  acceptRepairRequestDecisionSchema,
   providerRequestSlugSchema,
   repairRequestIdSchema,
   submitRepairRequestSchema,
+  type AcceptRepairRequestDecisionOutput,
 } from "./schemas";
 import type {
   AcceptedRepairResult,
+  AcceptRepairRequestDecision,
   RepairRequestDetail,
   SubmitRepairRequestInput,
-  VerifiedRepairRequestInput,
 } from "./types";
 import { RepairRequestError } from "./types";
 
 function optional(value: string | undefined): string | undefined {
   return value?.trim() || undefined;
+}
+
+// The Repair snapshot is the stored Request plus the Provider's decision.
+// Fields a Request does not hold (condition, accessories, observations,
+// diagnosis) stay empty for the Provider to add on the Repair afterwards.
+function snapshotFromRequest(
+  request: RepairRequestDetail,
+  decision: AcceptRepairRequestDecisionOutput,
+): RequestOriginRepairInput {
+  return {
+    customerName: request.customerName,
+    customerPhone: request.customerPhone,
+    customerEmail: request.customerEmail ?? undefined,
+    deviceType: request.deviceType,
+    brand: request.brand ?? undefined,
+    model: request.model ?? undefined,
+    serialNumber: request.serialNumber ?? undefined,
+    colorVariant: request.colorVariant ?? undefined,
+    deviceSpecs: request.deviceSpecs ?? undefined,
+    reportedProblem: request.reportedProblem,
+    internalNotes: optional(decision.internalNotes),
+    serviceMode:
+      decision.serviceMode === undefined
+        ? (request.preferredServiceMode ?? undefined)
+        : (decision.serviceMode ?? undefined),
+    serviceModeDetails: optional(decision.serviceModeDetails),
+  };
 }
 
 export async function submitRepairRequest(
@@ -99,11 +128,12 @@ export async function submitRepairRequest(
 
 export async function acceptRepairRequest(
   requestId: string,
-  input: VerifiedRepairRequestInput,
+  decision: AcceptRepairRequestDecision,
   client?: SupabaseClient,
 ): Promise<AcceptedRepairResult> {
   const id = repairRequestIdSchema.safeParse(requestId);
-  const verifiedInput = requestOriginRepairSchema.safeParse(input);
+  const verifiedDecision =
+    acceptRepairRequestDecisionSchema.safeParse(decision);
   if (!id.success) {
     throw new RepairRequestError(
       id.error.issues[0]?.message ?? "Invalid Repair Request ID",
@@ -111,10 +141,10 @@ export async function acceptRepairRequest(
     );
   }
 
-  if (!verifiedInput.success) {
+  if (!verifiedDecision.success) {
     throw new RepairRequestError(
-      verifiedInput.error.issues[0]?.message ??
-        "Invalid Repair acceptance input",
+      verifiedDecision.error.issues[0]?.message ??
+        "Invalid Repair acceptance decision",
       "INVALID_INPUT",
     );
   }
@@ -140,7 +170,11 @@ export async function acceptRepairRequest(
   }
 
   try {
-    return await createRepairFromRequest(id.data, verifiedInput.data, supabase);
+    return await createRepairFromRequest(
+      id.data,
+      snapshotFromRequest(request, verifiedDecision.data),
+      supabase,
+    );
   } catch (error) {
     if (error instanceof RepairError) {
       const code =

@@ -1,8 +1,5 @@
 import type { ServiceMode } from "@/features/providers";
-import type {
-  RepairResult,
-  RequestOriginRepairInput,
-} from "@/features/repairs";
+import type { RepairResult } from "@/features/repairs";
 
 export type RepairRequestStatus = "SUBMITTED" | "ACCEPTED" | "DECLINED";
 
@@ -74,7 +71,14 @@ export interface RepairRequestPage {
 }
 
 export type AcceptedRepairResult = RepairResult;
-export type VerifiedRepairRequestInput = RequestOriginRepairInput;
+// What the Provider decides at acceptance. Customer-submitted details are
+// never accepted from the client; the Repair snapshot comes from the Request.
+export interface AcceptRepairRequestDecision {
+  // "" means no Service Mode. When absent, the preferred Service Mode is used.
+  serviceMode?: string;
+  serviceModeDetails?: string;
+  internalNotes?: string;
+}
 
 export type RepairRequestErrorCode =
   | "PROVIDER_UNAVAILABLE"

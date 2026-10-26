@@ -34,6 +34,8 @@ const NORMALIZED_TRACKING_CODE = "TRK-0123456789ABCDEF01234567";
 const PUBLIC_VIEW: PublicRepairView = {
   providerDisplayName: "Downtown Repair",
   deviceSummary: "iPhone 13 Pro",
+  deviceType: "iPhone 13 Pro",
+  brandModel: null,
   currentStatus: "IN_PROGRESS",
   statusLabel: "In progress",
   statusDescription: "Device repair is underway.",
