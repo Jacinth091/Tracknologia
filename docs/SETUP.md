@@ -182,6 +182,9 @@ Run the suite with `pnpm test:e2e`. Before running it:
    supabase start
    pnpm db:reset
    ```
+   The committed `supabase/config.toml` starts only the services the test
+   suites need (Postgres, Auth, REST, gateway; issue #80), so no extra flags
+   are required.
    The fixtures seed and delete actors/tenants via the service-role key, so
    they refuse to run against anything but a local `localhost`/`127.0.0.1`
    stack — never production or shared mutable data.
