@@ -1,1 +1,6 @@
 .agents/
+
+.opencode/
+.serena
+graphify-out/
+scripts/load/outputs/
