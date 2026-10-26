@@ -363,8 +363,9 @@ Recommended reading order for developers:
 5. [`docs/DATABASE.md`](docs/DATABASE.md) — initial relational model
 6. [`docs/SECURITY.md`](docs/SECURITY.md) — security model
 7. [`docs/TESTING.md`](docs/TESTING.md) — testing expectations
-8. [`CONTRIBUTING.md`](CONTRIBUTING.md) — contribution workflow
-9. `docs/adr/` — accepted architecture decisions
+8. [`docs/OPERATIONS.md`](docs/OPERATIONS.md) — post-deployment operations and hotfix runbook
+9. [`CONTRIBUTING.md`](CONTRIBUTING.md) — contribution workflow
+10. `docs/adr/` — accepted architecture decisions
 
 ---
 
