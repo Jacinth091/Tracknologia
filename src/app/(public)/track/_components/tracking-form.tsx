@@ -238,8 +238,16 @@ function TrackingResult({ view }: { view: PublicRepairView }) {
               value={view.serviceModeLabel ?? "Not provided"}
             />
             <Detail label="Last update" value={lastUpdate} />
+            <Detail label="Received" value={formatDateTime(view.submittedAt)} />
             <Detail label="Code type" value={codeType} />
           </dl>
+
+          <div className="rounded-xl border border-border bg-muted/50 p-4">
+            <p className="font-semibold">Reported problem</p>
+            <p className="mt-1 text-sm leading-relaxed whitespace-pre-wrap break-words text-foreground">
+              {view.reportedProblem}
+            </p>
+          </div>
 
           <JourneyTimeline view={view} />
 

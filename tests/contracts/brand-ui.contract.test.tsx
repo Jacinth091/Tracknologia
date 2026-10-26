@@ -164,6 +164,8 @@ const view: PublicRepairView = {
   serviceModeLabel: "Home service",
   handoverMessage: "Coordinate the final handover with your Provider.",
   lastUpdatedAt: "2026-10-20T12:00:00Z",
+  reportedProblem: "Screen cracked and battery does not charge.",
+  submittedAt: "2026-10-20T10:00:00Z",
   customerUpdates: [
     { message: "Latest customer update", createdAt: "2026-10-20T12:00:00Z" },
     { message: "Earlier customer update", createdAt: "2026-10-19T12:00:00Z" },

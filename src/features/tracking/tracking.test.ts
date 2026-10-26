@@ -40,6 +40,8 @@ function publicProjectionRow(overrides: Record<string, unknown> = {}) {
     ],
     tracking_type: "REPAIR",
     reference_code: TRACKING_CODE,
+    reported_problem: "Screen cracked and keyboard unresponsive.",
+    submitted_at: "2026-08-24T01:00:00.000Z",
     ...overrides,
   };
 }
@@ -77,9 +79,12 @@ describe("Tracking lookup", () => {
       ],
       trackingType: "REPAIR",
       trackingCode: TRACKING_CODE,
+      reportedProblem: "Screen cracked and keyboard unresponsive.",
+      submittedAt: "2026-08-24T01:00:00.000Z",
     });
     expect(result).not.toHaveProperty("customerPhone");
     expect(result).not.toHaveProperty("internalNotes");
+    expect(result).not.toHaveProperty("diagnosis");
     expect(result).not.toHaveProperty("repairId");
   });
 
@@ -118,6 +123,8 @@ describe("Tracking lookup", () => {
       customerUpdates: [],
       trackingType: "REQUEST",
       trackingCode: REQUEST_CODE,
+      reportedProblem: "Screen cracked and keyboard unresponsive.",
+      submittedAt: "2026-08-24T01:00:00.000Z",
     });
   });
 
@@ -163,6 +170,17 @@ describe("Tracking lookup", () => {
 
     await expect(
       lookupRepairByTrackingCode(TRACKING_CODE, tooManyUpdates.client),
+    ).rejects.toThrow("Public Tracking projection is invalid");
+
+    // Oversized reported problem (schema cap mirrors the DB constraint)
+    const oversizedProblem = trackingClient(
+      publicProjectionRow({
+        reported_problem: "p".repeat(2001),
+      }),
+    );
+
+    await expect(
+      lookupRepairByTrackingCode(TRACKING_CODE, oversizedProblem.client),
     ).rejects.toThrow("Public Tracking projection is invalid");
   });
 

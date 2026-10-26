@@ -247,8 +247,12 @@ Minimal internal validation telemetry for successful public Tracking views.
 `lookup_public_repair(text)` is a read-only `SECURITY DEFINER` function rather
 than a table or unrestricted view. It normalizes a bounded Tracking Code and
 returns only Provider display name, device type/brand/model, current status,
-selected Service Mode, computed last activity time, and at most 25 Customer
-Update message/timestamp objects. It intentionally excludes customer identity,
+selected Service Mode, computed last activity time, the customer's own
+reported problem (with the Repair `created_at` for `TRK-` codes, or
+`repair_requests.submitted_at` for `REQ-` codes), and at most 25 Customer
+Update message/timestamp objects. For `REQ-` codes the reported problem falls
+back to the linked Repair's value once the Request is accepted. It
+intentionally excludes customer identity,
 contact data, private technical fields, Ticket Number, credentials, internal
 ids, actors, and audit history. The existing globally unique
 `repairs.tracking_code` index supports the lookup.

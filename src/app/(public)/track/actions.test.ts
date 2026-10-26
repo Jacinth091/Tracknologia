@@ -44,6 +44,8 @@ const PUBLIC_VIEW: PublicRepairView = {
   serviceMode: "DROP_OFF",
   serviceModeLabel: "Carry-in",
   handoverMessage: null,
+  reportedProblem: "Device will not power on.",
+  submittedAt: "2026-08-27T09:00:00.000Z",
   trackingType: "REPAIR",
   trackingCode: NORMALIZED_TRACKING_CODE,
 };

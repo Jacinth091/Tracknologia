@@ -140,6 +140,14 @@ test.describe("E2E-02 Customer Request", () => {
       await expect(
         trackerPage.getByText("In progress", { exact: true }),
       ).toBeVisible();
+      // The customer's own reported problem and the submitted date are part
+      // of the public projection (issue #79).
+      await expect(
+        trackerPage.getByText("Screen cracked", { exact: true }),
+      ).toBeVisible();
+      await expect(
+        trackerPage.getByText("Received", { exact: true }),
+      ).toBeVisible();
       // The public projection must never expose Provider-internal notes.
       await expect(trackerPage.getByText(internalMarker)).not.toBeVisible();
       await trackerContext.close();
