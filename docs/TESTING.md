@@ -105,6 +105,7 @@ tests/integration/
   repair-requests.db.test.ts   — RepairRequest lifecycle & Provider isolation
   repairs.db.test.ts           — Repair lifecycle & Provider isolation
   tracking.db.test.ts          — Public tracking & observation
+  load-stress.db.test.ts       — Burst invariants (Plan 10)
   helpers/
     supabase-test-context.ts   — client setup, user/fixture lifecycle
     shared-test-utils.ts       — reusable DB fixture helpers
@@ -129,3 +130,15 @@ exact concurrent threshold, shared state across separate service clients,
 operation isolation, expiry reset, bounded cleanup, opaque stored actor keys,
 and denial of limiter/public-operation RPC execution to both `anon` and
 authenticated roles.
+
+## Load & resilience harness
+
+Plan 10 adds a zero-dependency load harness under `scripts/load/` that runs
+against a real stack outside Vitest/CI. It is separate from the automated
+suite; the burst _invariants_ it would validate are asserted in CI by
+`tests/integration/load-stress.db.test.ts` (same-Repair and same-Request races
+serialize to one durable outcome; public-operation abuse bursts are denied
+above the durable budget).
+
+Prerequisites, usage, and recorded baselines live in
+`docs/release/v0.1.0-hardening/evidence/10-LOAD-RESILIENCE-BASELINES.md`.

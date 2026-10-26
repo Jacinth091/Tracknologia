@@ -97,3 +97,35 @@ Before adding a package, answer:
 4. Is the dependency worth maintaining for the MVP?
 
 Current deliberate omissions include Axios, Express, NestJS, React Router, Prisma, Redux and Zustand.
+
+## Load harness (Plan 10)
+
+A zero-dependency load harness lives in `scripts/load/` and runs outside the
+Vitest/Playwright suites. It drives the same persistence seams the application
+uses against a real Supabase stack.
+
+```bash
+# 1. Local stack must be running and reset
+npx supabase start
+pnpm db:reset
+
+# 2. Seed fixtures (Provider, owner User, Repairs, Repair Requests)
+#    Env contract matches tests/integration (SUPABASE_TEST_URL / *_KEY / JWT_SECRET).
+node scripts/load/seed.mjs
+
+# 3. Run HTTPS page-read scenarios against a built app (optional but required
+#    for dashboard-read / repair-list-search baselines):
+pnpm build && pnpm start
+
+# 4. Run every profile (dashboard, tracking, mutations, races, abuse burst):
+node scripts/load/harness.mjs
+#    or a single profile:  node scripts/load/harness.mjs --profile tracking-lookup
+```
+
+Per-stage captures (count, p50/p95/p99, errors, denials) are written as JSON
+under `scripts/load/outputs/`. Session-cookie construction for the page-read
+scenarios round-trips the `@supabase/ssr` encoding (`base64-` prefix), so the
+harness measures real SSR page work.
+
+See `docs/release/v0.1.0-hardening/evidence/10-LOAD-RESILIENCE-BASELINES.md`
+for the recorded baselines and current verdicts.
