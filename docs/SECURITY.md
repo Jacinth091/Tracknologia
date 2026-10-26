@@ -163,9 +163,16 @@ The public tracking feature returns only a safe `PublicRepairView` through
 provider name
 device summary
 current status
+reported problem (customer's own description)
+received/submitted date
 customer-visible update
 last updated timestamp
 ```
+
+The reported problem is data the customer already provided, and the tracking
+code is a bearer credential — anyone holding the code could submit it
+themselves, so both are acceptable to return. Internal fields (diagnosis,
+initial observation, internal notes) stay excluded.
 
 The function bounds and validates RPC input, fixes its `search_path`, returns
 explicitly declared columns, and caps nested Updates at 25 message/timestamp

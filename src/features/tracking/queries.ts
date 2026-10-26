@@ -127,6 +127,8 @@ export async function lookupRepairByTrackingCode(
       message: update.message,
       createdAt: update.created_at,
     })),
+    reportedProblem: record.reported_problem,
+    submittedAt: record.submitted_at,
     trackingType: record.tracking_type,
     trackingCode: record.reference_code,
   };

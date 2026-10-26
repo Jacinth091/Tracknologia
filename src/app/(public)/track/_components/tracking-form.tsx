@@ -101,6 +101,18 @@ function TrackingResult({ view }: { view: PublicRepairView }) {
             </div>
           </div>
 
+          <div className="rounded-2xl border border-border/80 bg-background/80 p-4">
+            <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
+              Reported problem
+            </p>
+            <p className="mt-1 text-sm text-foreground">
+              {view.reportedProblem}
+            </p>
+            <p className="mt-1 text-xs text-muted-foreground">
+              Received {formatDateTime(view.submittedAt)}
+            </p>
+          </div>
+
           {view.handoverMessage && (
             <div className="rounded-2xl border border-emerald-700/20 bg-emerald-700/10 p-4 text-sm text-emerald-950">
               <p className="font-semibold">Next steps</p>
