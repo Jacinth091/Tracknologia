@@ -73,24 +73,55 @@ export function createRequestSubmit(ctx) {
 export function createStatusChange(ctx) {
   const repairs = ctx.fixtures.repairs.map((r) => r.repairId);
   let cursor = 0;
-  // Alternate IN_PROGRESS <-> WAITING_FOR_PARTS so every transition is legal
-  // and the same Repair can be exercised repeatedly.
+  // Alternate statuses while identifying genuine same-Repair overlaps.
   const nextStatus = new Map(repairs.map((id) => [id, "WAITING_FOR_PARTS"]));
+  const inFlight = new Map();
   return async () => {
     const repairId = repairs[cursor % repairs.length];
     cursor += 1;
     const target = nextStatus.get(repairId);
-    const { error } = await ctx.owner.rpc("change_repair_status", {
-      p_repair_id: repairId,
-      p_next_status: target,
-    });
-    nextStatus.set(
-      repairId,
-      target === "WAITING_FOR_PARTS" ? "IN_PROGRESS" : "WAITING_FOR_PARTS",
-    );
+    const pending = inFlight.get(repairId) ?? new Set();
+    let finishAttempt;
+    const attempt = {
+      overlaps: [],
+      completed: new Promise((resolve) => {
+        finishAttempt = resolve;
+      }),
+    };
+    for (const other of pending) {
+      other.overlaps.push(attempt);
+      attempt.overlaps.push(other);
+    }
+    pending.add(attempt);
+    inFlight.set(repairId, pending);
+    let error;
+    try {
+      ({ error } = await ctx.owner.rpc("change_repair_status", {
+        p_repair_id: repairId,
+        p_next_status: target,
+      }));
+    } catch (cause) {
+      finishAttempt({ failed: true });
+      throw cause;
+    } finally {
+      pending.delete(attempt);
+      if (pending.size === 0) inFlight.delete(repairId);
+    }
+    finishAttempt({ failed: Boolean(error) });
+    if (!error) {
+      nextStatus.set(
+        repairId,
+        target === "WAITING_FOR_PARTS" ? "IN_PROGRESS" : "WAITING_FOR_PARTS",
+      );
+    }
+    const expectedRejection =
+      Boolean(error?.message?.includes("INVALID_STATUS_TRANSITION")) &&
+      (
+        await Promise.all(attempt.overlaps.map((other) => other.completed))
+      ).some((outcome) => !outcome.failed);
     return {
-      ok: !error,
-      denied: Boolean(error?.message?.includes("RATE_LIMIT")),
+      ok: !error || expectedRejection,
+      kind: expectedRejection ? "expected-rejection" : error ? "error" : "ok",
       error: error?.message,
     };
   };
@@ -182,33 +213,23 @@ export function createRaceSameRepair(ctx) {
     const winningStatus = !a.error ? "WAITING_FOR_PARTS" : "READY";
     const transitions =
       events.data?.filter((event) => event.from_status === "IN_PROGRESS") ?? [];
+    const valid =
+      winners.length === 1 &&
+      losers.length === 1 &&
+      losers[0].error?.message?.includes("INVALID_STATUS_TRANSITION") &&
+      !durable.error &&
+      durable.data?.current_status === winningStatus &&
+      !events.error &&
+      transitions.length === 1 &&
+      transitions[0].to_status === winningStatus;
     return {
-      ok:
-        winners.length === 1 &&
-        losers.length === 1 &&
-        losers[0].error?.message?.includes("INVALID_STATUS_TRANSITION") &&
-        !durable.error &&
-        durable.data?.current_status === winningStatus &&
-        !events.error &&
-        transitions.length === 1 &&
-        transitions[0].to_status === winningStatus,
+      ok: Boolean(valid),
       denied: false,
-      kind:
-        losers.length > 0 &&
-        losers.every((r) =>
-          r.error?.message?.includes("INVALID_STATUS_TRANSITION"),
-        )
-          ? "expected-rejection"
-          : winners.length === 1
-            ? "ok"
-            : "error",
-      error:
-        losers
-          .filter(
-            (r) => !r.error?.message?.includes("INVALID_STATUS_TRANSITION"),
-          )
-          .map((r) => r.error?.message)
-          .join("; ") || null,
+      kind: valid ? "expected-rejection" : "error",
+      error: valid
+        ? null
+        : losers.map((r) => r.error?.message).join("; ") ||
+          "Repair race invariant failed",
     };
   };
 }
@@ -294,7 +315,8 @@ export function createRaceSameRequest(ctx) {
       kind: valid ? "expected-rejection" : "error",
       error: valid
         ? null
-        : losers.map((r) => r.error?.message).join("; ") || null,
+        : losers.map((r) => r.error?.message).join("; ") ||
+          "Request race invariant failed",
     };
   };
 }

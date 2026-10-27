@@ -73,6 +73,9 @@ export function summarize(results) {
     p99: percentile(99),
     errorCount,
     deniedCount,
+    expectedRejectionCount: results.filter(
+      (r) => r.kind === "expected-rejection",
+    ).length,
     httpStatusCounts: Object.fromEntries(
       [
         ...new Set(results.map((r) => r.httpStatus).filter((s) => s != null)),

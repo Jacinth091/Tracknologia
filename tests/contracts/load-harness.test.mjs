@@ -4,6 +4,7 @@ import { runBurst, summarize } from "../../scripts/load/lib/pool.mjs";
 import {
   createAbuseBurst,
   createRaceSameRequest,
+  createStatusChange,
 } from "../../scripts/load/scenarios.mjs";
 
 afterEach(() => vi.unstubAllEnvs());
@@ -41,6 +42,16 @@ describe("load harness safety and results", () => {
       errorCount: 3,
       httpStatusCounts: { 429: 3 },
     });
+  });
+
+  it("treats a non-overlapping invalid transition as a failure", async () => {
+    const task = createStatusChange({
+      owner: {
+        rpc: async () => ({ error: { message: "INVALID_STATUS_TRANSITION" } }),
+      },
+      fixtures: { repairs: [{ repairId: "repair" }] },
+    });
+    expect(await task()).toMatchObject({ ok: false, kind: "error" });
   });
 
   it("does not count a limiter outage as a denial", async () => {

@@ -2,6 +2,7 @@
 
 import { readFileSync, writeFileSync, rmSync } from "node:fs";
 import path from "node:path";
+import { parseArgs } from "node:util";
 import { fileURLToPath } from "node:url";
 import { resolveEnv } from "./lib/env.mjs";
 import {
@@ -40,8 +41,7 @@ function loadFixtures() {
   }
 }
 
-function buildContext(fixtures) {
-  const env = resolveEnv();
+function buildContext(fixtures, env) {
   const service = createServiceClient(env.url, env.serviceRoleKey);
   const ownerToken = mintSupabaseJwt(fixtures.owner.userId, env.jwtSecret, {
     expiresInSeconds: 3600,
@@ -59,7 +59,7 @@ function buildContext(fixtures) {
   return { env, service, owner, fixtures, appUrl: env.appUrl, ssrCookie };
 }
 
-async function runProfile(name, profile, ctx) {
+async function runProfile(profile, ctx) {
   const createTask = SCENARIO_MAP[profile.scenario];
   if (!createTask) throw new Error(`Unknown scenario: ${profile.scenario}`);
 
@@ -75,11 +75,10 @@ async function runProfile(name, profile, ctx) {
       rampMs: stage.rampSec * 1000,
       task,
     });
-    stageResults.push({
-      config: stage,
-      summary: summarize(results),
-      raw: results,
-    });
+    const summary = summarize(results);
+    const passed = summary.count > 0 && summary.errorCount === 0;
+    stageResults.push({ config: stage, passed, summary, raw: results });
+    if (!passed) break;
   }
   return stageResults;
 }
@@ -97,8 +96,9 @@ function writeResult(profileName, stageResults) {
 
 function printSummary(profileName, stageResults) {
   console.log(`\n=== ${profileName} ===`);
-  for (const { config, summary } of stageResults) {
+  for (const { config, passed, summary } of stageResults) {
     const parts = [
+      passed ? "PASS" : "FAIL",
       `c=${config.concurrency}`,
       `n=${summary.count}`,
       `p50=${summary.p50}ms`,
@@ -107,39 +107,63 @@ function printSummary(profileName, stageResults) {
     ];
     if (summary.errorCount > 0) parts.push(`errors=${summary.errorCount}`);
     if (summary.deniedCount > 0) parts.push(`denied=${summary.deniedCount}`);
+    if (summary.expectedRejectionCount > 0)
+      parts.push(`expected-rejections=${summary.expectedRejectionCount}`);
     console.log(`  ${parts.join("  ")}`);
   }
 }
 
 async function main() {
-  const args = process.argv.slice(2);
-  const profileArg = args[args.indexOf("--profile") + 1];
-  const scenarioArg = args[args.indexOf("--scenario") + 1];
-
-  const fixtures = loadFixtures();
-  const ctx = buildContext(fixtures);
-
+  const { values } = parseArgs({
+    options: { profile: { type: "string" }, scenario: { type: "string" } },
+    strict: true,
+    allowPositionals: false,
+  });
+  if (values.profile !== undefined && values.scenario !== undefined) {
+    throw new Error("Choose either --profile or --scenario, not both");
+  }
+  if (values.profile === "" || values.scenario === "") {
+    throw new Error("Profile and scenario values cannot be empty");
+  }
   const profiles = JSON.parse(readFileSync(PROFILES_PATH, "utf8")).profiles;
-
-  const toRun = profileArg
-    ? profiles.filter((p) => p.name === profileArg)
-    : scenarioArg
-      ? profiles.filter((p) => p.scenario === scenarioArg)
-      : profiles;
+  const toRun =
+    values.profile !== undefined
+      ? profiles.filter((p) => p.name === values.profile)
+      : values.scenario !== undefined
+        ? profiles.filter((p) => p.scenario === values.scenario)
+        : profiles;
 
   if (toRun.length === 0) {
-    console.error(
+    throw new Error(
       `No profiles matched. Available: ${profiles.map((p) => p.name).join(", ")}`,
     );
-    process.exit(1);
   }
+  const env = resolveEnv();
+  if (
+    !env.appUrl &&
+    toRun.some((profile) =>
+      ["dashboard-read", "repair-list-search"].includes(profile.scenario),
+    )
+  ) {
+    throw new Error(
+      "Set LOAD_APP_URL to a local application URL for page-read profiles",
+    );
+  }
+  const ctx = buildContext(loadFixtures(), env);
 
   for (const profile of toRun) {
     console.log(`Running ${profile.name} (${profile.scenario})...`);
-    const stageResults = await runProfile(profile.name, profile, ctx);
+    const stageResults = await runProfile(profile, ctx);
     const outName = writeResult(profile.name, stageResults);
     printSummary(profile.name, stageResults);
     console.log(`  wrote ${outName}`);
+    if (stageResults.some((stage) => !stage.passed)) {
+      console.error(
+        `Profile ${profile.name} failed; remaining profiles were not run.`,
+      );
+      process.exitCode = 1;
+      return;
+    }
   }
 
   console.log("\nDone.");
