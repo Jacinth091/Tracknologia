@@ -94,6 +94,24 @@ docker compose run --rm web npm run lint
 docker compose run --rm web npm run build
 ```
 
+## UAT pilot data pack (Plan 11)
+
+Manual UAT runs against repeatable seed data, never production personal data.
+The pack is seeded by `scripts/uat/seed.mjs` (refuses non-local hosts; lives
+alongside the E2E fixture contract):
+
+```bash
+node scripts/uat/seed.mjs                                                # seed
+node scripts/uat/seed.mjs --cleanup scripts/uat/outputs/<manifest>.json  # one run
+pnpm db:reset                                                       # hard reset
+```
+
+Cleanup uses only the user and Provider identities in the generated manifest. Old manifests without identities are refused; reset the disposable stack instead. The database suite runs a two-pack seed and cleanup isolation check (`tests/integration/uat.db.test.ts`); it requires the local Supabase JWT secret as well as the standard test credentials.
+
+It prints a credential manifest for the four personas (one-person Shop,
+multi-Staff Shop, Independent Provider, closed-intake Shop). The pilot record
+lives in `docs/release/v0.1.0-hardening/evidence/11-UAT-PILOT.md`.
+
 ## Real PostgreSQL / RLS integration tests
 
 Run `supabase db reset` before `pnpm test:db` when working against a local
@@ -109,6 +127,7 @@ tests/integration/
   repair-requests.db.test.ts   — RepairRequest lifecycle & Provider isolation
   repairs.db.test.ts           — Repair lifecycle & Provider isolation
   tracking.db.test.ts          — Public tracking & observation
+  load-stress.db.test.ts       — Burst invariants (Plan 10)
   helpers/
     supabase-test-context.ts   — client setup, user/fixture lifecycle
     shared-test-utils.ts       — reusable DB fixture helpers
@@ -133,3 +152,17 @@ exact concurrent threshold, shared state across separate service clients,
 operation isolation, expiry reset, bounded cleanup, opaque stored actor keys,
 and denial of limiter/public-operation RPC execution to both `anon` and
 authenticated roles.
+
+## Load & resilience harness
+
+Plan 10 adds a zero-dependency load harness under `scripts/load/` that runs
+against a real stack outside Vitest/CI. Runner CLI contract tests exercise
+selection, local page preconditions, and failure/denial exit status in CI. The
+live load runs are separate from the automated suite; the burst _invariants_ it would validate are asserted in CI by
+`tests/integration/load-stress.db.test.ts` (same-Repair and same-Request races
+serialize to one durable outcome; public-operation abuse bursts are denied
+above the durable budget).
+
+Prerequisites and usage live in `docs/DEVELOPMENT.md`. Corrected baselines and
+public-action measurements are still pending; see
+`docs/release/v0.1.0-hardening/evidence/10-LOAD-RESILIENCE-BASELINES.md`.

@@ -53,5 +53,7 @@ supabase/.branches/
 # local agent/session tool artifacts
 .headroom/
 
+# UAT data-pack run manifests (credentials for local testers)
+/scripts/uat/outputs/
 # graphify knowledge-graph output
 /graphify-out/
