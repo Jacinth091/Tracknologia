@@ -1,7 +1,7 @@
 # Evidence — UAT, Accessibility, Mobile, and Day-in-the-Life Pilot (Plan 11)
 
 **Requirement:** repeatable realistic test data pack; every MVP persona completes core workflows; findings recorded and classified; release blockers fixed in bounded loops; deferred items captured separately.
-**Repository doc:** [Plan 11](plans/11_UAT_ACCESSIBILITY_MOBILE_AND_PILOT_PLAN.md), authoritative source `handoff/06_UAT_AND_PILOT_VALIDATION.md`.
+**Repository doc:** [Plan 11](../plans/11_UAT_ACCESSIBILITY_MOBILE_AND_PILOT_PLAN.md), [handoff](../handoff/06_UAT_AND_PILOT_VALIDATION.md).
 
 ## Test Data Pack
 
@@ -18,6 +18,12 @@ node scripts/uat/seed.mjs   # seeds the pack; prints the credential manifest
 - Runs all writes through the same persistence seams the application uses (service-role inserts + owner-JWT RPCs), so seeded state is real (ticket numbers, tracking codes, status events).
 - `node scripts/uat/seed.mjs --cleanup scripts/uat/outputs/uat-manifest-<run>.json` removes one run; `pnpm db:reset` is always the sledgehammer.
 - Credentials for human testers are printed to the manifest and never committed.
+
+### Invitation acceptance setup
+
+The multi-Staff Shop manifest contains a `newStaffEmail` that is not an existing account or membership. Sign in as that Shop Owner, open Team, create an invitation for this address, and copy the generated link. In a separate browser session, open the link, register using that exact address, and complete the Staff profile. Check the resulting Staff access and record the outcome below. Use the existing expired/revoked rows for negative-state checks; they do not contain joinable links. If a live invalid-link test is needed, create and revoke a fresh invitation through Team and try its copied link.
+
+The newly registered Staff account is created during UAT and is not in the seed manifest. Reset the disposable local stack after the pilot to remove it. Actual human invitation, mobile and accessibility outcomes remain TBD.
 
 ## Pilot Result Record
 
