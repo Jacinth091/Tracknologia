@@ -1,7 +1,7 @@
 # Evidence — Release Candidate, Deployment, Migration, and Recovery (Plan 12)
 
 **Requirement:** immutable RC candidate proven in production-like rehearsals and deployed exactly once per tag, with recovery understanding recorded.
-**Repository doc:** [Plan 12](plans/12_RELEASE_CANDIDATE_DEPLOYMENT_MIGRATION_AND_RECOVERY_PLAN.md), authoritative source `handoff/07_RELEASE_CANDIDATE_AND_DEPLOYMENT.md`.
+**Repository doc:** [Plan 12](../plans/12_RELEASE_CANDIDATE_DEPLOYMENT_MIGRATION_AND_RECOVERY_PLAN.md), [handoff](../handoff/07_RELEASE_CANDIDATE_AND_DEPLOYMENT.md).
 **Related:** operational runbook [docs/OPERATIONS.md](../../../OPERATIONS.md) carries the hotfix flow and the rollback vs forward-fix criteria — this file does not duplicate them.
 
 ## Candidate record

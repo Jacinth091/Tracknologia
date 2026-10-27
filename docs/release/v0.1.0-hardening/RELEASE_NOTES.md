@@ -1,15 +1,15 @@
 # Release Notes — Tracknologia v0.1.0
 
-Status: release notes for the v0.1.0 hardening release. The exact candidate
-commit, RC tags, and production tag are recorded in
+Status: draft release notes for the planned v0.1.0 hardening release. The exact
+candidate commit, RC tags, and production tag will be recorded in
 [evidence/12-RC-DEPLOYMENT-REHEARSAL.md](evidence/12-RC-DEPLOYMENT-REHEARSAL.md)
-when the candidate protocol (Plan 12) completes; this file records what the
-release delivers and its known limitations.
+when the candidate protocol (Plan 12) completes; release contents and validation
+claims must be verified against that candidate.
 
 ## Highlights
 
-v0.1.0 delivers the complete MVP loop with the hardening work required to run
-it safely with real users.
+The planned v0.1.0 release covers the complete MVP repair loop and its
+associated hardening work.
 
 ### Complete repair workflow
 
@@ -56,11 +56,8 @@ it safely with real users.
 - CI gates: format, lint, typecheck, unit suite, real-PostgreSQL integration
   suite (RLS/isolation invariants), Playwright E2E for core flows, and a
   migration-rehearsal gate (`pnpm rehearse:migrations`).
-- Recorded pilot-load baselines: repeatable load harness
-  (`scripts/load/`) with all pilot targets achieved (see
-  [evidence/10-LOAD-RESILIENCE-BASELINES.md](evidence/10-LOAD-RESILIENCE-BASELINES.md)).
-- UAT delivery toolkit: repeatable test data pack (`scripts/uat/`) and the
-  pilot evidence scaffold.
+- **Pending load evidence:** [PR #84](https://github.com/Jacinth091/Tracknologia/pull/84) proposes a load harness. Its integration and current-candidate validation remain pending; public-path measurements and corrected, replayable baselines are needed before claiming pilot targets are met.
+- **Pending UAT toolkit:** [PR #98](https://github.com/Jacinth091/Tracknologia/pull/98) proposes a repeatable test data pack and pilot evidence scaffold. Their inclusion depends on acceptance and integration; human UAT results remain pending.
 
 ## Known limitations (explicitly not in this release)
 
@@ -82,8 +79,8 @@ Operational limitations while running as a pilot:
 
 - There is no cross-provider operator model: authorization is always scoped to
   one Provider membership.
-- A Supplier-domain email mismatch on a staff invitation surfaces an explicit
-  error detail to the inviter; there is no auto-retry of delivery.
+- Staff invitations are bound to the invited recipient email; an account that
+  already belongs to a Provider is ineligible for another membership.
 - Rate limiting is per durable actor bucket; shared carrier IPs without a
   configured trusted-proxy secret share one anonymity bucket
   (`PUBLIC_ABUSE_SHARED_DEV_BUCKET` is a development-only toggle and is
