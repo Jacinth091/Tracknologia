@@ -1,0 +1,79 @@
+{
+  "profiles": [
+    {
+      "name": "dashboard-read",
+      "scenario": "dashboard-read",
+      "stages": [
+        { "concurrency": 10, "durationSec": 30, "rampSec": 5 },
+        { "concurrency": 25, "durationSec": 30, "rampSec": 5 }
+      ]
+    },
+    {
+      "name": "repair-list-search",
+      "scenario": "repair-list-search",
+      "stages": [
+        { "concurrency": 10, "durationSec": 30, "rampSec": 5 },
+        { "concurrency": 25, "durationSec": 30, "rampSec": 5 },
+        { "concurrency": 50, "durationSec": 30, "rampSec": 5 }
+      ]
+    },
+    {
+      "name": "tracking-lookup",
+      "scenario": "tracking-lookup",
+      "stages": [
+        { "concurrency": 25, "durationSec": 30, "rampSec": 5 },
+        { "concurrency": 50, "durationSec": 30, "rampSec": 5 },
+        { "concurrency": 100, "durationSec": 30, "rampSec": 5 }
+      ]
+    },
+    {
+      "name": "request-submit",
+      "scenario": "request-submit",
+      "stages": [
+        { "concurrency": 10, "durationSec": 30, "rampSec": 5 },
+        { "concurrency": 25, "durationSec": 30, "rampSec": 5 },
+        { "concurrency": 50, "durationSec": 30, "rampSec": 5 }
+      ]
+    },
+    {
+      "name": "status-change",
+      "scenario": "status-change",
+      "stages": [
+        { "concurrency": 10, "durationSec": 30, "rampSec": 5 },
+        { "concurrency": 25, "durationSec": 30, "rampSec": 5 }
+      ]
+    },
+    {
+      "name": "analytics-observation",
+      "scenario": "analytics-observation",
+      "stages": [
+        { "concurrency": 25, "durationSec": 30, "rampSec": 5 },
+        { "concurrency": 100, "durationSec": 30, "rampSec": 5 }
+      ]
+    },
+    {
+      "name": "abuse-burst",
+      "scenario": "abuse-burst",
+      "stages": [
+        { "concurrency": 100, "durationSec": 20, "rampSec": 2 },
+        { "concurrency": 200, "durationSec": 20, "rampSec": 2 }
+      ]
+    },
+    {
+      "name": "race-same-repair",
+      "scenario": "race-same-repair",
+      "stages": [
+        { "concurrency": 2, "durationSec": 20, "rampSec": 0 },
+        { "concurrency": 2, "durationSec": 20, "rampSec": 0 }
+      ]
+    },
+    {
+      "name": "race-same-request",
+      "scenario": "race-same-request",
+      "stages": [
+        { "concurrency": 2, "durationSec": 20, "rampSec": 0 },
+        { "concurrency": 2, "durationSec": 20, "rampSec": 0 }
+      ]
+    }
+  ]
+}
