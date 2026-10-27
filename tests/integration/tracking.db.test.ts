@@ -126,7 +126,9 @@ describe("Public Tracking & Observation", () => {
         "model",
         "provider_display_name",
         "reference_code",
+        "reported_problem",
         "service_mode",
+        "submitted_at",
         "tracking_type",
       ]);
       expect(publicRow).toMatchObject({
@@ -138,7 +140,12 @@ describe("Public Tracking & Observation", () => {
         service_mode: "DROP_OFF",
         tracking_type: "REPAIR",
         reference_code: receipt.tracking_code,
+        reported_problem: "Battery does not charge",
       });
+      expect(publicRow).toHaveProperty("submitted_at");
+      expect(publicRow).not.toHaveProperty("diagnosis");
+      expect(publicRow).not.toHaveProperty("internal_notes");
+      expect(publicRow).not.toHaveProperty("serial_number");
 
       const anonRpcLookup = await anonClient.rpc("lookup_public_repair", {
         p_tracking_code: receipt.tracking_code,
@@ -327,7 +334,11 @@ describe("Public Tracking & Observation", () => {
         tracking_type: "REQUEST",
         reference_code: requestReceipt.reference_code,
         customer_updates: [],
+        reported_problem: "Customer reports that the device will not charge.",
       });
+      expect(submittedRow).toHaveProperty("submitted_at");
+      expect(submittedRow).not.toHaveProperty("diagnosis");
+      expect(submittedRow).not.toHaveProperty("internal_notes");
 
       // 2. Check DECLINED request tracking via reference code
       const secondSubmitted = assertSupabaseSuccess(
@@ -416,6 +427,7 @@ describe("Public Tracking & Observation", () => {
         service_mode: "DROP_OFF",
         tracking_type: "REPAIR",
         reference_code: repairReceipt.tracking_code,
+        reported_problem: "Verified charging failure",
         customer_updates: [
           expect.objectContaining({
             message: "Repair is ready for the agreed handover.",
@@ -445,6 +457,7 @@ describe("Public Tracking & Observation", () => {
         service_mode: "DROP_OFF",
         tracking_type: "REQUEST",
         reference_code: requestReceipt.reference_code,
+        reported_problem: "Verified charging failure",
         customer_updates: [
           expect.objectContaining({
             message: "Repair is ready for the agreed handover.",

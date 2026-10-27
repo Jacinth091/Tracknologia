@@ -40,6 +40,8 @@ function publicProjectionRow(overrides: Record<string, unknown> = {}) {
     ],
     tracking_type: "REPAIR",
     reference_code: TRACKING_CODE,
+    reported_problem: "Screen cracked and keyboard unresponsive.",
+    submitted_at: "2026-08-24T01:00:00.000Z",
     ...overrides,
   };
 }
@@ -60,6 +62,8 @@ describe("Tracking lookup", () => {
     expect(result).toEqual({
       providerDisplayName: "Jacinth Device Care",
       deviceSummary: "Lenovo IdeaPad 3 · Laptop",
+      deviceType: "Laptop",
+      brandModel: "Lenovo IdeaPad 3",
       currentStatus: "IN_PROGRESS",
       statusLabel: "In progress",
       statusDescription: "Provider is actively working on your repair.",
@@ -75,9 +79,12 @@ describe("Tracking lookup", () => {
       ],
       trackingType: "REPAIR",
       trackingCode: TRACKING_CODE,
+      reportedProblem: "Screen cracked and keyboard unresponsive.",
+      submittedAt: "2026-08-24T01:00:00.000Z",
     });
     expect(result).not.toHaveProperty("customerPhone");
     expect(result).not.toHaveProperty("internalNotes");
+    expect(result).not.toHaveProperty("diagnosis");
     expect(result).not.toHaveProperty("repairId");
   });
 
@@ -103,6 +110,8 @@ describe("Tracking lookup", () => {
     expect(result).toEqual({
       providerDisplayName: "Jacinth Device Care",
       deviceSummary: "Lenovo IdeaPad 3 · Laptop",
+      deviceType: "Laptop",
+      brandModel: "Lenovo IdeaPad 3",
       currentStatus: "SUBMITTED",
       statusLabel: "Request Submitted",
       statusDescription:
@@ -114,8 +123,29 @@ describe("Tracking lookup", () => {
       customerUpdates: [],
       trackingType: "REQUEST",
       trackingCode: REQUEST_CODE,
+      reportedProblem: "Screen cracked and keyboard unresponsive.",
+      submittedAt: "2026-08-24T01:00:00.000Z",
     });
   });
+
+  it.each([
+    ["Lenovo", "IdeaPad 3", "Lenovo IdeaPad 3"],
+    ["Lenovo", null, "Lenovo"],
+    [null, "IdeaPad 3", "IdeaPad 3"],
+    [null, null, null],
+  ])(
+    "exposes device type and brand/model separately (brand %s, model %s)",
+    async (brand, model, brandModel) => {
+      const { client } = trackingClient(publicProjectionRow({ brand, model }));
+
+      const result = await lookupRepairByTrackingCode(TRACKING_CODE, client);
+
+      expect(result).toMatchObject({
+        deviceType: "Laptop",
+        brandModel,
+      });
+    },
+  );
 
   it("fails closed when persistence returns invalid or corrupt projection schema", async () => {
     // Missing required fields
@@ -140,6 +170,17 @@ describe("Tracking lookup", () => {
 
     await expect(
       lookupRepairByTrackingCode(TRACKING_CODE, tooManyUpdates.client),
+    ).rejects.toThrow("Public Tracking projection is invalid");
+
+    // Oversized reported problem (schema cap mirrors the DB constraint)
+    const oversizedProblem = trackingClient(
+      publicProjectionRow({
+        reported_problem: "p".repeat(2001),
+      }),
+    );
+
+    await expect(
+      lookupRepairByTrackingCode(TRACKING_CODE, oversizedProblem.client),
     ).rejects.toThrow("Public Tracking projection is invalid");
   });
 

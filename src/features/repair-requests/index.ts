@@ -27,5 +27,5 @@ export {
   type RepairRequestStatus,
   type RepairRequestSummary,
   type SubmitRepairRequestInput,
-  type VerifiedRepairRequestInput,
+  type AcceptRepairRequestDecision,
 } from "./types";

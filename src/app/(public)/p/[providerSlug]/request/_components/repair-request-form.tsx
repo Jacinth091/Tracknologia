@@ -1,8 +1,20 @@
 "use client";
 
-import Link from "next/link";
-import { useActionState, useState } from "react";
+import { HugeiconsIcon } from "@hugeicons/react";
+import {
+  Alert02Icon,
+  Location01Icon,
+  Message01Icon,
+  SmartPhone01Icon,
+  User02Icon,
+} from "@hugeicons/core-free-icons";
+import { CopyButton } from "@/components/shared/copy-button";
+import { StatusGauge } from "@/components/shared/status-gauge";
 
+import Link from "next/link";
+import { useActionState } from "react";
+
+import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Button, buttonVariants } from "@/components/ui/button";
 import {
   Card,
@@ -30,36 +42,6 @@ const SERVICE_MODE_LABELS = {
   OTHER: "Other arrangement",
 } as const;
 
-async function copyTextToClipboard(text: string): Promise<boolean> {
-  if (typeof navigator !== "undefined" && navigator.clipboard?.writeText) {
-    try {
-      await navigator.clipboard.writeText(text);
-      return true;
-    } catch {
-      // Fall through to fallback
-    }
-  }
-
-  if (typeof document !== "undefined") {
-    try {
-      const textarea = document.createElement("textarea");
-      textarea.value = text;
-      textarea.setAttribute("readonly", "");
-      textarea.style.position = "absolute";
-      textarea.style.left = "-9999px";
-      document.body.appendChild(textarea);
-      textarea.select();
-      const success = document.execCommand("copy");
-      document.body.removeChild(textarea);
-      return Boolean(success);
-    } catch {
-      return false;
-    }
-  }
-
-  return false;
-}
-
 function FieldError({
   field,
   state,
@@ -78,78 +60,53 @@ function RequestReceiptCard({
   referenceCode: string;
   providerName: string;
 }) {
-  const [copiedCode, setCopiedCode] = useState(false);
-  const [copiedLink, setCopiedLink] = useState(false);
-
-  const handleCopyCode = async () => {
-    const success = await copyTextToClipboard(referenceCode);
-    if (success) {
-      setCopiedCode(true);
-      setTimeout(() => setCopiedCode(false), 2500);
-    }
-  };
-
-  const handleCopyLink = async () => {
-    const origin =
-      typeof window !== "undefined"
-        ? window.location.origin
-        : "https://tracknologia.com";
-    const trackUrl = `${origin}/track?code=${encodeURIComponent(referenceCode)}`;
-
-    const success = await copyTextToClipboard(trackUrl);
-    if (success) {
-      setCopiedLink(true);
-      setTimeout(() => setCopiedLink(false), 2500);
-    }
-  };
+  const origin = typeof window === "undefined" ? "" : window.location.origin;
+  const trackUrl = `${origin}/track?code=${encodeURIComponent(referenceCode)}`;
 
   return (
-    <Card className="border-primary/20 shadow-xs">
-      <CardHeader>
-        <div className="mb-2 inline-flex w-fit items-center gap-1.5 rounded-full bg-primary/10 px-3 py-1 text-xs font-semibold text-primary">
-          <span className="inline-block size-1.5 rounded-full bg-primary" />
-          Request submitted
+    <Card>
+      <CardHeader className="gap-4 sm:flex-row sm:items-center sm:gap-6">
+        <StatusGauge status="SUBMITTED" className="size-20" />
+        <div className="min-w-0 space-y-2">
+          <div
+            data-status="SUBMITTED"
+            className="status-badge mb-2 inline-flex w-fit items-center gap-1.5 rounded-full border px-3 py-1 text-xs font-semibold"
+          >
+            Request submitted
+          </div>
+          <CardTitle role="status" className="text-2xl wrap-anywhere">
+            Request sent to {providerName}
+          </CardTitle>
+          <CardDescription>
+            Provider will review your information before creating an active
+            repair.
+          </CardDescription>
         </div>
-        <CardTitle className="text-2xl">
-          Request sent to {providerName}
-        </CardTitle>
-        <CardDescription>
-          Provider will review your information before creating an active
-          repair.
-        </CardDescription>
       </CardHeader>
       <CardContent className="space-y-6">
-        <div className="flex flex-col gap-3 rounded-2xl border border-border bg-muted/40 p-4 sm:flex-row sm:items-center sm:justify-between">
+        <div className="space-y-4 rounded-xl bg-muted/40 p-4">
           <div>
             <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
               Request Reference Code
             </p>
-            <p className="mt-1 font-mono text-xl font-bold tracking-wider text-foreground">
-              {referenceCode}
-            </p>
+            <div className="mt-1 flex items-center gap-1">
+              <p className="min-w-0 font-mono text-lg font-bold tracking-wide wrap-anywhere text-foreground">
+                {referenceCode}
+              </p>
+              <CopyButton
+                iconOnly
+                text={referenceCode}
+                label="Copy request reference"
+              />
+            </div>
           </div>
 
           <div className="flex flex-col gap-2 sm:flex-row">
-            <Button
-              type="button"
-              variant={copiedCode ? "default" : "outline"}
-              size="sm"
-              onClick={handleCopyCode}
-              aria-label="Copy reference code to clipboard"
-              className="w-full shrink-0 sm:w-auto"
-            >
-              {copiedCode ? "Copied code" : "Copy code"}
-            </Button>
-            <Button
-              type="button"
-              variant={copiedLink ? "default" : "outline"}
-              size="sm"
-              onClick={handleCopyLink}
-              aria-label="Copy direct tracking link to clipboard"
-              className="w-full shrink-0 sm:w-auto"
-            >
-              {copiedLink ? "Copied link" : "Copy link"}
-            </Button>
+            <CopyButton
+              text={trackUrl}
+              label="Copy link"
+              copiedLabel="Copied link"
+            />
           </div>
         </div>
 
@@ -220,17 +177,22 @@ export function RepairRequestForm({
   return (
     <form action={formAction} className="space-y-6">
       {state?.error && (
-        <div
-          role="alert"
-          className="rounded-2xl border border-destructive/20 bg-destructive/10 p-4 text-sm font-medium text-destructive"
-        >
-          {state.error}
-        </div>
+        <Alert variant="destructive" role="alert">
+          <HugeiconsIcon icon={Alert02Icon} aria-hidden="true" />
+          <AlertDescription>{state.error}</AlertDescription>
+        </Alert>
       )}
 
       <Card>
         <CardHeader>
-          <CardTitle className="text-lg">Your contact details</CardTitle>
+          <CardTitle className="flex items-center gap-2 text-lg">
+            <HugeiconsIcon
+              icon={User02Icon}
+              aria-hidden="true"
+              className="size-5"
+            />
+            Your contact details
+          </CardTitle>
           <CardDescription>
             Give Provider a reliable way to follow up about Request.
           </CardDescription>
@@ -281,7 +243,14 @@ export function RepairRequestForm({
 
       <Card>
         <CardHeader>
-          <CardTitle className="text-lg">Device details</CardTitle>
+          <CardTitle className="flex items-center gap-2 text-lg">
+            <HugeiconsIcon
+              icon={SmartPhone01Icon}
+              aria-hidden="true"
+              className="size-5"
+            />
+            Device details
+          </CardTitle>
           <CardDescription>
             Device type is required. Add other identifiers when known.
           </CardDescription>
@@ -370,7 +339,14 @@ export function RepairRequestForm({
 
       <Card>
         <CardHeader>
-          <CardTitle className="text-lg">Reported Problem</CardTitle>
+          <CardTitle className="flex items-center gap-2 text-lg">
+            <HugeiconsIcon
+              icon={Message01Icon}
+              aria-hidden="true"
+              className="size-5"
+            />
+            Reported Problem
+          </CardTitle>
           <CardDescription>
             Describe what you observe. Provider will verify technical details.
           </CardDescription>
@@ -452,7 +428,14 @@ export function RepairRequestForm({
       {serviceModes.length > 0 && (
         <Card>
           <CardHeader>
-            <CardTitle className="text-lg">Preferred Service Mode</CardTitle>
+            <CardTitle className="flex items-center gap-2 text-lg">
+              <HugeiconsIcon
+                icon={Location01Icon}
+                aria-hidden="true"
+                className="size-5"
+              />
+              Preferred Service Mode
+            </CardTitle>
             <CardDescription>
               Preference is not final until Provider reviews Request.
             </CardDescription>
@@ -465,7 +448,7 @@ export function RepairRequestForm({
                   name="preferredServiceMode"
                   value=""
                   defaultChecked={!state?.values?.preferredServiceMode}
-                  className="mt-1 accent-primary"
+                  className="mt-1 accent-ring"
                   disabled={pending}
                 />
                 <span className="text-sm font-medium text-foreground">
@@ -484,7 +467,7 @@ export function RepairRequestForm({
                     defaultChecked={
                       state?.values?.preferredServiceMode === serviceMode.mode
                     }
-                    className="mt-1 accent-primary"
+                    className="mt-1 accent-ring"
                     disabled={pending}
                   />
                   <span>

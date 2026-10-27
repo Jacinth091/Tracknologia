@@ -40,6 +40,8 @@ export const publicRepairProjectionSchema = z
       .max(25),
     tracking_type: z.enum(["REPAIR", "REQUEST"]),
     reference_code: z.string().min(1),
+    reported_problem: z.string().trim().min(1).max(2000),
+    submitted_at: z.string().min(1),
   })
   .strict();
 

@@ -1,10 +1,14 @@
 import type { Metadata } from "next";
 import { requireProviderContext } from "@/features/auth";
 import {
+  getProvider,
   listPendingStaffInvitations,
   listTeamMembers,
 } from "@/features/providers";
+import { getAppOrigin } from "@/lib/config/server";
 import { createClient } from "@/lib/supabase/server";
+import { PageHeader } from "../_components/page-header";
+import { RequestLinkCard } from "../_components/request-link-card";
 import { TeamClient } from "./_components/team-client";
 
 export const metadata: Metadata = {
@@ -19,30 +23,35 @@ export default async function TeamPage() {
   const isOwner = context.role === "OWNER";
   const isShop = context.providerType === "SHOP";
 
-  const [members, invitations] = await Promise.all([
+  const [members, invitations, provider] = await Promise.all([
     listTeamMembers(context.providerId, supabase),
     isOwner && isShop
       ? listPendingStaffInvitations(context.providerId, supabase)
       : Promise.resolve([]),
+    getProvider(context.providerId, supabase),
   ]);
 
   return (
-    <div className="space-y-6 max-w-4xl">
-      <div>
-        <h1 className="text-2xl font-bold tracking-tight sm:text-3xl text-foreground">
-          Team & Staff Management
-        </h1>
-        <p className="text-sm text-muted-foreground mt-1">
-          Manage staff members, invitations, and workshop access for{" "}
-          {context.providerName}
-        </p>
-      </div>
+    <div className="space-y-6">
+      <PageHeader
+        eyebrow="Team"
+        title="Team & Staff Management"
+        description={`Manage staff members, invitations, and workshop access for ${context.providerName}`}
+      />
 
       <TeamClient
         isOwner={isOwner}
         isShop={isShop}
         members={members}
         invitations={invitations}
+        requestLink={
+          provider ? (
+            <RequestLinkCard
+              url={`${getAppOrigin()}/p/${provider.slug}/request`}
+              acceptingRequests={provider.acceptingRequests}
+            />
+          ) : null
+        }
       />
     </div>
   );

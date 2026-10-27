@@ -98,7 +98,7 @@ test.describe("E2E-02 Customer Request", () => {
       await page
         .getByRole("button", { name: "Accept & Create Repair" })
         .click();
-      await expect(page.getByText("ACCEPTED", { exact: true })).toBeVisible({
+      await expect(page.getByText("Accepted", { exact: true })).toBeVisible({
         timeout: 15_000,
       });
       page.off("request", captureAcceptRequest);
@@ -139,6 +139,14 @@ test.describe("E2E-02 Customer Request", () => {
       await expect(trackerPage.getByText(providerName)).toBeVisible();
       await expect(
         trackerPage.getByText("In progress", { exact: true }),
+      ).toBeVisible();
+      // The customer's own reported problem and the submitted date are part
+      // of the public projection (issue #79).
+      await expect(
+        trackerPage.getByText("Screen cracked", { exact: true }),
+      ).toBeVisible();
+      await expect(
+        trackerPage.getByText("Received", { exact: true }),
       ).toBeVisible();
       // The public projection must never expose Provider-internal notes.
       await expect(trackerPage.getByText(internalMarker)).not.toBeVisible();

@@ -22,6 +22,38 @@ export const providerRequestSlugSchema = z
 
 export const repairRequestIdSchema = z.uuid("Repair Request ID is invalid");
 
+// The Provider's decision at acceptance. The Repair snapshot is derived from
+// the stored Request, so only these fields are read from the client. An empty
+// Service Mode means "no Service Mode" and becomes null.
+export const acceptRepairRequestDecisionSchema = z
+  .object({
+    serviceMode: serviceModeEnum
+      .optional()
+      .or(z.literal(""))
+      .transform((value) => (value === "" ? null : value)),
+    serviceModeDetails: optionalText(
+      240,
+      "Service Mode details must be 240 characters or fewer",
+    ),
+    internalNotes: optionalText(
+      4000,
+      "Internal Notes must be 4,000 characters or fewer",
+    ),
+  })
+  .superRefine((input, context) => {
+    if (!input.serviceMode && input.serviceModeDetails) {
+      context.addIssue({
+        code: "custom",
+        path: ["serviceModeDetails"],
+        message: "Select a Service Mode before adding arrangement details",
+      });
+    }
+  });
+
+export type AcceptRepairRequestDecisionOutput = z.infer<
+  typeof acceptRepairRequestDecisionSchema
+>;
+
 export const repairRequestStatusEnum = z.enum([
   "SUBMITTED",
   "ACCEPTED",

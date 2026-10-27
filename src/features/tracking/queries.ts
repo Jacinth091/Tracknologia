@@ -64,13 +64,17 @@ const READY_HANDOVER_MESSAGES: Record<ServiceMode, string> = {
   OTHER: "Your device is ready. Contact your Provider to arrange handover.",
 };
 
+function composeBrandModel(brand: string | null, model: string | null) {
+  return [brand, model].filter(Boolean).join(" ") || null;
+}
+
 function composeDeviceSummary(
   deviceType: string,
   brand: string | null,
   model: string | null,
 ) {
-  const makeAndModel = [brand, model].filter(Boolean).join(" ");
-  return makeAndModel ? `${makeAndModel} · ${deviceType}` : deviceType;
+  const brandModel = composeBrandModel(brand, model);
+  return brandModel ? `${brandModel} · ${deviceType}` : deviceType;
 }
 
 function getReadyHandoverMessage(
@@ -111,6 +115,8 @@ export async function lookupRepairByTrackingCode(
       record.brand,
       record.model,
     ),
+    deviceType: record.device_type,
+    brandModel: composeBrandModel(record.brand, record.model),
     currentStatus,
     statusLabel: status.label,
     statusDescription: status.description,
@@ -127,6 +133,8 @@ export async function lookupRepairByTrackingCode(
       message: update.message,
       createdAt: update.created_at,
     })),
+    reportedProblem: record.reported_problem,
+    submittedAt: record.submitted_at,
     trackingType: record.tracking_type,
     trackingCode: record.reference_code,
   };

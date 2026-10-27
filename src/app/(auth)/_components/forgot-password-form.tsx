@@ -1,7 +1,14 @@
 "use client";
 
 import { useActionState } from "react";
+import { HugeiconsIcon } from "@hugeicons/react";
+import {
+  AlertCircleIcon,
+  CheckmarkCircle02Icon,
+} from "@hugeicons/core-free-icons";
+
 import { forgotPasswordAction } from "../actions";
+import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -14,59 +21,56 @@ export function ForgotPasswordForm() {
   );
 
   return (
-    <div className="relative">
-      {/* Loading Overlay */}
-      {isPending && (
-        <div className="absolute inset-0 z-20 flex flex-col items-center justify-center rounded-2xl bg-background/60 backdrop-blur-[1px] transition-all">
-          <div className="flex items-center gap-2 rounded-xl bg-card border border-border/80 px-4 py-2 shadow-md">
-            <LoadingSpinner
-              size="sm"
-              className="text-primary border-primary border-t-transparent"
-            />
-            <span className="text-xs font-medium text-foreground">
-              Sending reset link...
-            </span>
-          </div>
-        </div>
+    <form action={formAction} aria-busy={isPending} className="space-y-4">
+      {state?.error && (
+        <Alert variant="destructive">
+          <HugeiconsIcon
+            icon={AlertCircleIcon}
+            strokeWidth={1.8}
+            className="size-4"
+            aria-hidden="true"
+          />
+          <AlertTitle>Could not send the reset link</AlertTitle>
+          <AlertDescription>{state.error}</AlertDescription>
+        </Alert>
       )}
 
-      <form action={formAction} className="space-y-4">
-        {state?.error && (
-          <div className="rounded-xl border border-destructive/20 bg-destructive/10 p-3 text-sm text-destructive font-medium">
-            {state.error}
-          </div>
-        )}
-
-        {state?.success && (
-          <div className="rounded-xl border border-primary/20 bg-primary/10 p-3 text-sm text-primary font-medium">
-            {state.success}
-          </div>
-        )}
-
-        <div className="space-y-2">
-          <Label htmlFor="email">Email</Label>
-          <Input
-            id="email"
-            name="email"
-            type="email"
-            autoComplete="email"
-            placeholder="name@provider.com"
-            disabled={isPending}
-            required
+      {state?.success && (
+        <Alert>
+          <HugeiconsIcon
+            icon={CheckmarkCircle02Icon}
+            strokeWidth={1.8}
+            className="size-4 text-foreground"
+            aria-hidden="true"
           />
-        </div>
+          <AlertTitle>Check your inbox</AlertTitle>
+          <AlertDescription>{state.success}</AlertDescription>
+        </Alert>
+      )}
 
-        <Button type="submit" className="w-full" disabled={isPending}>
-          {isPending ? (
-            <span className="flex items-center justify-center gap-2">
-              <LoadingSpinner size="sm" />
-              Sending reset link...
-            </span>
-          ) : (
-            "Send Reset Link"
-          )}
-        </Button>
-      </form>
-    </div>
+      <div className="space-y-2">
+        <Label htmlFor="email">Email</Label>
+        <Input
+          id="email"
+          name="email"
+          type="email"
+          autoComplete="email"
+          placeholder="name@provider.com"
+          disabled={isPending}
+          required
+        />
+      </div>
+
+      <Button type="submit" className="w-full" disabled={isPending}>
+        {isPending ? (
+          <span className="flex items-center justify-center gap-2">
+            <LoadingSpinner size="sm" />
+            Sending reset link...
+          </span>
+        ) : (
+          "Send Reset Link"
+        )}
+      </Button>
+    </form>
   );
 }

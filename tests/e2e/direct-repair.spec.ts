@@ -56,6 +56,12 @@ test.describe("E2E-01 Direct Repair", () => {
         activePage.getByText("In progress", { exact: true }),
       ).toBeVisible();
       await expect(activePage.getByText(customerUpdate)).toBeVisible();
+      await expect(
+        activePage.getByText("No power on battery", { exact: true }),
+      ).toBeVisible();
+      await expect(
+        activePage.getByText("Received", { exact: true }),
+      ).toBeVisible();
       await activeContext.close();
 
       await page.getByRole("button", { name: "Ready", exact: true }).click();

@@ -35,6 +35,8 @@
   --color-secondary: var(--secondary);
   --color-primary-foreground: var(--primary-foreground);
   --color-primary: var(--primary);
+  --color-primary-hover: var(--primary-hover);
+  --color-primary-pressed: var(--primary-pressed);
   --color-popover-foreground: var(--popover-foreground);
   --color-popover: var(--popover);
   --color-card-foreground: var(--card-foreground);
@@ -49,82 +51,197 @@
 }
 
 :root {
-  --background: oklch(1 0 0);
-  --foreground: oklch(0.145 0 0);
-  --card: oklch(1 0 0);
-  --card-foreground: oklch(0.145 0 0);
-  --popover: oklch(1 0 0);
-  --popover-foreground: oklch(0.145 0 0);
-  --primary: oklch(0.205 0 0);
-  --primary-foreground: oklch(0.985 0 0);
-  --secondary: oklch(0.97 0 0);
-  --secondary-foreground: oklch(0.205 0 0);
-  --muted: oklch(0.97 0 0);
-  --muted-foreground: oklch(0.556 0 0);
-  --accent: oklch(0.97 0 0);
-  --accent-foreground: oklch(0.205 0 0);
-  --destructive: oklch(0.577 0.245 27.325);
-  --border: oklch(0.922 0 0);
-  --input: oklch(0.922 0 0);
-  --ring: oklch(0.708 0 0);
-  --chart-1: oklch(0.87 0 0);
-  --chart-2: oklch(0.556 0 0);
-  --chart-3: oklch(0.439 0 0);
-  --chart-4: oklch(0.371 0 0);
-  --chart-5: oklch(0.269 0 0);
+  color-scheme: light;
+  --background: #faf8f3;
+  --foreground: #141414;
+  --card: #ffffff;
+  --card-foreground: #141414;
+  --popover: #ffffff;
+  --popover-foreground: #141414;
+  --primary: #ffc72c;
+  --primary-hover: #f0b000;
+  --primary-pressed: #c98f00;
+  --primary-foreground: #141414;
+  --secondary: #f3f0e8;
+  --secondary-foreground: #45403a;
+  --muted: #f3f0e8;
+  --muted-foreground: #6b6455;
+  --accent: #fff1c4;
+  --accent-foreground: #141414;
+  --destructive: #a11f25;
+  --border: #e9e4d8;
+  --input: #9a8f78;
+  --ring: #8a6100;
+  --chart-1: #ffc72c;
+  --chart-2: #8a6100;
+  --chart-3: #6b6455;
+  --chart-4: #45403a;
+  --chart-5: #141414;
   --radius: 0.625rem;
-  --sidebar: oklch(0.985 0 0);
-  --sidebar-foreground: oklch(0.145 0 0);
-  --sidebar-primary: oklch(0.205 0 0);
-  --sidebar-primary-foreground: oklch(0.985 0 0);
-  --sidebar-accent: oklch(0.97 0 0);
-  --sidebar-accent-foreground: oklch(0.205 0 0);
-  --sidebar-border: oklch(0.922 0 0);
-  --sidebar-ring: oklch(0.708 0 0);
+  --sidebar: var(--card);
+  --sidebar-foreground: var(--foreground);
+  --sidebar-primary: var(--primary);
+  --sidebar-primary-foreground: var(--primary-foreground);
+  --sidebar-accent: var(--accent);
+  --sidebar-accent-foreground: var(--accent-foreground);
+  --sidebar-border: var(--border);
+  --sidebar-ring: var(--ring);
 }
 
 .dark {
-  --background: oklch(0.145 0 0);
-  --foreground: oklch(0.985 0 0);
-  --card: oklch(0.205 0 0);
-  --card-foreground: oklch(0.985 0 0);
-  --popover: oklch(0.205 0 0);
-  --popover-foreground: oklch(0.985 0 0);
-  --primary: oklch(0.922 0 0);
-  --primary-foreground: oklch(0.205 0 0);
-  --secondary: oklch(0.269 0 0);
-  --secondary-foreground: oklch(0.985 0 0);
-  --muted: oklch(0.269 0 0);
-  --muted-foreground: oklch(0.708 0 0);
-  --accent: oklch(0.269 0 0);
-  --accent-foreground: oklch(0.985 0 0);
-  --destructive: oklch(0.704 0.191 22.216);
-  --border: oklch(1 0 0 / 10%);
-  --input: oklch(1 0 0 / 15%);
-  --ring: oklch(0.556 0 0);
-  --chart-1: oklch(0.87 0 0);
-  --chart-2: oklch(0.556 0 0);
-  --chart-3: oklch(0.439 0 0);
-  --chart-4: oklch(0.371 0 0);
-  --chart-5: oklch(0.269 0 0);
-  --sidebar: oklch(0.205 0 0);
-  --sidebar-foreground: oklch(0.985 0 0);
-  --sidebar-primary: oklch(0.488 0.243 264.376);
-  --sidebar-primary-foreground: oklch(0.985 0 0);
-  --sidebar-accent: oklch(0.269 0 0);
-  --sidebar-accent-foreground: oklch(0.985 0 0);
-  --sidebar-border: oklch(1 0 0 / 10%);
-  --sidebar-ring: oklch(0.556 0 0);
+  color-scheme: dark;
+  --background: #141414;
+  --foreground: #fbf6e9;
+  --card: #1e1d1a;
+  --card-foreground: #fbf6e9;
+  --popover: #1e1d1a;
+  --popover-foreground: #fbf6e9;
+  --secondary: #2b2a27;
+  --secondary-foreground: #fbf6e9;
+  --muted: #2b2a27;
+  --muted-foreground: #b5ac98;
+  --accent: #5c4100;
+  --accent-foreground: #fff1c4;
+  --destructive: #ff969b;
+  --border: #2e2c27;
+  --input: #9a8f78;
+  --ring: #ffc72c;
+  --chart-2: #ffd44f;
+  --chart-3: #c9bc9c;
+  --chart-4: #b5ac98;
+  --chart-5: #fbf6e9;
 }
 
 @layer base {
   * {
-    @apply border-border outline-ring/50;
+    @apply border-border outline-ring;
   }
   body {
     @apply bg-background text-foreground;
   }
   html {
     @apply font-sans;
+  }
+  :focus-visible {
+    outline: 2px solid var(--ring);
+    outline-offset: 3px;
+  }
+  ::selection {
+    background: var(--primary);
+    color: var(--primary-foreground);
+  }
+  input[type="checkbox"],
+  input[type="radio"] {
+    accent-color: var(--ring);
+  }
+}
+
+/* Charging gauge loader: the pie fills and holds; static at ~60% if reduced. */
+.gauge-charge-pie {
+  stroke-dasharray: 60 100;
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  .gauge-charge-pie {
+    animation: gauge-charge 1.8s ease-in-out infinite;
+  }
+}
+
+@keyframes gauge-charge {
+  0% {
+    stroke-dasharray: 2 100;
+  }
+  60%,
+  100% {
+    stroke-dasharray: 60 100;
+  }
+}
+
+/* On a yellow primary button the pie is ink-tinted so it shows on the fill. */
+.bg-primary[data-slot="button"]
+  [data-slot="loading-spinner"]
+  .gauge-charge-pie {
+  stroke: var(--primary-foreground);
+  stroke-opacity: 0.45;
+}
+
+@keyframes status-gauge-hold {
+  50% {
+    opacity: 0.6;
+  }
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  .status-gauge-held {
+    animation: status-gauge-hold 2.4s ease-in-out infinite;
+  }
+}
+
+@layer components {
+  /* Status colors stay independent of the yellow primary action. */
+  .status-badge {
+    color: var(--status-text, var(--muted-foreground));
+    background: var(--status-surface, var(--muted));
+    border-color: color-mix(in srgb, currentColor 25%, transparent);
+  }
+  .status-badge[data-status="SUBMITTED"] {
+    --status-text: #0b6e99;
+    --status-surface: #e2eef3;
+  }
+  .status-badge[data-status="ACCEPTED"] {
+    --status-text: #157a4b;
+    --status-surface: var(--card);
+    border-color: currentColor;
+  }
+  .status-badge[data-status="DECLINED"] {
+    --status-text: #c0262d;
+    --status-surface: #f7e5e6;
+  }
+  .status-badge[data-status="IN_PROGRESS"] {
+    --status-text: #2f4fd8;
+    --status-surface: #e6eafa;
+  }
+  .status-badge[data-status="WAITING_FOR_PARTS"] {
+    --status-text: #b4470a;
+    --status-surface: #f6e9e2;
+  }
+  .status-badge[data-status="AWAITING_APPROVAL"] {
+    --status-text: #7a3fc2;
+    --status-surface: #efe8f8;
+  }
+  .status-badge[data-status="READY"] {
+    --status-text: var(--primary-foreground);
+    --status-surface: var(--primary);
+  }
+  .status-badge[data-status="COMPLETED"] {
+    --status-text: #57534a;
+    --status-surface: #ebeae9;
+  }
+  .dark .status-badge[data-status="SUBMITTED"] {
+    --status-text: #8fd4f0;
+    --status-surface: #182e39;
+  }
+  .dark .status-badge[data-status="ACCEPTED"] {
+    --status-text: #87d9a8;
+  }
+  .dark .status-badge[data-status="DECLINED"] {
+    --status-text: #ff969b;
+    --status-surface: #391f22;
+  }
+  .dark .status-badge[data-status="IN_PROGRESS"] {
+    --status-text: #b2bfff;
+    --status-surface: #222b48;
+  }
+  .dark .status-badge[data-status="WAITING_FOR_PARTS"] {
+    --status-text: #ffb58b;
+    --status-surface: #3b281e;
+  }
+  .dark .status-badge[data-status="AWAITING_APPROVAL"] {
+    --status-text: #d5b5ff;
+    --status-surface: #30223e;
+  }
+  .dark .status-badge[data-status="COMPLETED"] {
+    --status-text: #b5ac98;
+    --status-surface: #2b2a27;
   }
 }
