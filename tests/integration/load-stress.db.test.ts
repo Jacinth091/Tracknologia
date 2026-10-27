@@ -114,23 +114,25 @@ describe("Load-stress invariants (burst)", () => {
           .order("created_at", { ascending: true }),
         "read burst Repair events",
       );
-      expect(events.data).toHaveLength(5);
-      const eventPairs = (events.data ?? []).map(
-        (event) => `${event.from_status}->${event.to_status}`,
-      );
-      for (let index = 0; index < eventPairs.length; index += 1) {
-        const [fromStatus, toStatus] = eventPairs[index]?.split("->") ?? [];
-        if (toStatus === "WAITING_FOR_PARTS") {
-          expect(fromStatus).toBe("IN_PROGRESS");
-        } else if (toStatus === "READY") {
-          expect(fromStatus).toBe("IN_PROGRESS");
-        } else {
-          throw new Error(`Unexpected burst transition ${eventPairs[index]}`);
-        }
+      expect(events.data).toHaveLength(10);
+      for (const repair of durable.data ?? []) {
+        const history = (events.data ?? []).filter(
+          (event) => event.repair_id === repair.id,
+        );
+        expect(history).toHaveLength(2);
+        expect(history).toEqual(
+          expect.arrayContaining([
+            expect.objectContaining({
+              from_status: null,
+              to_status: "IN_PROGRESS",
+            }),
+            expect.objectContaining({
+              from_status: "IN_PROGRESS",
+              to_status: repair.current_status,
+            }),
+          ]),
+        );
       }
-      // Both targets are legitimately reachable from IN_PROGRESS; which one
-      // wins each race is timing-dependent, so only the per-event invariant
-      // above is asserted.
     } finally {
       await cleanupFixture(adminClient, {
         providerIds: [provider.providerId],
