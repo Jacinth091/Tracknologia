@@ -94,6 +94,24 @@ docker compose run --rm web npm run lint
 docker compose run --rm web npm run build
 ```
 
+## UAT pilot data pack (Plan 11)
+
+Manual UAT runs against repeatable seed data, never production personal data.
+The pack is seeded by `scripts/uat/seed.mjs` (refuses non-local hosts; lives
+alongside the E2E fixture contract):
+
+```bash
+node scripts/uat/seed.mjs                                                # seed
+node scripts/uat/seed.mjs --cleanup scripts/uat/outputs/<manifest>.json  # one run
+pnpm db:reset                                                       # hard reset
+```
+
+Cleanup uses only the user and Provider identities in the generated manifest. Old manifests without identities are refused; reset the disposable stack instead. The database suite runs a two-pack seed and cleanup isolation check (`tests/integration/uat.db.test.ts`); it requires the local Supabase JWT secret as well as the standard test credentials.
+
+It prints a credential manifest for the four personas (one-person Shop,
+multi-Staff Shop, Independent Provider, closed-intake Shop). The pilot record
+lives in `docs/release/v0.1.0-hardening/evidence/11-UAT-PILOT.md`.
+
 ## Real PostgreSQL / RLS integration tests
 
 Run `supabase db reset` before `pnpm test:db` when working against a local
