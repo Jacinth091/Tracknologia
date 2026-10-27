@@ -134,11 +134,13 @@ authenticated roles.
 ## Load & resilience harness
 
 Plan 10 adds a zero-dependency load harness under `scripts/load/` that runs
-against a real stack outside Vitest/CI. It is separate from the automated
-suite; the burst _invariants_ it would validate are asserted in CI by
+against a real stack outside Vitest/CI. Runner CLI contract tests exercise
+selection, local page preconditions, and failure/denial exit status in CI. The
+live load runs are separate from the automated suite; the burst _invariants_ it would validate are asserted in CI by
 `tests/integration/load-stress.db.test.ts` (same-Repair and same-Request races
 serialize to one durable outcome; public-operation abuse bursts are denied
 above the durable budget).
 
-Prerequisites, usage, and recorded baselines live in
+Prerequisites and usage live in `docs/DEVELOPMENT.md`. Corrected baselines and
+public-action measurements are still pending; see
 `docs/release/v0.1.0-hardening/evidence/10-LOAD-RESILIENCE-BASELINES.md`.

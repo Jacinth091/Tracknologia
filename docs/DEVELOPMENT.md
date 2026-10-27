@@ -113,17 +113,25 @@ pnpm db:reset
 #    Env contract matches tests/integration (SUPABASE_TEST_URL / *_KEY / JWT_SECRET).
 node scripts/load/seed.mjs
 
-# 3. Run HTTPS page-read scenarios against a built app (optional but required
-#    for dashboard-read / repair-list-search baselines):
+# 3. Start the built app for dashboard / repair-list page profiles:
 pnpm build && pnpm start
 
-# 4. Run every profile (dashboard, tracking, mutations, races, abuse burst):
-node scripts/load/harness.mjs
-#    or a single profile:  node scripts/load/harness.mjs --profile tracking-lookup
+# 4. In another shell, run every profile with the local app URL:
+LOAD_APP_URL=http://localhost:3000 node scripts/load/harness.mjs
+# A DB-only profile does not require LOAD_APP_URL:
+node scripts/load/harness.mjs --profile tracking-lookup
+# Select every profile for one scenario:
+node scripts/load/harness.mjs --scenario tracking-lookup
 ```
 
 Per-stage captures (count, p50/p95/p99, errors, denials) are written as JSON
-under `scripts/load/outputs/`. Session-cookie construction for the page-read
+under `scripts/load/outputs/`. Use either `--profile` or `--scenario`; unknown,
+missing, or combined options fail. Any unexpected sample error, failed invariant,
+or empty stage marks that stage FAIL, writes its diagnostics, stops the run, and
+returns a nonzero exit status. Deliberate limiter denials and expected
+`INVALID_STATUS_TRANSITION` rejections during overlapping operations on the same
+Repair in the status-change profile are counted separately only when an
+overlapping operation succeeds and do not fail the run. Session-cookie construction for the page-read
 scenarios round-trips the `@supabase/ssr` encoding (`base64-` prefix), so the
 harness measures real SSR page work.
 
