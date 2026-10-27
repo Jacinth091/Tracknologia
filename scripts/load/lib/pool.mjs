@@ -5,7 +5,6 @@
 export async function runBurst({ concurrency, durationMs, rampMs = 0, task }) {
   const results = [];
   const start = performance.now();
-  const taskStart = start + (rampMs > 0 ? rampMs : 0);
 
   await Promise.all(
     Array.from({ length: concurrency }, async (_, workerIndex) => {
@@ -13,7 +12,7 @@ export async function runBurst({ concurrency, durationMs, rampMs = 0, task }) {
         rampMs > 0
           ? start + (workerIndex / Math.max(1, concurrency - 1)) * rampMs
           : start;
-      if (workerStart > taskStart) {
+      if (workerStart > performance.now()) {
         await sleep(workerStart - performance.now());
       }
 
@@ -23,9 +22,10 @@ export async function runBurst({ concurrency, durationMs, rampMs = 0, task }) {
           const outcome = await task();
           results.push({
             latencyMs: performance.now() - began,
-            ok: outcome.ok !== false,
+            ok: outcome.ok !== false && outcome.kind !== "error",
             denied: Boolean(outcome.denied),
             kind: outcome.kind ?? "ok",
+            httpStatus: outcome.httpStatus ?? null,
             error: outcome.error ?? null,
           });
         } catch (error) {
@@ -73,6 +73,14 @@ export function summarize(results) {
     p99: percentile(99),
     errorCount,
     deniedCount,
+    httpStatusCounts: Object.fromEntries(
+      [
+        ...new Set(results.map((r) => r.httpStatus).filter((s) => s != null)),
+      ].map((status) => [
+        status,
+        results.filter((r) => r.httpStatus === status).length,
+      ]),
+    ),
     errorKinds: errMessages,
   };
 }

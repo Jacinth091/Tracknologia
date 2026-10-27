@@ -8,6 +8,7 @@ import {
   createServiceClient,
   createUserClient,
   mintSupabaseJwt,
+  buildSsrSessionCookie,
 } from "./lib/supabase.mjs";
 import { runBurst, summarize } from "./lib/pool.mjs";
 import * as scenarios from "./scenarios.mjs";
@@ -46,7 +47,16 @@ function buildContext(fixtures) {
     expiresInSeconds: 3600,
   });
   const owner = createUserClient(env.url, env.anonKey, ownerToken);
-  return { env, service, owner, fixtures, appUrl: fixtures.appUrl };
+  if (fixtures.url !== env.url)
+    throw new Error(
+      "Fixtures belong to a different Supabase URL; reseed first",
+    );
+  const ssrCookie = buildSsrSessionCookie(env.url, ownerToken, {
+    id: fixtures.owner.userId,
+    email: fixtures.owner.email,
+    role: "authenticated",
+  });
+  return { env, service, owner, fixtures, appUrl: env.appUrl, ssrCookie };
 }
 
 async function runProfile(name, profile, ctx) {

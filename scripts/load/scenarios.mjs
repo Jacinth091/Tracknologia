@@ -129,8 +129,12 @@ export function createAbuseBurst(ctx) {
       },
     );
     const row = Array.isArray(data) ? data[0] : data;
-    const denied = Boolean(row && row.allowed === false) || Boolean(error);
-    return { ok: !denied, denied, error: error?.message };
+    if (error || typeof row?.allowed !== "boolean")
+      return {
+        ok: false,
+        error: error?.message ?? "invalid rate-limit result",
+      };
+    return { ok: true, denied: !row.allowed };
   };
 }
 
@@ -166,8 +170,28 @@ export function createRaceSameRepair(ctx) {
     ]);
     const winners = [a, b].filter((r) => !r.error);
     const losers = [a, b].filter((r) => r.error);
+    const durable = await ctx.service
+      .from("repairs")
+      .select("current_status")
+      .eq("id", repairId)
+      .single();
+    const events = await ctx.service
+      .from("repair_status_events")
+      .select("from_status, to_status")
+      .eq("repair_id", repairId);
+    const winningStatus = !a.error ? "WAITING_FOR_PARTS" : "READY";
+    const transitions =
+      events.data?.filter((event) => event.from_status === "IN_PROGRESS") ?? [];
     return {
-      ok: winners.length === 1,
+      ok:
+        winners.length === 1 &&
+        losers.length === 1 &&
+        losers[0].error?.message?.includes("INVALID_STATUS_TRANSITION") &&
+        !durable.error &&
+        durable.data?.current_status === winningStatus &&
+        !events.error &&
+        transitions.length === 1 &&
+        transitions[0].to_status === winningStatus,
       denied: false,
       kind:
         losers.length > 0 &&
@@ -234,14 +258,41 @@ export function createRaceSameRequest(ctx) {
       ctx.owner.rpc("decline_repair_request", { p_request_id: requestId }),
     ]);
     const losers = [accept, decline].filter((r) => r.error);
-    const expected = losers.every((r) =>
-      r.error?.message?.includes("REQUEST_ALREADY_PROCESSED"),
-    );
+    const expected =
+      losers.length === 1 &&
+      [accept, decline].filter((r) => !r.error).length === 1 &&
+      losers.every((r) =>
+        r.error?.message?.includes("REQUEST_ALREADY_PROCESSED"),
+      );
+    const durable = await ctx.service
+      .from("repair_requests")
+      .select("status, accepted_at, declined_at")
+      .eq("id", requestId)
+      .single();
+    const repairs = await ctx.service
+      .from("repairs")
+      .select("id, current_status")
+      .eq("repair_request_id", requestId);
+    const accepted = !accept.error;
+    const valid =
+      expected &&
+      !durable.error &&
+      !repairs.error &&
+      (accepted
+        ? durable.data?.status === "ACCEPTED" &&
+          durable.data.accepted_at &&
+          !durable.data.declined_at &&
+          repairs.data?.length === 1 &&
+          repairs.data[0].current_status === "IN_PROGRESS"
+        : durable.data?.status === "DECLINED" &&
+          durable.data.declined_at &&
+          !durable.data.accepted_at &&
+          repairs.data?.length === 0);
     return {
-      ok: expected,
+      ok: Boolean(valid),
       denied: false,
-      kind: expected ? "expected-rejection" : "error",
-      error: expected
+      kind: valid ? "expected-rejection" : "error",
+      error: valid
         ? null
         : losers.map((r) => r.error?.message).join("; ") || null,
     };
@@ -251,7 +302,7 @@ export function createRaceSameRequest(ctx) {
 async function pageFetch(ctx, pathname) {
   const res = await fetch(`${ctx.appUrl}${pathname}`, {
     headers: {
-      cookie: `${ctx.fixtures.ssrCookie.name}=${ctx.fixtures.ssrCookie.value}`,
+      cookie: `${ctx.ssrCookie.name}=${ctx.ssrCookie.value}`,
       "x-tracknologia-load-harness": "1",
     },
     redirect: "manual",

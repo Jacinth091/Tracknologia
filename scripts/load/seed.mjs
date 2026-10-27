@@ -7,14 +7,13 @@ import {
   createServiceClient,
   createUserClient,
   mintSupabaseJwt,
-  buildSsrSessionCookie,
 } from "./lib/supabase.mjs";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const OUTPUT_DIR = path.join(__dirname, "outputs");
 const FIXTURES_PATH = path.join(OUTPUT_DIR, "fixtures.json");
 
-const OWNER_PASSWORD = "LoadHarnessPassword1!";
+const OWNER_PASSWORD = randomUUID();
 
 async function main() {
   const env = resolveEnv();
@@ -119,28 +118,16 @@ async function main() {
     });
   }
 
-  const ssrCookie = buildSsrSessionCookie(env.url, ownerToken, {
-    id: user.id,
-    email: user.email,
-    role: "authenticated",
-  });
-
   const fixtures = {
     url: env.url,
-    anonKey: env.anonKey,
-    serviceRoleKey: env.serviceRoleKey,
-    jwtSecret: env.jwtSecret,
-    appUrl: env.appUrl,
     owner: {
       userId: user.id,
       email,
-      password: OWNER_PASSWORD,
       providerId,
       providerSlug,
     },
     repairs,
     requests,
-    ssrCookie,
   };
 
   mkdirSync(OUTPUT_DIR, { recursive: true });

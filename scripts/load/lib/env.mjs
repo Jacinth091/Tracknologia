@@ -40,5 +40,26 @@ export function resolveEnv() {
     );
   }
 
+  for (const [name, value] of [
+    ["Supabase URL", url],
+    ["LOAD_APP_URL", appUrl],
+  ]) {
+    if (!value && name === "LOAD_APP_URL") continue;
+    let parsed;
+    try {
+      parsed = new URL(value);
+    } catch {
+      throw new Error(`${name} must be a valid local HTTP URL`);
+    }
+    if (
+      !["http:", "https:"].includes(parsed.protocol) ||
+      !["localhost", "127.0.0.1", "[::1]"].includes(parsed.hostname) ||
+      parsed.username ||
+      parsed.password
+    ) {
+      throw new Error(`${name} must target a disposable local host`);
+    }
+  }
+
   return { url, anonKey, serviceRoleKey, jwtSecret, appUrl };
 }
