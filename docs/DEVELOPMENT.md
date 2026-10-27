@@ -102,7 +102,7 @@ Current deliberate omissions include Axios, Express, NestJS, React Router, Prism
 
 A zero-dependency load harness lives in `scripts/load/` and runs outside the
 Vitest/Playwright suites. It drives the same persistence seams the application
-uses against a real Supabase stack.
+uses against a disposable local Supabase stack only. Both Supabase and app URLs must be loopback URLs. The harness creates many durable records; reset the local stack after use.
 
 ```bash
 # 1. Local stack must be running and reset
@@ -127,5 +127,4 @@ under `scripts/load/outputs/`. Session-cookie construction for the page-read
 scenarios round-trips the `@supabase/ssr` encoding (`base64-` prefix), so the
 harness measures real SSR page work.
 
-See `docs/release/v0.1.0-hardening/evidence/10-LOAD-RESILIENCE-BASELINES.md`
-for the recorded baselines and current verdicts.
+The tracking and request profiles measure database RPCs only, not the public Server Actions. See `docs/release/v0.1.0-hardening/evidence/10-LOAD-RESILIENCE-BASELINES.md` for outstanding evidence.
