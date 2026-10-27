@@ -97,3 +97,42 @@ Before adding a package, answer:
 4. Is the dependency worth maintaining for the MVP?
 
 Current deliberate omissions include Axios, Express, NestJS, React Router, Prisma, Redux and Zustand.
+
+## Load harness (Plan 10)
+
+A zero-dependency load harness lives in `scripts/load/` and runs outside the
+Vitest/Playwright suites. It drives the same persistence seams the application
+uses against a disposable local Supabase stack only. Both Supabase and app URLs must be loopback URLs. The harness creates many durable records; reset the local stack after use.
+
+```bash
+# 1. Local stack must be running and reset
+npx supabase start
+pnpm db:reset
+
+# 2. Seed fixtures (Provider, owner User, Repairs, Repair Requests)
+#    Env contract matches tests/integration (SUPABASE_TEST_URL / *_KEY / JWT_SECRET).
+node scripts/load/seed.mjs
+
+# 3. Start the built app for dashboard / repair-list page profiles:
+pnpm build && pnpm start
+
+# 4. In another shell, run every profile with the local app URL:
+LOAD_APP_URL=http://localhost:3000 node scripts/load/harness.mjs
+# A DB-only profile does not require LOAD_APP_URL:
+node scripts/load/harness.mjs --profile tracking-lookup
+# Select every profile for one scenario:
+node scripts/load/harness.mjs --scenario tracking-lookup
+```
+
+Per-stage captures (count, p50/p95/p99, errors, denials) are written as JSON
+under `scripts/load/outputs/`. Use either `--profile` or `--scenario`; unknown,
+missing, or combined options fail. Any unexpected sample error, failed invariant,
+or empty stage marks that stage FAIL, writes its diagnostics, stops the run, and
+returns a nonzero exit status. Deliberate limiter denials and expected
+`INVALID_STATUS_TRANSITION` rejections during overlapping operations on the same
+Repair in the status-change profile are counted separately only when an
+overlapping operation succeeds and do not fail the run. Session-cookie construction for the page-read
+scenarios round-trips the `@supabase/ssr` encoding (`base64-` prefix), so the
+harness measures real SSR page work.
+
+The tracking and request profiles measure database RPCs only, not the public Server Actions. See `docs/release/v0.1.0-hardening/evidence/10-LOAD-RESILIENCE-BASELINES.md` for outstanding evidence.

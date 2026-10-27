@@ -24,6 +24,8 @@ This directory contains the repository-facing engineering documentation for Trac
 
 - `handoff/` — process parts: change control, security/reliability scope, testing/CI gates, bug burn, load, UAT, RC/deployment, stabilization, readiness checklist. Start at `00_POST_MVP_MASTER_HANDOFF.md`.
 - `plans/` — executable implementation plans derived from the handoff, with dependency order and shared execution context. Start at `00_MASTER_INDEX_AND_DEPENDENCY_MAP.md`.
+- `evidence/` — per-plan execution records and release evidence (load baselines, UAT pilot, RC deployment record).
+- `RELEASE_NOTES.md` — what v0.1.0 delivers and its explicit known limitations.
 
 ## Architecture Decision Records
 
