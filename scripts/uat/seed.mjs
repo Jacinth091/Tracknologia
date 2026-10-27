@@ -46,7 +46,7 @@ const APP_URL =
   process.env.NEXT_PUBLIC_APP_URL ||
   "http://localhost:3000";
 
-const LOCAL_HOSTS = new Set(["localhost", "127.0.0.1", "::1"]);
+const LOCAL_HOSTS = new Set(["localhost", "127.0.0.1", "[::1]"]);
 
 function fail(message) {
   throw new Error(`[UAT seed] ${message}`);
@@ -110,7 +110,7 @@ function ownerClient(user) {
 
 // ---------------------------------------------------------------- guard
 
-async function assertOk({ error }, operation) {
+function assertOk({ error }, operation) {
   if (error) fail(`${operation} failed: ${error.message}`);
 }
 
@@ -131,7 +131,7 @@ async function seedUser(displayName) {
   assertOk({ error }, `create user ${email}`);
   const user = data.user;
   if (!user?.id) fail(`create user ${email} returned no id`);
-  userIds.push(user.id);
+  userIds.push({ id: user.id, email });
   assertOk(
     await admin
       .from("provider_user_profiles")
@@ -163,7 +163,7 @@ async function seedProvider({
     .select("id")
     .single();
   assertOk({ error }, `create provider ${slug}`);
-  providerIds.push(provider.id);
+  providerIds.push({ id: provider.id, slug });
   if (modes.length > 0) {
     assertOk(
       await admin
@@ -344,6 +344,8 @@ async function main() {
       "Re-run from a clean database: `pnpm db:reset`, then seed again.",
       "Reset the whole pack with --cleanup plus `pnpm db:reset`.",
     ],
+    users: userIds,
+    providers: providerIds,
     personas: [],
   };
 
@@ -353,7 +355,6 @@ async function main() {
     type: "SHOP",
     name: "Solo Quick Fix",
     modes: ["DROP_OFF", "MEETUP"],
-    service_area: null,
   });
   await seedMembership({
     provider: solo.provider,
@@ -450,7 +451,6 @@ async function main() {
     type: "SHOP",
     name: "Tracknologia Service Center",
     modes: ["DROP_OFF", "MEETUP"],
-    service_area: null,
     address: "123 Main Road, Quezon City",
   });
   await seedMembership({
@@ -478,6 +478,7 @@ async function main() {
     memberRole: "OWNER",
     repairStates: "representative of every lifecycle state",
   });
+  manifest.personas.at(-1).newStaffEmail = `uat.invite.new.${runId}@uat.test`;
   manifest.personas.at(-1).invitations = [
     await seedInvitation({
       provider: shop.provider,
@@ -599,7 +600,7 @@ async function main() {
     type: "INDEPENDENT",
     name: "Indy Tech Valet",
     modes: ["MEETUP", "HOME_SERVICE"],
-    service_area: "Marikina, Antipolo, Cainta",
+    serviceArea: "Marikina, Antipolo, Cainta",
   });
   await seedMembership({
     provider: indie.provider,
@@ -622,7 +623,7 @@ async function main() {
         problem: "Trackpad unresponsive",
         mode: "HOME_SERVICE",
         details: "First floor unit, morning visits only",
-        transitions: ["WAITING_FOR_PARTS", "IN_PROGRESS"],
+        transitions: ["WAITING_FOR_PARTS"],
       }),
       await seedRepair(indieClient, indie, {
         customerName: "Fay Bautista",
@@ -703,60 +704,94 @@ async function main() {
 // ---------------------------------------------------------------- cleanup
 
 async function cleanup(manifest) {
-  // Delete via the same cascade order as tests/e2e: memberships, profiles,
-  // providers (repairs/requests/events/updates cascade with providers), then
-  // the Auth users.
-  const providerSlugs = manifest.personas.map(
-    (persona) => persona.providerSlug,
-  );
-  const { data: providers, error: providerReadError } = await admin
+  // Old manifests cannot safely identify their users; reset the disposable stack instead.
+  if (
+    !/^[0-9a-f]{8}$/.test(manifest.runId ?? "") ||
+    !Array.isArray(manifest.users) ||
+    !manifest.users.length ||
+    !Array.isArray(manifest.providers) ||
+    !manifest.providers.length
+  ) {
+    fail("Invalid or legacy manifest; use pnpm db:reset instead of cleanup");
+  }
+  const uuid =
+    /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+  if (
+    manifest.users.some(
+      (user) =>
+        !uuid.test(user.id ?? "") ||
+        !user.email?.startsWith("uat.") ||
+        !user.email.endsWith(`.${manifest.runId}@uat.test`),
+    ) ||
+    manifest.providers.some(
+      (provider) =>
+        !uuid.test(provider.id ?? "") ||
+        !provider.slug?.endsWith(`-${manifest.runId}`),
+    )
+  ) {
+    fail("Invalid manifest identities; refusing cleanup");
+  }
+  const userIdList = manifest.users.map((user) => user.id);
+  const providerIdList = manifest.providers.map((provider) => provider.id);
+  const providers = await admin
     .from("providers")
-    .select("id")
-    .in("slug", providerSlugs);
-  assertOk({ error: providerReadError }, "read providers for cleanup");
-  const providerIdList = (providers ?? []).map((row) => row.id);
-
-  const { data: users, error: userReadError } =
-    await admin.auth.admin.listUsers({
-      page: 1,
-      perPage: 1000,
-    });
-  assertOk({ error: userReadError }, "list users for cleanup");
-  const uatUsers = (users?.users ?? []).filter((user) =>
-    user.email?.includes("uat."),
+    .select("id, slug")
+    .in("id", providerIdList);
+  assertOk(providers, "read providers for cleanup");
+  if (
+    providers.data.some(
+      (row) =>
+        !manifest.providers.some(
+          (provider) => provider.id === row.id && provider.slug === row.slug,
+        ),
+    )
+  ) {
+    fail("Provider identity does not match the manifest");
+  }
+  const existingUsers = [];
+  for (const user of manifest.users) {
+    const result = await admin.auth.admin.getUserById(user.id);
+    if (result.error?.status === 404) continue;
+    assertOk(result, "read user for cleanup");
+    if (!result.data.user || result.data.user.email !== user.email)
+      fail("User identity does not match the manifest");
+    existingUsers.push(user);
+  }
+  const memberships = await admin
+    .from("provider_memberships")
+    .select("user_id, provider_id")
+    .in("user_id", userIdList);
+  assertOk(memberships, "read memberships for cleanup");
+  if (
+    memberships.data.some(
+      (membership) => !providerIdList.includes(membership.provider_id),
+    )
+  ) {
+    fail("A manifest user belongs to another Provider; refusing cleanup");
+  }
+  assertOk(
+    await admin.from("provider_memberships").delete().in("user_id", userIdList),
+    "delete UAT memberships",
   );
-  const uatUserIds = uatUsers.map((user) => user.id);
-
-  if (uatUserIds.length > 0) {
-    assertOk(
-      await admin
-        .from("provider_memberships")
-        .delete()
-        .in("user_id", uatUserIds),
-      "delete UAT memberships",
-    );
-    assertOk(
-      await admin
-        .from("provider_user_profiles")
-        .delete()
-        .in("user_id", uatUserIds),
-      "delete UAT profiles",
-    );
-  }
-  if (providerIdList.length > 0) {
-    assertOk(
-      await admin.from("providers").delete().in("id", providerIdList),
-      "delete UAT providers",
-    );
-  }
-  for (const user of uatUsers) {
+  assertOk(
+    await admin
+      .from("provider_user_profiles")
+      .delete()
+      .in("user_id", userIdList),
+    "delete UAT profiles",
+  );
+  assertOk(
+    await admin.from("providers").delete().in("id", providerIdList),
+    "delete UAT providers",
+  );
+  for (const user of existingUsers) {
     assertOk(
       await admin.auth.admin.deleteUser(user.id),
       `delete user ${user.email}`,
     );
   }
   console.log(
-    `[UAT seed] Cleaned ${providerIdList.length} providers and ${uatUserIds.length} users.`,
+    `[UAT seed] Cleaned ${providers.data.length} providers and ${existingUsers.length} users.`,
   );
 }
 
