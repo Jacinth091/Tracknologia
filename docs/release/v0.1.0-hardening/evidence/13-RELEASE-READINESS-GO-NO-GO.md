@@ -5,7 +5,7 @@ evidence at the decision moment.
 **Repository docs:** [Plan 14](../plans/14_RELEASE_READINESS_GO_NO_GO_PLAN.md),
 authoritative source
 [handoff checklist](../handoff/09_RELEASE_READINESS_CHECKLIST.md).
-**Dependencies:** [PR #84](https://github.com/Jacinth091/Tracknologia/pull/84) (partial load harness), [PR #98](https://github.com/Jacinth091/Tracknologia/pull/98) (UAT pack), and [PR #99](https://github.com/Jacinth091/Tracknologia/pull/99) (RC evidence and release notes) remain open. Their draft artifacts are not accepted release evidence. [Operations runbook](../../../OPERATIONS.md).
+**Merged scaffolds:** [PR #84](https://github.com/Jacinth091/Tracknologia/pull/84) (partial load harness), [PR #98](https://github.com/Jacinth091/Tracknologia/pull/98) (UAT pack), and [PR #99](https://github.com/Jacinth091/Tracknologia/pull/99) (RC evidence and release notes) are merged into staging. See the [load](10-LOAD-RESILIENCE-BASELINES.md), [UAT](11-UAT-PILOT.md), and [RC](12-RC-DEPLOYMENT-REHEARSAL.md) records and [operations runbook](../../../OPERATIONS.md). Merging these scaffolds does not establish candidate-specific release evidence.
 
 **Decision status: NOT VERIFIED / NO-GO pending evidence.** No immutable RC SHA
 has been selected. All gate statuses below are TBD or BLOCKED until the Lead verifies
@@ -22,7 +22,7 @@ future candidate; retain exact run URLs as historical references only.
 
 | Command (in CI order)           | Local result @ `f8641d8`, 2026-10-26 | Notes                                                                                                                                                                                                                                                                            |
 | ------------------------------- | ------------------------------------ | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `pnpm format:check`             | PASS (repo files)                    | The only flagged paths are untracked local tooling dirs and `scripts/uat/outputs/*.json` manifests; ignore rules ride in PRs #84/#98                                                                                                                                             |
+| `pnpm format:check`             | PASS (repo files)                    | The only flagged paths are untracked local tooling dirs and `scripts/uat/outputs/*.json` manifests; ignore rules were later merged in PRs #84/#98                                                                                                                                |
 | `pnpm lint`                     | PASS                                 | 1 pre-existing plugin warning, no errors                                                                                                                                                                                                                                         |
 | `pnpm typecheck`                | PASS                                 | `next typegen && tsc --noEmit`                                                                                                                                                                                                                                                   |
 | `pnpm test:run`                 | 214/214 PASS                         | Unit + contract suites                                                                                                                                                                                                                                                           |
@@ -59,15 +59,17 @@ until candidate-specific evidence and the responsible review are recorded.
 
 ### Scope and governance
 
-| Gate                             | Status | Evidence                                                                                                                                     |
-| -------------------------------- | ------ | -------------------------------------------------------------------------------------------------------------------------------------------- |
-| MVP Modules implemented          | TBD    | Shipped requirements appear in this commit (repairs, repair-requests, providers, auth, tracking modules + tests)                             |
-| Soft freeze completed            | TBD    | Plan 12 ceremony; proposed record pending in PR #99                                                                                          |
-| Hard freeze active               | TBD    | Same as above                                                                                                                                |
-| Every open issue has P0/P1/P2/P3 | TBD    | All open issues carry priority labels except umbrella #81 (v0.2.0) — fork identity lacks upstream label perms; owner adds `P3: Low Priority` |
-| No unresolved P0                 | TBD    | Reconcile issues and open review findings at the candidate gate, independent of labels                                                       |
-| No unresolved P1                 | TBD    | Reconcile issues and open review findings at the candidate gate, independent of labels                                                       |
-| Accepted P2 risks documented     | TBD    | Record at approval (form below)                                                                                                              |
+| Gate                             | Status  | Evidence                                                                                                                                                                                   |
+| -------------------------------- | ------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| MVP Modules implemented          | TBD     | Shipped requirements appear in this commit (repairs, repair-requests, providers, auth, tracking modules + tests)                                                                           |
+| Soft freeze completed            | TBD     | Plan 12 ceremony; use the merged [RC record](12-RC-DEPLOYMENT-REHEARSAL.md)                                                                                                                |
+| Hard freeze active               | TBD     | Same as above                                                                                                                                                                              |
+| Every open issue has P0/P1/P2/P3 | BLOCKED | [Issue #81](https://github.com/Jacinth091/Tracknologia/issues/81) has no P-level label; assign a priority and recheck all open issues at the RC snapshot                                   |
+| No unresolved P0                 | BLOCKED | [Issue #51](https://github.com/Jacinth091/Tracknologia/issues/51), the in-scope release gate, is open and P0-labeled; reconcile its required evidence and open findings at the RC snapshot |
+| No unresolved P1                 | TBD     | Reconcile issues and open review findings at the candidate gate, independent of labels                                                                                                     |
+| Accepted P2 risks documented     | TBD     | Record at approval (form below)                                                                                                                                                            |
+
+Issue-state snapshot (2026-10-27): [#51](https://github.com/Jacinth091/Tracknologia/issues/51) is the open, P0-labeled v0.1.0 readiness gate. [#97](https://github.com/Jacinth091/Tracknologia/issues/97) is also open and P0-labeled, but belongs to the separate November validation program; its inclusion in this release must be decided explicitly by the Lead. [#81](https://github.com/Jacinth091/Tracknologia/issues/81) remains open without a P-level label. Recheck all issues and review blockers at the RC snapshot rather than treating this list as exhaustive.
 
 ### Architecture
 
@@ -96,17 +98,17 @@ Lead review of these evidence pointers must be performed on the selected candida
 
 ### Provider onboarding / Staff
 
-| Gate                                   | Status | Evidence                                                                     |
-| -------------------------------------- | ------ | ---------------------------------------------------------------------------- |
-| Independent onboarding works           | TBD    | E2E + integration                                                            |
-| Shop Owner onboarding works            | TBD    | E2E + integration                                                            |
-| Staff joins by secure invitation only  | TBD    | `invitations.db.test.ts`                                                     |
-| Invitation single-use                  | TBD    | Same suite                                                                   |
-| Invitation expires                     | TBD    | Same suite                                                                   |
-| Invitation revocable                   | TBD    | Same suite                                                                   |
-| Email binding works                    | TBD    | Same suite (invited-email binding + mismatch error detail)                   |
-| Duplicate-active-invite policy defined | TBD    | Unique active-invitation constraint + tested refusal                         |
-| Production email delivery works        | TBD    | Resend production configuration at deploy; proposed record pending in PR #99 |
+| Gate                                   | Status | Evidence                                                                                             |
+| -------------------------------------- | ------ | ---------------------------------------------------------------------------------------------------- |
+| Independent onboarding works           | TBD    | E2E + integration                                                                                    |
+| Shop Owner onboarding works            | TBD    | E2E + integration                                                                                    |
+| Staff joins by secure invitation only  | TBD    | `invitations.db.test.ts`                                                                             |
+| Invitation single-use                  | TBD    | Same suite                                                                                           |
+| Invitation expires                     | TBD    | Same suite                                                                                           |
+| Invitation revocable                   | TBD    | Same suite                                                                                           |
+| Email binding works                    | TBD    | Same suite (invited-email binding + mismatch error detail)                                           |
+| Duplicate-active-invite policy defined | TBD    | Unique active-invitation constraint + tested refusal                                                 |
+| Production email delivery works        | TBD    | Resend production configuration at deploy; use the merged [RC record](12-RC-DEPLOYMENT-REHEARSAL.md) |
 
 ### Repair Requests
 
@@ -118,7 +120,7 @@ Lead review of these evidence pointers must be performed on the selected candida
 | Provider isolation holds           | TBD    | Same suite                                                                                     |
 | Accept creates exactly one Repair  | TBD    | Accept tests + serialization constraint                                                        |
 | Decline creates none               | TBD    | Same suite                                                                                     |
-| Accept/decline races safe          | TBD    | Existing race tests are historical references; PR #84 remains unmerged and requires acceptance |
+| Accept/decline races safe          | TBD    | PR #84 is merged; rerun race tests against the selected candidate                              |
 | Durable abuse protection active    | TBD    | Limiter unit tests + RPC contract (`check_public_operation_rate_limit`) + E2E ingress behavior |
 
 ### Repairs
@@ -148,8 +150,8 @@ Lead review of these evidence pointers must be performed on the selected candida
 ### Load / resilience
 
 **NOT VERIFIED.** [PR #84](https://github.com/Jacinth091/Tracknologia/pull/84)
-is a partial harness and remains unmerged. Its previous baselines were
-withdrawn. Before the release gate, record corrected, sanitized and reproducible
+merged a partial harness; its previous baselines were withdrawn. See the
+[load evidence record](10-LOAD-RESILIENCE-BASELINES.md). Before the release gate, record corrected, sanitized and reproducible
 candidate-specific dashboard and public Tracking/Request measurements,
 concurrency and resource observations, p95/error results, and actual
 Supabase, Resend and analytics dependency-failure drills. Link the artifacts
@@ -175,9 +177,10 @@ permission checks. See Plan 14 and the Plan 12 rehearsal.
 
 ### UAT
 
-**TBD:** human execution and acceptance are required. The proposed data pack and
-pilot scaffold in [PR #98](https://github.com/Jacinth091/Tracknologia/pull/98)
-remain unmerged; their CI checks do not constitute human UAT.
+**TBD:** human execution and acceptance are required. The data pack and
+[pilot scaffold](11-UAT-PILOT.md) were merged in
+[PR #98](https://github.com/Jacinth091/Tracknologia/pull/98); their CI checks
+do not constitute human UAT.
 
 ```text
 [ ] Shop Owner flow accepted
@@ -192,9 +195,10 @@ remain unmerged; their CI checks do not constitute human UAT.
 
 ### Configuration / migration / recovery
 
-Owned by the deploy ceremony. The proposed rehearsal record is in
-[PR #99](https://github.com/Jacinth091/Tracknologia/pull/99), which is still
-unmerged. The [operations runbook](../../../OPERATIONS.md) is available:
+Owned by the deploy ceremony. The [rehearsal record](12-RC-DEPLOYMENT-REHEARSAL.md)
+and [release notes](../RELEASE_NOTES.md) were merged in
+[PR #99](https://github.com/Jacinth091/Tracknologia/pull/99); their execution
+and approval remain TBD. The [operations runbook](../../../OPERATIONS.md) is available:
 
 ```text
 [ ] production Supabase configuration
@@ -209,13 +213,13 @@ unmerged. The [operations runbook](../../../OPERATIONS.md) is available:
 
 ### Release Candidate
 
-Owned by Plan 12; the proposed evidence record is pending in [PR #99](https://github.com/Jacinth091/Tracknologia/pull/99):
+Owned by Plan 12; record candidate evidence in the merged [RC record](12-RC-DEPLOYMENT-REHEARSAL.md):
 
 ```text
 [ ] immutable v0.1.0-rc.N tag
 [ ] two consecutive full green validation cycles
-[ ] release notes ready            -> draft pending acceptance in PR #99
-[ ] known limitations recorded     -> draft pending acceptance in PR #99
+[ ] release notes ready            -> draft merged; verify against the candidate
+[ ] known limitations recorded     -> draft merged; verify against the candidate
 [ ] exact approved commit deployed
 [ ] production smoke green
 [ ] v0.1.0 tag identifies production commit
@@ -236,10 +240,10 @@ Accepted P2 risks:
 3. ________________________________________
 ```
 
-## Owner deliverables traced from this session (2026-10-26)
+## Owner deliverables
 
-1. Add priority label to umbrella #81 (fork token lacks upstream label perms).
+1. Assign a priority label to [#81](https://github.com/Jacinth091/Tracknologia/issues/81) and reassess all open issue labels at the RC snapshot.
 2. Run the Plan 12 ceremony at the chosen RC SHA; both rehearsal evidence and
    the two green cycles must be recorded against that exact SHA.
-3. After PR #98 is accepted, execute and record human UAT personas.
+3. Execute and record human UAT personas using the merged [pilot scaffold](11-UAT-PILOT.md).
 4. Complete this file's approval block after the Go/No-Go meeting.
