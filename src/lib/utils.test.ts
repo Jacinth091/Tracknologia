@@ -74,8 +74,8 @@ describe("getSafeInternalRedirectUrl", () => {
   });
 
   it("uses the caller's fallback", () => {
-    expect(getSafeInternalRedirectUrl("https://evil.example", "/confirmed")).toBe(
-      "/confirmed",
-    );
+    expect(
+      getSafeInternalRedirectUrl("https://evil.example", "/confirmed"),
+    ).toBe("/confirmed");
   });
 });
