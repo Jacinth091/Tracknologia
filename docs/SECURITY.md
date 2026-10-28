@@ -40,6 +40,10 @@ Supabase Auth owns authentication/session mechanics:
 
 Tracknologia must not implement its own password hashing or JWT system.
 
+### Login return paths
+
+`/login?redirectTo=` targets are untrusted input. One helper, `getSafeInternalRedirectUrl`, is shared by the login page, `loginAction`, the auth callback, and `proxy`: it accepts only single-leading-slash local paths of at most 2048 characters, trims boundary whitespace, preserves safe query/fragment values, and falls back to `/dashboard` for absolute, protocol-relative, backslash, control-character, or oversized targets. The login form re-posts only the sanitized target and the Server Action re-sanitizes it, so a forged form field cannot redirect off-site. `proxy` treats `/internal` and `/internal/...` (not lookalikes such as `/internally`) as coarse authenticated destinations only; that redirect is not operator authorization, which remains future guard plus feature/RLS enforcement.
+
 ## Authorization
 
 Tracknologia owns application permissions:
