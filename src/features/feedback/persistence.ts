@@ -156,7 +156,7 @@ export async function listFeedbackPreviews(
     throw feedbackUnavailable("list feedback", error);
   }
 
-  const parsed = z.array(previewRowSchema).safeParse(data ?? []);
+  const parsed = z.array(previewRowSchema).safeParse(data);
   if (!parsed.success) {
     throw malformed("list feedback");
   }
@@ -186,7 +186,9 @@ export async function readFeedbackDetail(
   if (error) {
     throw feedbackUnavailable("read feedback", error);
   }
-  if (!data) {
+  // maybeSingle returns null only for an authorized missing row. Any other
+  // value, including undefined or a falsy non-null value, is malformed.
+  if (data === null) {
     return null;
   }
 
@@ -206,7 +208,7 @@ export async function readFeedbackDetail(
     throw feedbackUnavailable("read feedback history", history.error);
   }
 
-  const events = z.array(historyRowSchema).safeParse(history.data ?? []);
+  const events = z.array(historyRowSchema).safeParse(history.data);
   if (!events.success) {
     throw malformed("read feedback history");
   }
@@ -261,7 +263,7 @@ export async function readFeedbackCurrentState(
   if (error) {
     throw feedbackUnavailable("read feedback state", error);
   }
-  if (!data) {
+  if (data === null) {
     return null;
   }
 
@@ -350,7 +352,7 @@ export async function readFeedbackSummaryRows(
     throw feedbackUnavailable("feedback count summary", error);
   }
 
-  const rows = z.array(summaryRowSchema).safeParse(data ?? []);
+  const rows = z.array(summaryRowSchema).safeParse(data);
   if (!rows.success) {
     throw malformed("feedback count summary");
   }
