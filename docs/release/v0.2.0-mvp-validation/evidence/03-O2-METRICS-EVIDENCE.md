@@ -1,91 +1,73 @@
-# Issue #93 — O2 aggregate validation metrics
+﻿# Issue #93 — aggregate metrics behavior and verification
 
-**Status: IMPLEMENTED (code, migration, and verification committed on
-`fix/93-aggregate-metrics`).** This record is the exact-commit evidence for the
-#93 checklist. Owner release review of this record, and owner merge of the
-associated PR, remain outstanding and are not required for this document.
+This record describes the implemented O2 contract and its discriminating tests.
+Exact-head pass/fail evidence belongs to [PR #106](https://github.com/Jacinth091/Tracknologia/pull/106)
+and its linked Actions jobs. Implementation and test source are not substitutes
+for an executed fresh/upgrade database suite or owner release approval.
 
-- **Prepared:** 2026-10-29; run `20261029-issue93-o2-metrics`.
-- **Author:** governed documentation Worker T01-A1 in the approved isolated source
-  copy, prepared for Lead and owner review. Implementation verification results
-  belong to the associated PR/run report.
-- **Run:** `20261101000000_add_internal_validation_metrics.sql`.
-- **Companion:** [01-SCOPE-SOURCES-AND-PRIVACY.md](01-SCOPE-SOURCES-AND-PRIVACY.md) and
-  [02-DECISION-PROPOSAL.md](02-DECISION-PROPOSAL.md). The metric definitions
-  implemented here are the canonical values recorded in
-  [`docs/16_VALIDATION_AND_ANALYTICS.md`](../../../16_VALIDATION_AND_ANALYTICS.md).
+Canonical definitions: [Validation and Analytics](../../../16_VALIDATION_AND_ANALYTICS.md).
+Owner decisions remain in [the #87 proposal](02-DECISION-PROPOSAL.md); proposed
+retention, pilot dates, monitoring sources and workload targets are not approved
+by this implementation.
 
-## 1. Implemented contract
+## Contract
 
-`public.get_internal_validation_metrics(p_operator_user_id uuid,
-p_window_start timestamptz, p_window_end timestamptz)` is a
-`SECURITY DEFINER` function with `SET search_path = public, pg_temp`, service-role
-only (`PUBLIC, anon, authenticated` have no EXECUTE), operator mapping rechecked
-under `FOR SHARE`, and a bounded window (end after start, at most 90 Asia/Manila
-days). It returns `(dimension, bucket, row_count, interval_seconds)` and adds no
-table or column.
+`getValidationMetrics` returns fixed aggregate sections for Provider onboarding,
+activity/repeat days, current Staff footprint, Repair origin/lifecycle/current
+statuses, Request events/submission-cohort conversion/decision time, Tracking
+views/adoption, and Feedback trends. Provider/Repair/Request IDs stay inside
+SQL; no raw rows, messages, contact details or credentials enter the report.
 
-The fixed groups are:
+The domain RPC is service-role-only, checks the enabled operator mapping under
+`FOR SHARE`, and uses one set-based aggregate statement. Its fixed rows include
+`dimension`, `bucket`, `row_count`, `interval_seconds` and a common `as_of`
+captured after the access lock. Period observations are capped at that database
+read time. The feature requires a successful access audit, validates complete
+allowlisted result groups, computes ratios with null for an empty denominator,
+and zero-fills the bounded daily series.
 
-| Dimension                      | Buckets                                         | Meaning                                           |
-| ------------------------------ | ----------------------------------------------- | ------------------------------------------------- |
-| `PROVIDER_ONBOARDED_IN_PERIOD` | `SHOP`, `INDEPENDENT`, `TOTAL`                  | created in window, by type (TOTAL = sum of split) |
-| `PROVIDER_ONBOARDED_ALL_TIME`  | per type + `TOTAL`                              | all-time onboarding anchors per type              |
-| `ACTIVE_PROVIDER_IN_PERIOD`    | `TOTAL`, `REPEAT`                               | distinct providers with real work in window       |
-| `ACTIVE_DAY`                   | `YYYY-MM-DD`                                    | distinct active providers per Manila day          |
-| `STAFF_MEMBERSHIP_ACTIVE`      | `TOTAL`                                         | current STAFF memberships                         |
-| `SHOP_WITH_STAFF`              | `TOTAL`                                         | distinct shops with staff                         |
-| `REPAIR_STATUS_NOW`            | five `repair_status` values                     | current snapshot                                  |
-| `REPAIR_CREATED_IN_PERIOD`     | `TOTAL`, `CUSTOMER_REQUEST`, `PROVIDER_CREATED` | origin split                                      |
-| `REPAIR_COMPLETED_IN_PERIOD`   | `TOTAL`                                         | completed inside window                           |
-| `READY_REACHED_IN_PERIOD`      | `TOTAL`                                         | distinct repairs reaching READY in window         |
-| `STATUS_MAINTAINED_IN_PERIOD`  | `TOTAL`                                         | distinct repairs with a non-initial status event  |
-| `REQUEST_RECEIVED_IN_PERIOD`   | `TOTAL`                                         | submitted inside window                           |
-| `REQUEST_DECIDED_IN_PERIOD`    | `TOTAL`, `ACCEPTED`, `DECLINED`                 | decided inside window (period semantics)          |
-| `REQUEST_PENDING_NOW`          | `TOTAL`                                         | undecided snapshot                                |
-| `REQUEST_COHORT_IN_PERIOD`     | `RECEIVED`, `ACCEPTED`                          | submission cohort                                 |
-| `REQUEST_DECISION_SECONDS`     | `MEAN`                                          | mean submitted→decision seconds over decided      |
-| `TRACKING_VIEWS_IN_PERIOD`     | `TOTAL`, `REPAIRS`                              | views in window; distinct repairs viewed          |
-| `TRACKING_ALL_TIME`            | `TOTAL`, `REPAIRS`                              | all-time views; distinct repairs viewed           |
-| `REPAIR_ALL_TIME`              | `TOTAL`                                         | all-time Repairs (adoption denominator)           |
+Windows are today/7d/30d/custom, up to 90 Manila calendar days. Future-only
+windows, future days beyond the next Manila midnight, malformed bounds and
+extra query fields are rejected. Feedback keeps its accepted 31-day query
+limit: disjoint batches cover the requested report window, and the report
+labels their independent generation timestamps. A failed batch withholds the
+whole Feedback section rather than presenting partial counts. Available domain
+metrics remain labelled; authorization failure denies the whole report.
 
-Window bounds are UTC instants derived by the application from Asia/Manila
-calendar days (inclusive start, exclusive end). Fixed periods: `today`,
-`7d` (trailing 7 Manila days including today), `30d` (trailing 30), and `custom`
-1–90 Manila days. Ratios (`REQUEST_COHORT` conversion, Tracking adoption, mean
-decision lag) are computed in the application; an empty denominator is reported as
-an explicit `N/A` (null), never as zero.
+Current status and membership counts are current snapshots. Retention coverage
+is explicitly limited to retained rows; Tracking observations are not unique
+people. This adds no participant endpoint, operator provisioning or deployment.
 
-Feedback counts are not recomputed by this function; they are read only through
-the Feedback summary interface (`get_feedback_count_summary`) with the same
-bounded window.
+## Regression tests
 
-## 2. Verification performed
+- Metrics unit/contract tests use the real Feedback interface and schema, with
+  only trusted auth/client seams mocked. They cover 31/32/62/90-day windows,
+  31+31+28 batching without gaps, partial batch failure, future rejection,
+  null/empty/malformed/incomplete domain rows, separate source freshness,
+  database `as_of`, exact effective-end clamping and zero-filled days.
+- The PostgreSQL fixture runs in one rolled-back `REPEATABLE READ` session,
+  with a fixed past Manila window `[2026-10-19, 2026-10-22)`. It seeds a pending
+  baseline before reading, then fixture rows, proving that global snapshots
+  include existing state while after-minus-before counts isolate the fixture.
+  Means and ratios are compared to the appropriate raw values, not subtracted.
+- SQL tests cover grants, missing/disabled operators, finite/aligned windows,
+  the 90-day bound, current-day future-observation exclusion and shared read
+  timestamps. The full fresh and pending-only upgraded suites must both pass.
 
-- Migration applied on the local Supabase stack through
-  `npx supabase db reset`; no migration error.
-- Unit suite (`src/features/internal-operations/metrics*.test.ts`,
-  `metrics.test.ts`): period resolution (Manila day boundaries), fixed-group
-  projection, ratio null-on-empty-denominator, row schema guards — all green.
-- Database integration suite (`tests/integration/internal-metrics.db.test.ts`):
-  - Function grant matrix: `anon` and `authenticated` cannot EXECUTE; the
-    service-role caller that names an unknown or disabled operator mapping is
-    denied by the `FOR SHARE` recheck.
-  - Exact seeded multi-Provider snapshot inside one REPEATABLE READ transaction
-    that ends `ROLLBACK`: seeded Manila-midnight boundaries, cohort vs
-    period separation, origin split, READY/maintenance counts, completion, Staff
-    footprint, repeat activity, decision mean, and Tracking ratios.
-  - Typed full-circle projection: fixed rows validate through the application
-    row schema and project into the typed metrics output.
-- Performance: `EXPLAIN (ANALYZE, COSTS OFF, TIMING OFF, SUMMARY ON)` of
-  `get_internal_validation_metrics` over a pilot-shaped local load returned one
-  `Function Scan` with `actual rows=29 loops=1` and **Execution Time 15.822 ms**.
-  The function is a single set-based statement, so no per-row query pattern is
-  possible; the measured plan shape and time are recorded here as the #93
-  non-N+1 evidence.
+## Performance evidence and limits
 
-## 3. Residual owner-review items
+The test adds 400 synthetic Repairs for a representative local query sample,
+asserts a finite measured execution time below a 5-second regression ceiling,
+and emits that timing as safe test output. This is not an approved pilot
+workload or production SLO. An outer Function Scan does not expose the inner
+query plan and alone cannot establish the number of internal queries; the
+set-based SQL source is inspected separately. No speculative index, cache,
+rollup table or warehouse was added.
 
-- Owner merge of the #93 PR.
-- Period-selection product behavior for the internal dashboard (#95 remains the
-  consuming screen; the #87 owner decisions gate hosted migration/deployment).
+The author's earlier 15.822 ms measurement and local pass claims apply to the
+original candidate only. Its upgraded CI suite failed because the typed
+projection assumed an empty database (`pendingNow=3` versus actual 4). The
+corrected fixture deliberately includes a pre-existing pending request, keeping
+that regression sensitive on both fresh and upgrade paths. New results must be
+read from the corrected candidate's actual CI; no local PostgreSQL pass is
+claimed when Docker is unavailable.

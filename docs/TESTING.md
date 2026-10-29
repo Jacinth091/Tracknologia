@@ -133,6 +133,7 @@ tests/integration/
   tracking.db.test.ts          — Public tracking & observation
   internal-operations.db.test.ts — Internal operator grants, audit, denials
   internal-operations-overlap.db.test.ts — Overlapping audit/revoke and grant sessions
+  internal-metrics.db.test.ts  — Aggregate grants, fixed past-window snapshot/deltas, nonempty baselines, database as_of, future bounds and representative EXPLAIN timing
   feedback.db.test.ts          — Private Feedback grants, constraints, nonce retry, reviews, feedback budget, old-state upgrade check, count-summary grants, denials, windows, and exact counts
   feedback-projection.db.test.ts — Feedback persistence through PostgREST: keyset paging, detail/history bounds, null clearing
   feedback-summary-manila.db.test.ts — Manila-aligned summary bounds and day buckets, one REPEATABLE READ snapshot, rolled back
