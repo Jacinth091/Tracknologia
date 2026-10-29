@@ -134,6 +134,7 @@ tests/integration/
   internal-operations.db.test.ts — Internal operator grants, audit, denials
   internal-operations-overlap.db.test.ts — Overlapping audit/revoke and grant sessions
   feedback.db.test.ts          — Private Feedback grants, constraints, nonce retry, reviews, feedback budget, old-state upgrade check, count-summary grants, denials, windows, and exact counts
+  feedback-projection.db.test.ts — Feedback persistence through PostgREST: keyset paging, detail/history bounds, null clearing
   load-stress.db.test.ts       — Burst invariants (Plan 10)
   helpers/
     supabase-test-context.ts   — client setup, user/fixture lifecycle
