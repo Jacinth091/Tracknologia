@@ -227,6 +227,46 @@ This is not full anonymization. Retention, redaction and purge policy stays
 pending owner approval (issue #87) and is not implemented. The FK action runs as
 the table owner; no client grant is required or added.
 
+### Feedback redaction and deletion
+
+Participant feedback lives in private tables with no client write path and no
+linked business identity, so redaction is a deliberate administrator action in
+the trusted SQL connection (the same context as the Grant/Revoke steps, with an
+owner-approved ticket):
+
+```sql
+begin;
+
+-- Redact the participant text of one submission (keep the triage facts).
+update public.feedback_submissions
+set title = '[redacted]', message = '[redacted]'
+where id = '<feedback-submission-uuid>';
+
+-- Or purge one submission and its review history entirely.
+delete from public.feedback_review_events
+where feedback_id = '<feedback-submission-uuid>';
+delete from public.feedback_submissions
+where id = '<feedback-submission-uuid>';
+
+-- Record the action in the append-only internal access audit with a bounded
+-- non-PII reason. The catalog is kept narrow by the O1 migration; use the
+-- internal access category plus the approval reference in the reason.
+insert into public.internal_access_audit
+  (operator_user_id, actor_user_id, operation, reason)
+values
+  ('<approver-auth-user-uuid>'::uuid,
+   '<approver-auth-user-uuid>'::uuid,
+   'INTERNAL_ACCESS_VIEW',
+   'owner-approved feedback redaction <ticket>');
+
+commit;
+```
+
+The insert reuses the audit table's own constraints (bounded reason, fixed
+operation set) and runs as the table owner; no client grant is required. There
+is no public or Provider path to feedback lookups, and no automated GitHub
+posting; the linked-issue field in triage is a written reference only.
+
 ### What is out of scope
 
 ```text

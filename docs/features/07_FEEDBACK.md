@@ -10,9 +10,15 @@ bounded way to review it. It owns validation, trusted participant
 classification, the shared abuse budget, review transitions, internal reads,
 and count-only summaries.
 
-It is a Module with a small Interface. It has no UI, no routes, no
-notifications, and no coupling to Repairs, Repair Requests, or Tracking. Route
-adapters (#91, #92) pass only browser input.
+It is a Module with a small Interface. It has no participant UI or public
+routes, and no coupling to Repairs, Repair Requests, or Tracking. Route
+adapters (#91) pass only public/Provider browser input for the future
+participant forms; the internal operator inbox (#92) is the one rendered
+surface: `src/app/(internal)/internal/feedback/` lists bounded previews, shows
+the bounded original text to enabled operators only, and adapts triage
+decisions through `recordFeedbackReview`. The adapter passes only browser
+input; the operator, transition allow-list, optimistic version and audit
+entries stay inside the Module.
 
 ## Primary goal
 
@@ -189,11 +195,13 @@ reviewer identity appear in the result.
 
 ## Explicit non-goals
 
-- No UI, routes, notifications, or support inbox (#91, #92 and later).
+- No participant UI, routes, notifications, or support engagement (#91 and later;
+  participant surfaces stay gated by issue #87 activation).
 - No Feedback reference on Repair, Repair Request, or Tracking records.
 - No public lookup, receipt identifier, or status endpoint.
 - No new tables beyond #89 (one aggregate RPC only).
-- Retention and erasure remain launch gates (issue #87).
+- Retention and erasure remain launch gates (issue #87); the incident redaction
+  runbook lives in `docs/OPERATIONS.md` ("Feedback redaction and deletion").
 
 ## Tests
 
