@@ -800,7 +800,14 @@ describe("getValidationMetrics guard and interface", () => {
     [
       "rows missing as_of",
       () => ({
-        data: completeRows().map(({ as_of: _asOf, ...rest }) => rest),
+        data: completeRows().map(
+          ({ dimension, bucket, row_count, interval_seconds }) => ({
+            dimension,
+            bucket,
+            row_count,
+            interval_seconds,
+          }),
+        ),
         error: null,
       }),
     ],
