@@ -388,14 +388,18 @@ It is separate from `internal_access_audit`, which stays access-only.
 `get_internal_validation_metrics(p_operator_user_id, p_window_start, p_window_end)`
 (issue #93) is a service-role-only, set-based aggregate over the authoritative
 domain tables for internal operator dashboards. It returns fixed
-`(dimension, bucket, row_count, interval_seconds)` groups only, where
+`(dimension, bucket, row_count, interval_seconds, as_of)` groups only, where
 `interval_seconds` is the mean request decision lag (seconds) for the decision
 measures. No table and no column is added. It adds no provider series and no row
 identifiers, and identifiers may only enter `COUNT` or `COUNT(DISTINCT ...)`
 groupings inside the function.
 
-- Window: inclusive start, exclusive end, at most 90 Asia/Manila days; the
-  application derives the UTC bounds from Asia/Manila calendar days.
+- Window: inclusive start, exclusive end, at most 90 Asia/Manila days; finite
+  bounds must align with Manila midnight. Future starts and ends beyond the
+  next Manila midnight are rejected. The application derives the UTC bounds.
+- Every row shares one database-generated `as_of`, captured after the operator
+  mapping lock. Period event observations stop at `min(window_end, as_of)`;
+  snapshots are current retained state, not reconstructed historical state.
 - Measures return `(dimension, bucket, row_count)`: onboarding by type and
   all-time, active/repeat Provider activity, `ACTIVE_DAY` series buckets, staff
   snapshot, current Repair statuses, Repair created/completed/READY/maintenance,
@@ -409,7 +413,8 @@ groupings inside the function.
   disabled mapping.
 - It adds no table, no column, and no table policy. The Feedback trend is not
   duplicated here; it is read through the Feedback summary interface
-  (`get_feedback_count_summary`) with the same bounded window.
+  (`get_feedback_count_summary`) in disjoint windows of at most 31 days. The
+  application records their separate freshness, not a common atomic snapshot.
 
 ### 17. Public Tracking projection
 

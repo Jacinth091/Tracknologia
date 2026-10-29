@@ -42,7 +42,11 @@ formula may be introduced.
 
 - **Periods:** `today`, `7d`, `30d`, or a bounded custom interval of 1–90 Asia/Manila
   days; start inclusive, end exclusive, bounds converted to UTC. An empty
-  denominator is reported as an explicit `N/A`, never zero.
+  denominator is reported as an explicit `N/A`, never zero. Future-only windows
+  and ends beyond the next Manila midnight are rejected. Period observations
+  stop at the earlier of the requested end and the database-generated `asOf`.
+  The 90-day bound is a technical limit; #87's pilot/retention approval remains
+  separate.
 - **Providers onboarded:** created inside the period, split `SHOP` / `INDEPENDENT`
   with a separate cumulative all-time split. A Provider created at the inclusive
   start edge is inside the period.
@@ -62,6 +66,21 @@ formula may be introduced.
   submission cohort (submitted in window and accepted), independent of when the
   decision landed; mean submitted→decision seconds over decisions made in the
   window.
+
+Reports include every requested calendar day, zero-filled where no activity was
+observed. Current status and membership snapshots describe retained current
+state at the database read, not historical state at a custom period's end.
+Coverage is labelled `RETAINED_ROWS_ONLY`; no claim of complete lifetime history
+or approved retention is made. Tracking measures successful views and distinct
+Repairs, never unique people.
+
+Feedback is composed only through `getFeedbackAggregateSummary`, in disjoint
+batches of at most 31 days so the accepted Feedback contract stays unchanged.
+The report labels the batches' independent generation-time range; it does not
+claim an atomic snapshot shared with the domain query. Feedback failure returns
+an explicitly unavailable section (`feedback: null`), with available domain
+counts retained. Authorization failure denies the report, and a failed or
+incomplete domain query never becomes an apparently complete zero report.
 
 ## Provider metrics
 

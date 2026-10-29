@@ -170,6 +170,13 @@ roles, not `user_metadata`, and not inferred from owning or joining a Provider:
 - The Feedback `feedback_submit` budget covers both public and Provider
   submissions. Provider membership is resolved before the budget, and the budget
   runs before any input is parsed.
+- Operational validation metrics (issue #93) independently require the operator
+  guard and a successful access audit. The aggregate RPC rechecks the enabled
+  mapping under `FOR SHARE` and is executable only by `service_role`. It returns
+  fixed count/mean/date groups and a database read timestamp, never raw records
+  or identifiers. The feature rejects unknown, duplicate or incomplete groups
+  instead of turning failed reads into zero activity. Feedback unavailability
+  is explicit; a Feedback authorization denial still denies the whole report.
 
 ## Public Provider and invitation projections
 
