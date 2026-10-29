@@ -61,7 +61,10 @@ const P_SHOP3 = { id: fresh(), slug: `metrics-d-${randomUUID().slice(0, 8)}` };
 const P_INDEP2 = { id: fresh(), slug: `metrics-e-${randomUUID().slice(0, 8)}` };
 // Pre-existing global state: a provider and a SUBMITTED request that exist
 // before the BEFORE snapshot, as in an upgraded database.
-const P_BASE = { id: fresh(), slug: `metrics-base-${randomUUID().slice(0, 8)}` };
+const P_BASE = {
+  id: fresh(),
+  slug: `metrics-base-${randomUUID().slice(0, 8)}`,
+};
 
 // TN-[0-9]{4}-[A-F0-9]{10} and TRK-[A-F0-9]{24}: a UUID hex without dashes is
 // a safe deterministic source for both.
@@ -675,12 +678,7 @@ describe("internal validation metrics (PostgreSQL snapshot)", () => {
         startUtc: WINDOW.start,
         endUtc: WINDOW.end,
       };
-      const metrics = buildValidationMetrics(
-        complete,
-        window,
-        null,
-        asOfAfter,
-      );
+      const metrics = buildValidationMetrics(complete, window, null, asOfAfter);
 
       expect(metrics.asOf).toBe(asOfAfter);
       expect(metrics.providers.onboardedInPeriod).toEqual({

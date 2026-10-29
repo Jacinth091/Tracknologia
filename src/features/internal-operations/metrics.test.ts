@@ -165,8 +165,7 @@ function feedbackCalls() {
   return seams.rpc.mock.calls
     .filter(([name]) => name === "get_feedback_count_summary")
     .map(
-      ([, args]) =>
-        args as { p_window_start: string; p_window_end: string },
+      ([, args]) => args as { p_window_start: string; p_window_end: string },
     );
 }
 
@@ -606,7 +605,11 @@ describe("getValidationMetrics guard and interface", () => {
 
     // The composed report covers the full requested calendar window.
     expect(metrics.feedback).toMatchObject({
-      window: { startDate: "2026-07-01", endDateExclusive: "2026-09-29", days: 90 },
+      window: {
+        startDate: "2026-07-01",
+        endDateExclusive: "2026-09-29",
+        days: 90,
+      },
     });
     expect(metrics.feedback?.daily).toHaveLength(90);
     expect(metrics.coverage.feedback).toMatchObject({
@@ -665,10 +668,12 @@ describe("getValidationMetrics guard and interface", () => {
       .mockResolvedValueOnce({ status: "ALLOWED", userId: OPERATOR_ID })
       .mockResolvedValueOnce({ status: "FORBIDDEN" });
 
-    await expect(getValidationMetrics({ mode: "today" })).rejects.toMatchObject({
-      name: "MetricsError",
-      code: "FORBIDDEN",
-    });
+    await expect(getValidationMetrics({ mode: "today" })).rejects.toMatchObject(
+      {
+        name: "MetricsError",
+        code: "FORBIDDEN",
+      },
+    );
   });
 
   it("keeps available domain counts when Feedback data is unavailable", async () => {
@@ -769,7 +774,10 @@ describe("getValidationMetrics guard and interface", () => {
     const failure = await getValidationMetrics({ mode: "7d" }).catch(
       (error: unknown) => error,
     );
-    expect(failure).toMatchObject({ name: "MetricsError", code: "UNAVAILABLE" });
+    expect(failure).toMatchObject({
+      name: "MetricsError",
+      code: "UNAVAILABLE",
+    });
     expect(JSON.stringify(logged.mock.calls)).not.toContain(CANARY);
   });
 
@@ -854,9 +862,10 @@ describe("getValidationMetrics guard and interface", () => {
         return respond();
       });
 
-      await expect(
-        getValidationMetrics({ mode: "7d" }),
-      ).rejects.toMatchObject({ name: "MetricsError", code: "UNAVAILABLE" });
+      await expect(getValidationMetrics({ mode: "7d" })).rejects.toMatchObject({
+        name: "MetricsError",
+        code: "UNAVAILABLE",
+      });
     },
   );
 
