@@ -70,30 +70,21 @@ describe("recordFeedbackReviewAction missing review keys", () => {
   });
 
   it.each([
-    [
-      "internalNotes omitted",
-      ["internalNotes"],
-      "Internal notes is required; send null to clear it",
-    ],
-    [
-      "linkedIssueUrl omitted",
-      ["linkedIssueUrl"],
-      "Linked issue is required; send null to clear it",
-    ],
-    [
-      "both omitted",
-      ["internalNotes", "linkedIssueUrl"],
-      "Internal notes is required; send null to clear it",
-    ],
+    ["internalNotes omitted", ["internalNotes"]],
+    ["linkedIssueUrl omitted", ["linkedIssueUrl"]],
+    ["both omitted", ["internalNotes", "linkedIssueUrl"]],
   ])(
     "rejects %s as INVALID_INPUT before any persistence call",
-    async (_label, omitted, message) => {
+    async (_label, omitted) => {
       const state = await recordFeedbackReviewAction(
         null,
         reviewForm(withoutFields(omitted)),
       );
 
-      expect(state).toEqual({ error: message, appliedRowVersion: 2 });
+      expect(state).toEqual({
+        error: "Review details are invalid",
+        appliedRowVersion: 2,
+      });
       expect(seams.createInternalOpsClient).not.toHaveBeenCalled();
     },
   );

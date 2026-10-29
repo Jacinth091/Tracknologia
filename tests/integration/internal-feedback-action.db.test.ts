@@ -185,7 +185,7 @@ describe("Feedback review action keeps stored fields (PostgreSQL)", () => {
         reviewForm(id, 2, { status: "PLANNED", linkedIssueUrl: LINK }),
       );
       expect(notesOmitted).toEqual({
-        error: "Internal notes is required; send null to clear it",
+        error: "Review details are invalid",
         appliedRowVersion: 2,
       });
       const linkOmitted = await recordFeedbackReviewAction(
@@ -193,7 +193,15 @@ describe("Feedback review action keeps stored fields (PostgreSQL)", () => {
         reviewForm(id, 2, { status: "PLANNED", internalNotes: NOTES }),
       );
       expect(linkOmitted).toEqual({
-        error: "Linked issue is required; send null to clear it",
+        error: "Review details are invalid",
+        appliedRowVersion: 2,
+      });
+      const bothOmitted = await recordFeedbackReviewAction(
+        null,
+        reviewForm(id, 2, { status: "PLANNED" }),
+      );
+      expect(bothOmitted).toEqual({
+        error: "Review details are invalid",
         appliedRowVersion: 2,
       });
       expect(await readStored(id)).toEqual(before);
