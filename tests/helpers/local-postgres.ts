@@ -45,48 +45,53 @@ export function sqlUuidLiteral(value: string): string {
   return `'${value}'::uuid`;
 }
 
-/**
- * Refuses a remote Docker engine before destructive SQL. DOCKER_HOST wins over
- * the active context, as in the Docker CLI. Only unix/npipe sockets and
- * loopback TCP endpoints are local.
- */
-async function assertLocalDockerEndpoint(): Promise<void> {
-  let endpoint = process.env.DOCKER_HOST ?? "";
-  if (!endpoint) {
-    const context =
-      process.env.DOCKER_CONTEXT ||
-      (
-        await execFileAsync("docker", ["context", "show"], {
-          timeout: DOCKER_TIMEOUT_MS,
-        })
-      ).stdout.trim();
-    endpoint = (
-      await execFileAsync(
-        "docker",
-        [
-          "context",
-          "inspect",
-          context,
-          "--format",
-          "{{.Endpoints.docker.Host}}",
-        ],
-        { timeout: DOCKER_TIMEOUT_MS },
-      )
-    ).stdout.trim();
-  }
+async function inspectContextHost(name: string): Promise<string> {
+  const { stdout } = await execFileAsync(
+    "docker",
+    ["context", "inspect", name, "--format", "{{.Endpoints.docker.Host}}"],
+    { timeout: DOCKER_TIMEOUT_MS },
+  );
+  return stdout.trim();
+}
 
-  let parsed: URL | null = null;
+/** Unix sockets, the default local Windows pipe, and loopback TCP are local. */
+function isLocalDockerEndpoint(endpoint: string): boolean {
+  if (/^unix:\/\//i.test(endpoint)) {
+    return true;
+  }
+  if (/^npipe:\/\/\/\/\.\/pipe\//i.test(endpoint)) {
+    return true;
+  }
+  let parsed: URL;
   try {
     parsed = new URL(endpoint);
   } catch {
-    parsed = null;
+    return false;
   }
-  const local =
-    parsed !== null &&
-    (parsed.protocol === "unix:" ||
-      parsed.protocol === "npipe:" ||
-      (parsed.protocol === "tcp:" && LOCAL_HOSTNAMES.has(parsed.hostname)));
-  if (!local) {
+  return parsed.protocol === "tcp:" && LOCAL_HOSTNAMES.has(parsed.hostname);
+}
+
+/**
+ * Refuses a remote Docker engine before destructive SQL, using the endpoint the
+ * Docker CLI would actually use: DOCKER_CONTEXT overrides DOCKER_HOST, and
+ * DOCKER_HOST overrides the active context. The Docker context is never changed.
+ */
+async function assertLocalDockerEndpoint(): Promise<void> {
+  const dockerContext = process.env.DOCKER_CONTEXT ?? "";
+  const dockerHost = process.env.DOCKER_HOST ?? "";
+  let endpoint: string;
+  if (dockerContext) {
+    endpoint = await inspectContextHost(dockerContext);
+  } else if (dockerHost) {
+    endpoint = dockerHost;
+  } else {
+    const { stdout } = await execFileAsync("docker", ["context", "show"], {
+      timeout: DOCKER_TIMEOUT_MS,
+    });
+    endpoint = await inspectContextHost(stdout.trim());
+  }
+
+  if (!endpoint || !isLocalDockerEndpoint(endpoint)) {
     throw new Error(
       `Refusing local SQL: Docker endpoint "${endpoint || "(unknown)"}" is not a local socket or loopback TCP endpoint.`,
     );
@@ -106,7 +111,9 @@ export async function resolveLocalDbContainer(apiUrl: string): Promise<string> {
     );
   }
   if (!url.port) {
-    throw new Error(`Refusing local SQL: "${apiUrl}" has no explicit API port.`);
+    throw new Error(
+      `Refusing local SQL: "${apiUrl}" has no explicit API port.`,
+    );
   }
 
   await assertLocalDockerEndpoint();
@@ -156,7 +163,10 @@ export async function resolveLocalDbContainer(apiUrl: string): Promise<string> {
 }
 
 /** Runs one SQL string (may hold several statements) and returns raw stdout. */
-export async function runLocalSql(apiUrl: string, sql: string): Promise<string> {
+export async function runLocalSql(
+  apiUrl: string,
+  sql: string,
+): Promise<string> {
   const container = await resolveLocalDbContainer(apiUrl);
   const { stdout } = await execFileAsync(
     "docker",
@@ -242,9 +252,7 @@ function startSession(child: ChildProcessWithoutNullStreams): LocalSqlSession {
       return new Promise<string>((resolve, reject) => {
         const marker = `__DONE_${randomUUID()}__`;
         const deadline = setTimeout(() => {
-          fail(
-            new Error(`local psql query exceeded ${QUERY_DEADLINE_MS} ms`),
-          );
+          fail(new Error(`local psql query exceeded ${QUERY_DEADLINE_MS} ms`));
           child.kill();
         }, QUERY_DEADLINE_MS);
         pending = {

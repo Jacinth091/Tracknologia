@@ -139,9 +139,7 @@ describe("Internal operator overlapping PostgreSQL transactions", () => {
           .from("internal_access_audit")
           .select("operation")
           .eq("operator_user_id", user.id);
-        expect(
-          (audits.data ?? []).map((row) => row.operation).sort(),
-        ).toEqual([
+        expect((audits.data ?? []).map((row) => row.operation).sort()).toEqual([
           "INTERNAL_ACCESS_VIEW",
           "OPERATOR_PROVISIONED",
           "OPERATOR_REVOKED",
