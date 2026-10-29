@@ -216,7 +216,10 @@ describe("Feedback review action keeps stored fields (PostgreSQL)", () => {
           linkedIssueUrl: "",
         }),
       );
-      expect(cleared).toEqual({ success: "Review saved", appliedRowVersion: 3 });
+      expect(cleared).toEqual({
+        success: "Review saved",
+        appliedRowVersion: 3,
+      });
       const afterClear = await readStored(id);
       expect(afterClear.row).toEqual({
         message: MESSAGE,
@@ -237,7 +240,10 @@ describe("Feedback review action keeps stored fields (PostgreSQL)", () => {
           linkedIssueUrl: LINK,
         }),
       );
-      expect(complete).toEqual({ success: "Review saved", appliedRowVersion: 4 });
+      expect(complete).toEqual({
+        success: "Review saved",
+        appliedRowVersion: 4,
+      });
       const finished = await readStored(id);
       expect(finished.row).toMatchObject({
         internal_notes: FOLLOW_UP,
