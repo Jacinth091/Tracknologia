@@ -170,9 +170,10 @@ RPC rechecks the enabled mapping so revocation wins over a delayed append, and
 that Auth deletion removes the mapping while nulling the direct user references
 on retained audit rows (not full anonymization).
 
-`tests/integration/internal-operations-overlap.db.test.ts` uses two live psql
-sessions through the running local Supabase database container (resolved from
-the API port, with a loopback-only guard). It holds an audit append open while a
+`tests/integration/internal-operations-overlap.db.test.ts` uses live psql
+sessions through the running local Supabase database container (matched by the
+host port bound to the API container, after loopback and local Docker endpoint
+checks). It holds an audit append open while a
 revoke waits on the observed `pg_blocking_pids` state, and it overlaps two
 first grants for one operator. Both assert one consistent outcome. Sessions
 carry lock, statement, and idle-transaction timeouts and close in `finally`.
@@ -184,7 +185,8 @@ temporary actor-scoped audit failure that shows only the unavailable state and
 persists no view event (the fault is dropped in `finally`), immediate denial
 after revocation, and 404 for Provider OWNER/STAFF/INDEPENDENT accounts that
 have no internal mapping. The E2E fixture reaches the local database through
-`tests/helpers/local-postgres.ts` and refuses non-loopback Supabase URLs.
+`tests/helpers/local-postgres.ts`, which refuses non-loopback Supabase URLs and
+non-local Docker endpoints before any SQL runs.
 
 ## Load & resilience harness
 
