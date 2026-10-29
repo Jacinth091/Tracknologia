@@ -25,7 +25,7 @@ const MESSAGE = "privacy-message-canary-2f9d";
 const NOTES = "privacy-notes-canary-5a3b";
 const REASON = "privacy-reason-canary-8e4c";
 const LINK = "https://github.com/Jacinth091/Tracknologia/issues/12";
-const OPERATOR_PLACEHOLDER = "<approver-auth-user-uuid>";
+const ACTOR_PLACEHOLDER = "<actor-auth-user-uuid>";
 const FEEDBACK_PLACEHOLDER = "<feedback-submission-uuid>";
 const APPROVAL_PLACEHOLDER = "<approval-ref>";
 const APPROVAL = "ISSUE-92-PRIV";
@@ -72,7 +72,7 @@ function fillRunbook(
 ): string {
   return block
     .replace(FEEDBACK_PLACEHOLDER, values.feedbackId)
-    .replace(OPERATOR_PLACEHOLDER, values.actorId)
+    .replace(ACTOR_PLACEHOLDER, values.actorId)
     .replace(APPROVAL_PLACEHOLDER, values.approvalRef);
 }
 

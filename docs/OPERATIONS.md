@@ -242,6 +242,11 @@ Both blocks share the same rules:
 - Replace every `<...>` placeholder with a verified Auth UUID or a bounded
   approval reference (letters, digits and `#._/:-`, 3-80 characters). An
   unreplaced or malformed value raises before any write.
+- `<actor-auth-user-uuid>` is the Auth UUID of the administrator who executes
+  this block, entered as the actor. Enter the executing person's own UUID. Do
+  not substitute the approver's UUID unless the approver is also the person
+  executing it. Owner approval is recorded separately in `<approval-ref>`, the
+  ticket reference, and in the ticket outside the product.
 - The target row is locked with `FOR UPDATE` and must exist. Each mutation must
   affect exactly the expected rows, or the block raises.
 - The `feedback_privacy_audit` insert is part of the same transaction. If it
@@ -271,7 +276,7 @@ begin;
 do $$
 declare
   v_feedback_id uuid := '<feedback-submission-uuid>'::uuid;
-  v_actor_user_id uuid := '<approver-auth-user-uuid>'::uuid;
+  v_actor_user_id uuid := '<actor-auth-user-uuid>'::uuid;
   v_approval_ref text := '<approval-ref>';
   v_rows integer;
 begin
@@ -328,7 +333,7 @@ begin;
 do $$
 declare
   v_feedback_id uuid := '<feedback-submission-uuid>'::uuid;
-  v_actor_user_id uuid := '<approver-auth-user-uuid>'::uuid;
+  v_actor_user_id uuid := '<actor-auth-user-uuid>'::uuid;
   v_approval_ref text := '<approval-ref>';
   v_rows integer;
 begin
