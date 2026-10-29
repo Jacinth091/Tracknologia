@@ -136,10 +136,26 @@ approver and date recorded outside the product (issue/ticket)
 Do not grant access to a Provider owner/staff account merely because it manages
 a Provider. If the same person needs both, that is two separate authorizations.
 
+### Identity discovery and execution context
+
+Resolve the operator and approver UUIDs from the trusted Supabase Auth admin
+surface (Supabase Dashboard -> Authentication -> Users, or the Auth admin API),
+never from application tables, email guesses, or values copied out of a chat
+message. Both must already be existing, verified team Auth identities; this
+runbook never creates identities.
+
+The SQL examples below must run in a trusted SQL editor or owner-controlled
+admin connection (for example the Supabase SQL editor or `psql` as an
+administrator). They are not an HTTP request. Application or automation use
+instead calls the narrow `change_internal_operator_access` RPC through the
+service-role credential: a service API key is an HTTP credential, not a SQL
+connection, and cannot be pasted into these statements. Never place keys,
+tokens, or personal email addresses into SQL, docs, or tickets; use the
+placeholder UUIDs below only.
+
 ### Grant
 
-Run with the service-role credential only (never the publishable key), using
-placeholder values:
+Run in that trusted admin connection, using placeholder values:
 
 ```sql
 select public.change_internal_operator_access(

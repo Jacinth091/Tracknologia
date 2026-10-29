@@ -138,6 +138,14 @@ adapter, and returns a typed outcome rather than throwing security decisions.
 event through a service-role-only database function; the public Interface never
 accepts a caller-supplied operator identity.
 
+`access.ts` is the narrow public entry for this capability, not a pass-through.
+Future Feedback consumers must import the guard/audit entry from this Module
+instead of reaching into internal persistence. This keeps the dependency
+direction one-way when Operations reporting later depends on Feedback summaries:
+Operations -> Feedback summary -> Operations must never become a barrel cycle,
+so Feedback-adjacent code receives only the small guard/audit Interface and
+never imports an Operations barrel or persistence detail.
+
 The `src/app/(internal)/internal` route group owns only the shell, navigation,
 and safe denied/unavailable rendering. Both the layout and each sensitive page
 operation call the Module guard, so a layout cannot become the only enforcement
