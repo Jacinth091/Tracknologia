@@ -29,9 +29,7 @@ const TRUSTED_PROXY_PROOF_HEADER = "x-tracknologia-proxy-secret";
 const TRUSTED_CLIENT_IP_HEADER = "x-tracknologia-client-ip";
 const LOCAL_DEVELOPMENT_IDENTIFIER = "local-development-shared";
 export type RateLimitOperation =
-  | "tracking_lookup"
-  | "repair_request_submit"
-  | "feedback_submit";
+  "tracking_lookup" | "repair_request_submit" | "feedback_submit";
 
 export interface RateLimitResult {
   allowed: boolean;
