@@ -82,7 +82,9 @@ test.describe("E2E-08 Internal operator access", () => {
       const viewEvents = async () => {
         const { data, error } = await admin
           .from("internal_access_audit")
-          .select("event_id, operator_user_id, actor_user_id, operation, reason")
+          .select(
+            "event_id, operator_user_id, actor_user_id, operation, reason",
+          )
           .eq("operator_user_id", operator.userId)
           .eq("operation", "INTERNAL_ACCESS_VIEW");
         if (error) {
