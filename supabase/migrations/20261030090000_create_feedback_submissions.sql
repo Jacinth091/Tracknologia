@@ -7,7 +7,8 @@
 --
 -- Text is stored trimmed of ASCII edge whitespace (space, tab, LF, CR, FF, VT)
 -- and bounded in PostgreSQL characters (char_length counts code points, not
--- bytes). Ordinary C0 control characters are rejected as plain-text violations.
+-- bytes). Inside text, control characters U+0001-U+0008, U+000E-U+001F and
+-- U+007F are rejected; TAB, LF, VT, FF and CR are permitted.
 
 CREATE TABLE public.feedback_submissions (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
@@ -77,7 +78,10 @@ CREATE TABLE public.feedback_submissions (
   ),
   CONSTRAINT feedback_submissions_linked_issue_url_check CHECK (
     linked_issue_url IS NULL
-    OR linked_issue_url ~ '^https://github\.com/Jacinth091/Tracknologia/issues/[1-9][0-9]*$'
+    OR (
+      char_length(linked_issue_url) <= 2000
+      AND linked_issue_url ~ '^https://github\.com/Jacinth091/Tracknologia/issues/[1-9][0-9]*$'
+    )
   ),
   CONSTRAINT feedback_submissions_row_version_check CHECK (row_version > 0),
   CONSTRAINT feedback_submissions_review_stamp_check CHECK (
