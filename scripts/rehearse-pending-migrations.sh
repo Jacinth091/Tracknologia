@@ -143,7 +143,7 @@ lab_base_dir="${REHEARSAL_TMPDIR:-${TMPDIR:-/tmp}}"
 mkdir -p "$lab_base_dir"
 lab_root="$(mktemp -d "$lab_base_dir/tracknologia-rehearsal-XXXXXX")"
 mkdir -p "$lab_root/supabase/migrations"
-touch "$lab_root/supabase/seed.sql"
+cp "$repo_root/scripts/rehearse-upgrade-fixture.sql" "$lab_root/supabase/seed.sql"
 
 cleanup() {
   log "tearing down rehearsal lab ($lab_root)"
@@ -169,7 +169,7 @@ done
 log "starting lab stack"
 cli start >/dev/null
 
-log "applying BASE migration history only (release-like previous state)"
+log "applying BASE migration history only (release-like previous state, seeded with old-state fixture)"
 cli db reset >/dev/null
 
 log "copying pending migration(s) and applying ONLY pending (upgrade path)"
@@ -196,6 +196,9 @@ eval "$lab_env"
 export SUPABASE_TEST_URL="$API_URL"
 export SUPABASE_TEST_ANON_KEY="$ANON_KEY"
 export SUPABASE_TEST_SERVICE_ROLE_KEY="$SERVICE_ROLE_KEY"
+# Tells the suite the old-state fixture was seeded before the upgrade, so it
+# verifies that the pending-only upgrade preserved that data.
+export REHEARSAL_UPGRADE_FIXTURE=1
 log "lab API URL: $SUPABASE_TEST_URL"
 
 results="$lab_root/db-suite.log"
