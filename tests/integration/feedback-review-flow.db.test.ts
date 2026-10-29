@@ -123,6 +123,9 @@ async function readStored(id: string) {
       .order("row_version", { ascending: true }),
     "read stored feedback history",
   ).data;
+  if (row === null || history === null) {
+    throw new Error("stored feedback read returned no data");
+  }
   return { row, history };
 }
 
@@ -221,7 +224,7 @@ describe("Feedback review keeps stored fields (PostgreSQL)", () => {
         row_version: 3,
       });
       expect(after.history).toHaveLength(2);
-      expect(after.history[1]).toEqual({
+      expect(after.history.at(-1)).toEqual({
         from_status: "REVIEWING",
         to_status: "PLANNED",
         row_version: 3,
