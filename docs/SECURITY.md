@@ -133,6 +133,25 @@ roles, not `user_metadata`, and not inferred from owning or joining a Provider:
   records, so this is not full anonymization.
 - Internal audit retention/purge remains unapproved and is deliberately not
   implemented (issue #87).
+- Private Feedback (issue #89): `feedback_submissions` and
+  `feedback_review_events` have RLS enabled, no policies, and no client grants.
+  `service_role` may only `SELECT`; direct writes bypassing the RPCs are denied.
+  `submit_feedback(...)` (service-role only) accepts a nonce retry without
+  changing the original and returns the same generic `ACCEPTED` receipt, so it
+  never discloses earlier content or whether a nonce existed.
+  `record_feedback_review(...)` (service-role only) accepts an operator UUID
+  that the server resolves from the verified internal session before it calls
+  the function. The SQL function does not read any session itself; it trusts
+  only the service-role caller. It rechecks the enabled mapping under
+  `FOR SHARE` before locking the feedback row, and commits the row update and
+  its history event together. `submit_feedback` is reserved for the public
+  Feedback adapter; review stays on the internal operator adapter. Reviewers and submissions referenced by
+  history are `ON DELETE RESTRICT`, so deleting an Auth identity cannot erase
+  review history.
+- Feedback abuse budget: the durable limiter gains a `feedback_submit`
+  operation (default 5 requests per 600 seconds), with its own
+  `PUBLIC_ABUSE_FEEDBACK_*` overrides. Its counter is independent of the
+  tracking and Repair Request counters.
 
 ## Public Provider and invitation projections
 

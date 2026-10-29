@@ -73,8 +73,9 @@ abuse control. Keep it server-only and identical across application instances.
 Optional validated overrides are
 `PUBLIC_ABUSE_TRACKING_LOOKUP_MAX`,
 `PUBLIC_ABUSE_TRACKING_LOOKUP_WINDOW_SECONDS`,
-`PUBLIC_ABUSE_REPAIR_REQUEST_MAX`, and
-`PUBLIC_ABUSE_REPAIR_REQUEST_WINDOW_SECONDS`.
+`PUBLIC_ABUSE_REPAIR_REQUEST_MAX`,
+`PUBLIC_ABUSE_REPAIR_REQUEST_WINDOW_SECONDS`, `PUBLIC_ABUSE_FEEDBACK_MAX`
+(default `5`), and `PUBLIC_ABUSE_FEEDBACK_WINDOW_SECONDS` (default `600`).
 
 Production also requires a trusted ingress and a separate
 `PUBLIC_ABUSE_TRUSTED_PROXY_SECRET`. The ingress must remove any incoming
