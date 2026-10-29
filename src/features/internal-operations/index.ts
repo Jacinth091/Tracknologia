@@ -6,7 +6,6 @@ export {
 
 export {
   getValidationMetrics,
-  buildValidationMetrics,
   MetricsError,
   type ValidationMetrics,
   type ValidationMetricsWindow,

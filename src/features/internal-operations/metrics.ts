@@ -185,7 +185,9 @@ export const metricsRowSchema = z
     as_of: z.iso.datetime({ offset: true }),
   })
   .superRefine((row, ctx) => {
-    const allowed = METRIC_BUCKETS[row.dimension];
+    const allowed = Object.hasOwn(METRIC_BUCKETS, row.dimension)
+      ? METRIC_BUCKETS[row.dimension]
+      : undefined;
     if (
       !allowed ||
       (row.dimension === "ACTIVE_DAY"
