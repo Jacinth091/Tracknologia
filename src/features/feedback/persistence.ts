@@ -201,8 +201,7 @@ export async function readFeedbackDetail(
     .from("feedback_review_events")
     .select(HISTORY_COLUMNS)
     .eq("feedback_id", feedbackId)
-    .order("occurred_at", { ascending: true })
-    .order("event_id", { ascending: true })
+    .order("row_version", { ascending: false })
     .limit(FEEDBACK_HISTORY_LIMIT + 1);
   if (history.error) {
     throw feedbackUnavailable("read feedback history", history.error);
@@ -213,7 +212,9 @@ export async function readFeedbackDetail(
     throw malformed("read feedback history");
   }
 
-  const shown = events.data.slice(0, FEEDBACK_HISTORY_LIMIT);
+  // The query returns the newest 101 events by version, newest first. Keep the
+  // newest 100 and reverse them into causal (ascending version) order.
+  const shown = events.data.slice(0, FEEDBACK_HISTORY_LIMIT).reverse();
   return {
     original: {
       id: row.data.id,
