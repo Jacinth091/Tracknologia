@@ -293,7 +293,10 @@ internal access events.
 ### 14. `feedback_submissions`
 
 Private submitted feedback (issue #89). Written only by the service-role
-`submit_feedback(...)` RPC and reviewed only by `record_feedback_review(...)`.
+`submit_feedback(...)` RPC, which the public Feedback adapter may call, and
+reviewed only by `record_feedback_review(...)`, which the internal operator
+adapter calls with a server-resolved operator UUID. The SQL function itself
+trusts only the service-role caller.
 
 - `id` (uuid, PK, database-generated; never a public lookup token)
 - `submission_nonce` (uuid, unique): client retry key, not identity or
@@ -309,13 +312,17 @@ Private submitted feedback (issue #89). Written only by the service-role
 - `status` (default `NEW`: `NEW`, `REVIEWING`, `PLANNED`, `RESOLVED`,
   `DISMISSED`) and `priority` (default `NORMAL`: `NORMAL`, `HIGH`, `CRITICAL`)
 - `internal_notes` (nullable, trimmed, 1–2,000 characters) and
-  `linked_issue_url` (nullable; only `https://github.com/Jacinth091/Tracknologia/issues/<positive integer>`)
+  `linked_issue_url` (nullable; only `https://github.com/Jacinth091/Tracknologia/issues/<positive integer>`,
+  at most 2,000 characters)
 - `created_at`, `reviewed_at`, `reviewed_by` (nullable FK to `auth.users`,
   `ON DELETE RESTRICT`), `row_version` (starts at `1`, increases on each
   review mutation)
 - Text is trimmed of ASCII edge whitespace only (space, tab, LF, CR, FF, VT);
-  lengths count PostgreSQL characters, not bytes; C0 control characters are
-  rejected. Original `title` and `message` are never changed after insert.
+  lengths count PostgreSQL characters, not bytes. Control characters
+  U+0001–U+0008, U+000E–U+001F and U+007F are rejected inside `title` and
+  `message`; TAB, LF, VT, FF and CR are permitted as content, and only the
+  ASCII edge set is trimmed. Original `title` and `message` are never changed
+  after insert.
 - The review-stamp CHECK ties `row_version = 1` to no review and any later
   version to a recorded `reviewed_at`/`reviewed_by`.
 - Indexes: `(created_at DESC, id DESC)` and `(status, created_at DESC, id DESC)`.

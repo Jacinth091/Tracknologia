@@ -139,10 +139,13 @@ roles, not `user_metadata`, and not inferred from owning or joining a Provider:
   `submit_feedback(...)` (service-role only) accepts a nonce retry without
   changing the original and returns the same generic `ACCEPTED` receipt, so it
   never discloses earlier content or whether a nonce existed.
-  `record_feedback_review(...)` (service-role only) takes the operator
-  identity from the verified internal session, rechecks the enabled mapping
-  under `FOR SHARE` before locking the feedback row, and commits the row update
-  and its history event together. Reviewers and submissions referenced by
+  `record_feedback_review(...)` (service-role only) accepts an operator UUID
+  that the server resolves from the verified internal session before it calls
+  the function. The SQL function does not read any session itself; it trusts
+  only the service-role caller. It rechecks the enabled mapping under
+  `FOR SHARE` before locking the feedback row, and commits the row update and
+  its history event together. `submit_feedback` is reserved for the public
+  Feedback adapter; review stays on the internal operator adapter. Reviewers and submissions referenced by
   history are `ON DELETE RESTRICT`, so deleting an Auth identity cannot erase
   review history.
 - Feedback abuse budget: the durable limiter gains a `feedback_submit`
