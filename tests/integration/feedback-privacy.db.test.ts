@@ -54,7 +54,7 @@ interface PrivacyAuditRow {
 
 /** Extracts one fenced sql block by its `-- runbook: <name>` first line. */
 function readRunbookBlock(name: string): string {
-  const markdown = readFileSync(RUNBOOK_URL, "utf8");
+  const markdown = readFileSync(RUNBOOK_URL, "utf8").replace(/\r\n/g, "\n");
   const pattern = /```sql\n(-- runbook: [^\n]+\n[\s\S]*?)```/g;
   const blocks = [...markdown.matchAll(pattern)]
     .map((match) => match[1])
