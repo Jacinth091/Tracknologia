@@ -221,6 +221,22 @@ describe("Feedback summary Manila bounds (PostgreSQL snapshot)", () => {
         count(threeAfter, "STATUS", "REVIEWING") -
           count(threeBefore, "STATUS", "REVIEWING"),
       ).toBe(1);
+      expect(
+        count(threeAfter, "SOURCE", "PUBLIC_TRACKING") -
+          count(threeBefore, "SOURCE", "PUBLIC_TRACKING"),
+      ).toBe(2);
+      expect(
+        count(threeAfter, "SOURCE", "PUBLIC_FEEDBACK") -
+          count(threeBefore, "SOURCE", "PUBLIC_FEEDBACK"),
+      ).toBe(1);
+      expect(
+        count(threeAfter, "SOURCE", "PUBLIC_REQUEST") -
+          count(threeBefore, "SOURCE", "PUBLIC_REQUEST"),
+      ).toBe(1);
+      expect(
+        count(threeAfter, "SOURCE", "PROVIDER_WORKSPACE") -
+          count(threeBefore, "SOURCE", "PROVIDER_WORKSPACE"),
+      ).toBe(0);
 
       // The one-day window sees only the Nov 1 PHT rows.
       expect(categoryTotal(firstAfter) - categoryTotal(firstBefore)).toBe(3);
@@ -231,6 +247,22 @@ describe("Feedback summary Manila bounds (PostgreSQL snapshot)", () => {
       expect(
         count(firstAfter, "DAY", "2026-11-02") -
           count(firstBefore, "DAY", "2026-11-02"),
+      ).toBe(0);
+      expect(
+        count(firstAfter, "SOURCE", "PUBLIC_TRACKING") -
+          count(firstBefore, "SOURCE", "PUBLIC_TRACKING"),
+      ).toBe(2);
+      expect(
+        count(firstAfter, "SOURCE", "PUBLIC_FEEDBACK") -
+          count(firstBefore, "SOURCE", "PUBLIC_FEEDBACK"),
+      ).toBe(1);
+      expect(
+        count(firstAfter, "SOURCE", "PUBLIC_REQUEST") -
+          count(firstBefore, "SOURCE", "PUBLIC_REQUEST"),
+      ).toBe(0);
+      expect(
+        count(firstAfter, "SOURCE", "PROVIDER_WORKSPACE") -
+          count(firstBefore, "SOURCE", "PROVIDER_WORKSPACE"),
       ).toBe(0);
 
       // The transaction rolled back, so none of the fixtures persisted.
