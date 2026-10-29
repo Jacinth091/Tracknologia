@@ -914,7 +914,12 @@ describe("Count summary projection", () => {
         { dimension: "DAY", bucket: "2026-10-01", row_count: 2 },
         { dimension: "DAY", bucket: "2026-10-03", row_count: 0 },
       ],
-      { startDate: "2026-10-01", endDateExclusive: "2026-10-04", days: 3 },
+      {
+        timeZone: "Asia/Manila",
+        startDate: "2026-10-01",
+        endDateExclusive: "2026-10-04",
+        days: 3,
+      },
       "2026-10-29T00:00:00.000Z",
     );
 
