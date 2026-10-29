@@ -33,9 +33,7 @@ test.describe("E2E-08 Internal operator access", () => {
       const anonymousContext = await browser.newContext();
       const anonymousPage = await anonymousContext.newPage();
       await anonymousPage.goto("/internal");
-      await expect(anonymousPage).toHaveURL(
-        /\/login\?redirectTo=%2Finternal$/,
-      );
+      await expect(anonymousPage).toHaveURL(/\/login\?redirectTo=%2Finternal$/);
       await anonymousContext.close();
 
       // 2. The auth-only operator signs in through the real form and lands on
@@ -63,9 +61,11 @@ test.describe("E2E-08 Internal operator access", () => {
         "content",
         /noindex/,
       );
-      expect(internalResponse?.headers()["cache-control"] ?? "").not.toContain(
-        "public",
-      );
+      // Private, per-request surface: require an explicit non-public cache
+      // directive instead of only proving that "public" is absent.
+      const cacheControl = internalResponse?.headers()["cache-control"] ?? "";
+      expect(cacheControl).not.toContain("public");
+      expect(cacheControl).toMatch(/private|no-store/);
 
       // 3. Revocation applies to the same session on the next request.
       await revokeInternalOperator(admin, operator.userId);

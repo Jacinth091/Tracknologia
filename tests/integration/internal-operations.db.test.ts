@@ -18,11 +18,12 @@ requireDbConfig();
 
 const reason = "integration disposable operator change";
 
-function expectTablePermissionDenied(result: {
-  error: { code?: string; message: string } | null;
-}): void {
-  expect(result.error).not.toBeNull();
-  expect(result.error?.code).toBe("42501");
+function expectTablePermissionDenied(
+  result: { error: { code?: string; message: string } | null },
+  context = "private table operation",
+): void {
+  expect(result.error, context).not.toBeNull();
+  expect(result.error?.code, context).toBe("42501");
 }
 
 describe("Internal operator access and audit", () => {
@@ -40,15 +41,12 @@ describe("Internal operator access and audit", () => {
     actorUserId: string,
     enabled: boolean,
   ): Promise<boolean> {
-    const { data, error } = await admin.rpc(
-      "change_internal_operator_access",
-      {
-        p_operator_user_id: operatorUserId,
-        p_actor_user_id: actorUserId,
-        p_enabled: enabled,
-        p_reason: reason,
-      },
-    );
+    const { data, error } = await admin.rpc("change_internal_operator_access", {
+      p_operator_user_id: operatorUserId,
+      p_actor_user_id: actorUserId,
+      p_enabled: enabled,
+      p_reason: reason,
+    });
     if (error) {
       throw new Error(
         `change_internal_operator_access failed: ${error.message}`,
@@ -68,41 +66,62 @@ describe("Internal operator access and audit", () => {
     await changeAccess(user.id, user.id, true);
     const { client } = await signInTestUser(email, password);
 
-    const cases = [
+    // Explicit payload type keeps both fixture shapes one usable union member
+    // instead of an over-narrow literal inferred per object.
+    type OrdinaryClient = ReturnType<typeof createAnonClient>;
+    type TableCase = {
+      table: string;
+      payload: Record<string, unknown>;
+      filter: { column: string; value: string };
+    };
+
+    const cases: TableCase[] = [
       {
         table: "internal_operators",
-        insert: { user_id: user.id },
+        payload: { user_id: user.id },
         filter: { column: "user_id", value: user.id },
       },
       {
         table: "internal_access_audit",
-        insert: { operation: "INTERNAL_ACCESS_VIEW" },
+        payload: { operation: "INTERNAL_ACCESS_VIEW" },
         filter: { column: "event_id", value: randomUUID() },
       },
-    ] as const;
+    ];
 
-    for (const { table, insert, filter } of cases) {
-      expectTablePermissionDenied(await anon.from(table).select("*"));
-      expectTablePermissionDenied(await client.from(table).select("*"));
+    const ordinaryClients: Array<[string, OrdinaryClient]> = [
+      ["anon", anon],
+      ["authenticated", client],
+    ];
 
-      const inserted = await client
-        .from(table)
-        .insert(insert)
-        .select();
-      expectTablePermissionDenied(inserted);
+    for (const [roleName, ordinary] of ordinaryClients) {
+      for (const { table, payload, filter } of cases) {
+        expectTablePermissionDenied(
+          await ordinary.from(table).select("*"),
+          `${roleName} select ${table}`,
+        );
 
-      const updated = await client
-        .from(table)
-        .update(insert)
-        .eq(filter.column, filter.value)
-        .select();
-      expectTablePermissionDenied(updated);
+        expectTablePermissionDenied(
+          await ordinary.from(table).insert(payload).select(),
+          `${roleName} insert ${table}`,
+        );
 
-      const deleted = await client
-        .from(table)
-        .delete()
-        .eq(filter.column, filter.value);
-      expectTablePermissionDenied(deleted);
+        expectTablePermissionDenied(
+          await ordinary
+            .from(table)
+            .update(payload)
+            .eq(filter.column, filter.value)
+            .select(),
+          `${roleName} update ${table}`,
+        );
+
+        expectTablePermissionDenied(
+          await ordinary
+            .from(table)
+            .delete()
+            .eq(filter.column, filter.value),
+          `${roleName} delete ${table}`,
+        );
+      }
     }
   });
 
@@ -190,6 +209,31 @@ describe("Internal operator access and audit", () => {
       .eq("operator_user_id", user.id)
       .eq("operation", "OPERATOR_PROVISIONED");
     expect(provisioned.data).toHaveLength(1);
+
+    // A failed REVOKE must roll back too: the invalid actor only fails at the
+    // required audit insert, after the mapping UPDATE.
+    const failedRevoke = await admin.rpc("change_internal_operator_access", {
+      p_operator_user_id: user.id,
+      p_actor_user_id: randomUUID(),
+      p_enabled: false,
+      p_reason: reason,
+    });
+    expect(failedRevoke.error?.code).toBe("23503");
+
+    const stillEnabled = await admin
+      .from("internal_operators")
+      .select("enabled, revoked_at")
+      .eq("user_id", user.id)
+      .single();
+    expect(stillEnabled.data?.enabled).toBe(true);
+    expect(stillEnabled.data?.revoked_at).toBeNull();
+
+    const revokedEvents = await admin
+      .from("internal_access_audit")
+      .select("event_id")
+      .eq("operator_user_id", user.id)
+      .eq("operation", "OPERATOR_REVOKED");
+    expect(revokedEvents.data).toHaveLength(0);
 
     expect(await changeAccess(user.id, user.id, true)).toBe(false);
     expect(await changeAccess(user.id, user.id, false)).toBe(true);
