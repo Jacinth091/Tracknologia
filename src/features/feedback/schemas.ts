@@ -56,13 +56,12 @@ function boundedText(min: number, max: number, label: string) {
     );
 }
 
-// Optional fields: absent, null, or blank input becomes null. A non-blank
-// value must satisfy the bounds that the table enforces for the stored text.
-function optionalBoundedText(min: number, max: number, label: string) {
+// Stored text that can be cleared: blank becomes null, and a non-blank value
+// must satisfy the bounds the table enforces for the stored text.
+function clearableBoundedText(min: number, max: number, label: string) {
   return z
     .string()
-    .nullish()
-    .transform((value) => asciiTrim(value ?? ""))
+    .transform((value) => asciiTrim(value))
     .refine(
       (value) =>
         value === "" ||
@@ -74,6 +73,26 @@ function optionalBoundedText(min: number, max: number, label: string) {
       `${label} contains unsupported characters`,
     )
     .transform((value) => (value === "" ? null : value));
+}
+
+// Optional fields: absent, null, or blank input becomes null.
+function optionalBoundedText(min: number, max: number, label: string) {
+  return z
+    .string()
+    .nullish()
+    .transform((value) => value ?? "")
+    .pipe(clearableBoundedText(min, max, label));
+}
+
+// Required key of a full-replacement review. It must be present and hold a
+// string or an explicit null. Null or blank clears the stored text; an omitted
+// key is rejected before persistence, so a partial decision cannot erase notes.
+function requiredClearableText(min: number, max: number, label: string) {
+  return z
+    .string({ error: `${label} is required; send null to clear it` })
+    .nullable()
+    .transform((value) => value ?? "")
+    .pipe(clearableBoundedText(min, max, label));
 }
 
 const TRACKED_ISSUE_PATH = /^\/Jacinth091\/Tracknologia\/issues\/[1-9][0-9]*$/;
@@ -105,8 +124,8 @@ function isCanonicalTrackedIssueUrl(value: string): boolean {
 }
 
 const linkedIssueUrlSchema = z
-  .string()
-  .nullish()
+  .string({ error: "Linked issue is required; send null to clear it" })
+  .nullable()
   .transform((value) => asciiTrim(value ?? ""))
   .refine(
     (value) => codePointLength(value) <= 2000,
@@ -140,7 +159,7 @@ export const feedbackIdSchema = z.uuid("Feedback ID is invalid");
 export const feedbackReviewDecisionSchema = z.strictObject({
   status: z.enum(FEEDBACK_STATUSES),
   priority: z.enum(FEEDBACK_PRIORITIES),
-  internalNotes: optionalBoundedText(1, 2000, "Internal notes"),
+  internalNotes: requiredClearableText(1, 2000, "Internal notes"),
   linkedIssueUrl: linkedIssueUrlSchema,
   reason: optionalBoundedText(3, 500, "Reason"),
 });
