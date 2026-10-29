@@ -6,11 +6,12 @@ import {
 } from "@/features/internal-operations/access";
 import { createInternalOpsClient } from "@/lib/supabase/internal";
 
+import { sanitizeFeedbackError } from "./errors";
 import {
   listFeedbackPreviews,
-  buildFeedbackCountSummary,
   readFeedbackDetail,
   readFeedbackSummaryRows,
+  type FeedbackSummaryRow,
 } from "./persistence";
 import {
   feedbackIdSchema,
@@ -18,6 +19,9 @@ import {
   feedbackSummaryWindowSchema,
 } from "./schemas";
 import {
+  FEEDBACK_CATEGORIES,
+  FEEDBACK_SOURCES,
+  FEEDBACK_STATUSES,
   FeedbackError,
   type FeedbackCountSummary,
   type FeedbackDetail,
@@ -27,7 +31,7 @@ import {
 const DAY_MS = 86_400_000;
 
 // Every internal read passes the operator guard and the required access audit
-// before the privileged query. Any denial or audit failure stops here, so no
+// before the privileged query. Denial or audit failure stops here, so no
 // protected data is queried for an unauthorized or unrecorded request.
 async function requireAuditedOperatorRead(): Promise<string> {
   const access = await requireInternalOperator();
@@ -59,14 +63,21 @@ async function requireAuditedOperatorRead(): Promise<string> {
 export async function listInternalFeedback(
   options: unknown = {},
 ): Promise<FeedbackPreviewPage> {
-  await requireAuditedOperatorRead();
+  try {
+    await requireAuditedOperatorRead();
 
-  const parsed = feedbackListOptionsSchema.safeParse(options);
-  if (!parsed.success) {
-    throw new FeedbackError("Feedback filters are invalid", "INVALID_INPUT");
+    const parsed = feedbackListOptionsSchema.safeParse(options);
+    if (!parsed.success) {
+      throw new FeedbackError("Feedback filters are invalid", "INVALID_INPUT");
+    }
+
+    return await listFeedbackPreviews(
+      await createInternalOpsClient(),
+      parsed.data,
+    );
+  } catch (error) {
+    throw sanitizeFeedbackError("list internal feedback", error);
   }
-
-  return listFeedbackPreviews(await createInternalOpsClient(), parsed.data);
 }
 
 /**
@@ -76,14 +87,18 @@ export async function listInternalFeedback(
 export async function getInternalFeedback(
   feedbackId: unknown,
 ): Promise<FeedbackDetail | null> {
-  await requireAuditedOperatorRead();
+  try {
+    await requireAuditedOperatorRead();
 
-  const id = feedbackIdSchema.safeParse(feedbackId);
-  if (!id.success) {
-    return null;
+    const id = feedbackIdSchema.safeParse(feedbackId);
+    if (!id.success) {
+      return null;
+    }
+
+    return await readFeedbackDetail(await createInternalOpsClient(), id.data);
+  } catch (error) {
+    throw sanitizeFeedbackError("read internal feedback", error);
   }
-
-  return readFeedbackDetail(await createInternalOpsClient(), id.data);
 }
 
 /**
@@ -94,34 +109,97 @@ export async function getInternalFeedback(
 export async function getFeedbackAggregateSummary(
   window: unknown,
 ): Promise<FeedbackCountSummary> {
-  const operatorUserId = await requireAuditedOperatorRead();
+  try {
+    const operatorUserId = await requireAuditedOperatorRead();
 
-  const parsed = feedbackSummaryWindowSchema.safeParse(window);
-  if (!parsed.success) {
-    throw new FeedbackError(
-      parsed.error.issues[0]?.message ?? "Summary window is invalid",
-      "INVALID_INPUT",
+    const parsed = feedbackSummaryWindowSchema.safeParse(window);
+    if (!parsed.success) {
+      throw new FeedbackError(
+        parsed.error.issues[0]?.message ?? "Summary window is invalid",
+        "INVALID_INPUT",
+      );
+    }
+
+    const { startDate, endDateExclusive } = parsed.data;
+    const days = Math.round(
+      (Date.parse(endDateExclusive) - Date.parse(startDate)) / DAY_MS,
     );
+    const rows = await readFeedbackSummaryRows(
+      await createInternalOpsClient(),
+      operatorUserId,
+      {
+        start: `${startDate}T00:00:00.000Z`,
+        endExclusive: `${endDateExclusive}T00:00:00.000Z`,
+      },
+    );
+
+    return buildFeedbackCountSummary(
+      rows,
+      { startDate, endDateExclusive, days },
+      new Date().toISOString(),
+    );
+  } catch (error) {
+    throw sanitizeFeedbackError("summarize internal feedback", error);
   }
+}
 
-  const { startDate, endDateExclusive } = parsed.data;
-  const days = Math.round(
-    (Date.parse(endDateExclusive) - Date.parse(startDate)) / DAY_MS,
+/**
+ * Projects fixed count groups into the summary shape. Missing groups are
+ * zero-filled, and every calendar day in the window appears exactly once.
+ */
+export function buildFeedbackCountSummary(
+  rows: FeedbackSummaryRow[],
+  window: FeedbackCountSummary["window"],
+  asOf: string,
+): FeedbackCountSummary {
+  const byCategory = countsFor(FEEDBACK_CATEGORIES, rows, "CATEGORY");
+  const bySource = countsFor(FEEDBACK_SOURCES, rows, "SOURCE");
+  const byStatus = countsFor(FEEDBACK_STATUSES, rows, "STATUS");
+  const dayCounts = new Map(
+    rows
+      .filter((row) => row.dimension === "DAY")
+      .map((row) => [row.bucket, row.row_count]),
   );
-  const range = {
-    start: `${startDate}T00:00:00.000Z`,
-    endExclusive: `${endDateExclusive}T00:00:00.000Z`,
+
+  return {
+    asOf,
+    window,
+    snapshot: "CURRENT_STATUS",
+    retention: { policy: "UNAPPROVED", coverage: "RETAINED_ROWS_ONLY" },
+    total: Object.values(byCategory).reduce((sum, count) => sum + count, 0),
+    byCategory,
+    bySource,
+    byStatus,
+    daily: enumerateDays(window.startDate, window.days).map((date) => ({
+      date,
+      count: dayCounts.get(date) ?? 0,
+    })),
   };
+}
 
-  const rows = await readFeedbackSummaryRows(
-    await createInternalOpsClient(),
-    operatorUserId,
-    range,
-  );
+function countsFor<T extends string>(
+  keys: readonly T[],
+  rows: FeedbackSummaryRow[],
+  dimension: FeedbackSummaryRow["dimension"],
+): Record<T, number> {
+  const counts = Object.fromEntries(keys.map((key) => [key, 0])) as Record<
+    T,
+    number
+  >;
+  for (const row of rows) {
+    if (
+      row.dimension === dimension &&
+      (keys as readonly string[]).includes(row.bucket)
+    ) {
+      counts[row.bucket as T] = row.row_count;
+    }
+  }
+  return counts;
+}
 
-  return buildFeedbackCountSummary(
-    rows,
-    { startDate, endDateExclusive, days },
-    new Date().toISOString(),
+function enumerateDays(startDate: string, days: number): string[] {
+  const start = Date.parse(startDate);
+  return Array.from({ length: days }, (_, index) =>
+    new Date(start + index * DAY_MS).toISOString().slice(0, 10),
   );
 }

@@ -1,4 +1,4 @@
-import { beforeEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 const mocks = vi.hoisted(() => ({
   checkClientRateLimit: vi.fn(),
@@ -41,13 +41,21 @@ vi.mock("@/features/internal-operations/access", () => ({
   requireInternalOperator: mocks.requireInternalOperator,
 }));
 
+import { AuthError } from "@/features/auth";
+
+import {
+  buildFeedbackCountSummary,
+  getInternalFeedback,
+  getFeedbackAggregateSummary,
+  listInternalFeedback,
+} from "./queries";
 import {
   recordFeedbackReview,
   submitPublicFeedback,
   submitProviderFeedback,
 } from "./commands";
-import { getFeedbackAggregateSummary, listInternalFeedback } from "./queries";
 import {
+  feedbackListOptionsSchema,
   feedbackReviewDecisionSchema,
   feedbackSummaryWindowSchema,
   submitFeedbackSchema,
@@ -57,6 +65,7 @@ import { FeedbackError } from "./types";
 const NONCE = "5f0c6f7e-3b1a-4c5d-8e9f-0a1b2c3d4e5f";
 const REVIEWER_ID = "00000000-0000-4000-8000-0000000000aa";
 const FEEDBACK_ID = "00000000-0000-4000-8000-0000000000bb";
+const CANARY = "SECRET-CANARY-7c1e-do-not-log";
 
 function validSubmission(overrides: Record<string, unknown> = {}) {
   return {
@@ -66,6 +75,10 @@ function validSubmission(overrides: Record<string, unknown> = {}) {
     submissionNonce: NONCE,
     ...overrides,
   };
+}
+
+function reviewDecision(overrides: Record<string, unknown> = {}) {
+  return { status: "REVIEWING", priority: "NORMAL", ...overrides };
 }
 
 async function captureError(promise: Promise<unknown>): Promise<FeedbackError> {
@@ -89,22 +102,45 @@ function currentStateClient(
   return { from: vi.fn(() => ({ select })), rpc: mocks.rpc };
 }
 
-beforeEach(() => {
-  vi.resetAllMocks();
+function allowOperator() {
+  mocks.requireInternalOperator.mockResolvedValue({
+    status: "ALLOWED",
+    userId: REVIEWER_ID,
+  });
+}
+
+// Every public call passes the limiter; the denial cases override this.
+function allowBudget() {
   mocks.checkClientRateLimit.mockResolvedValue({
     allowed: true,
     retryAfterSeconds: 0,
   });
+}
+
+let errorSpy: ReturnType<typeof vi.spyOn>;
+
+beforeEach(() => {
+  vi.resetAllMocks();
+  errorSpy = vi.spyOn(console, "error").mockImplementation(() => {});
+  allowBudget();
   mocks.createPublicOperationClient.mockResolvedValue({ rpc: mocks.rpc });
   mocks.rpc.mockResolvedValue({ data: "ACCEPTED", error: null });
   mocks.recordSensitiveInternalAccess.mockResolvedValue(true);
 });
 
-describe("Feedback submission ordering", () => {
-  it("consumes the shared budget before parsing or persisting", async () => {
+afterEach(() => {
+  errorSpy.mockRestore();
+});
+
+function loggedText() {
+  return JSON.stringify(errorSpy.mock.calls);
+}
+
+describe("Feedback budget and public submission", () => {
+  it("denies with a bounded retry before any parse or write", async () => {
     mocks.checkClientRateLimit.mockResolvedValue({
       allowed: false,
-      retryAfterSeconds: 42,
+      retryAfterSeconds: 999_999,
     });
 
     const error = await captureError(
@@ -113,20 +149,38 @@ describe("Feedback submission ordering", () => {
 
     expect(mocks.checkClientRateLimit).toHaveBeenCalledWith("feedback_submit");
     expect(error.code).toBe("RATE_LIMITED");
-    expect(error.retryAfterSeconds).toBe(42);
+    expect(error.retryAfterSeconds).toBe(86_400);
     expect(mocks.createPublicOperationClient).not.toHaveBeenCalled();
   });
 
-  it("fails closed when the limiter is unavailable", async () => {
-    mocks.checkClientRateLimit.mockRejectedValue(new Error("db down"));
+  it.each([
+    [
+      "throws",
+      () => mocks.checkClientRateLimit.mockRejectedValue(new Error(CANARY)),
+    ],
+    [
+      "returns a non-boolean decision",
+      () => mocks.checkClientRateLimit.mockResolvedValue({ allowed: "yes" }),
+    ],
+    [
+      "denies with a non-finite retry",
+      () =>
+        mocks.checkClientRateLimit.mockResolvedValue({
+          allowed: false,
+          retryAfterSeconds: Number.NaN,
+        }),
+    ],
+  ])("fails closed when the limiter %s", async (_label, arrange) => {
+    arrange();
 
     const error = await captureError(submitPublicFeedback(validSubmission()));
 
     expect(error.code).toBe("UNAVAILABLE");
     expect(mocks.createPublicOperationClient).not.toHaveBeenCalled();
+    expect(loggedText()).not.toContain(CANARY);
   });
 
-  it("counts invalid public input against the budget and never persists it", async () => {
+  it("consumes exactly one budget for invalid input", async () => {
     const error = await captureError(
       submitPublicFeedback(validSubmission({ message: "   " })),
     );
@@ -136,30 +190,28 @@ describe("Feedback submission ordering", () => {
     expect(mocks.rpc).not.toHaveBeenCalled();
   });
 
-  it("returns the same generic receipt on an accepted write", async () => {
-    await expect(submitPublicFeedback(validSubmission())).resolves.toEqual({
-      accepted: true,
-    });
+  it("rejects a malformed trusted source once the budget is spent", async () => {
+    const error = await captureError(
+      submitPublicFeedback(validSubmission(), "PROVIDER_WORKSPACE"),
+    );
 
-    expect(mocks.rpc).toHaveBeenCalledWith("submit_feedback", {
-      p_submission_nonce: NONCE,
-      p_category: "BUG",
-      p_source: "PUBLIC_FEEDBACK",
-      p_participant_class: "PUBLIC_SELF_REPORTED_CUSTOMER",
-      p_title: "Tracking page",
-      p_message: "The tracking page shows an error.",
-    });
+    expect(error.code).toBe("INVALID_INPUT");
+    expect(mocks.checkClientRateLimit).toHaveBeenCalledTimes(1);
+    expect(mocks.rpc).not.toHaveBeenCalled();
   });
 
-  it("never reports success for an unexpected RPC result", async () => {
-    mocks.rpc.mockResolvedValue({ data: "MAYBE", error: null });
+  it("returns the same receipt for a same-nonce retry", async () => {
+    const first = await submitPublicFeedback(validSubmission());
+    const second = await submitPublicFeedback(validSubmission());
 
-    const error = await captureError(submitPublicFeedback(validSubmission()));
-
-    expect(error.code).toBe("UNAVAILABLE");
+    expect(first).toEqual({ accepted: true });
+    expect(second).toEqual({ accepted: true });
+    expect(
+      mocks.rpc.mock.calls.map(([, args]) => args.p_submission_nonce),
+    ).toEqual([NONCE, NONCE]);
   });
 
-  it("rejects forged trusted fields without echoing them", async () => {
+  it("names forged trusted fields generically without echoing them", async () => {
     const error = await captureError(
       submitPublicFeedback(
         validSubmission({ source: "PROVIDER_WORKSPACE", status: "RESOLVED" }),
@@ -170,6 +222,50 @@ describe("Feedback submission ordering", () => {
     expect(error.message).toBe("Feedback contains unsupported fields");
     expect(mocks.rpc).not.toHaveBeenCalled();
   });
+
+  it("sanitizes an RPC error and logs only its SQLSTATE", async () => {
+    mocks.rpc.mockResolvedValue({
+      data: null,
+      error: { message: `insert failed ${CANARY}`, code: "23505" },
+    });
+
+    const error = await captureError(submitPublicFeedback(validSubmission()));
+
+    expect(error.code).toBe("UNAVAILABLE");
+    expect(error.message).not.toContain(CANARY);
+    expect(loggedText()).toContain("23505");
+    expect(loggedText()).not.toContain(CANARY);
+  });
+
+  it("sanitizes a thrown transport error", async () => {
+    mocks.rpc.mockRejectedValue(new Error(CANARY));
+
+    const error = await captureError(submitPublicFeedback(validSubmission()));
+
+    expect(error.code).toBe("UNAVAILABLE");
+    expect(error.message).not.toContain(CANARY);
+    expect(loggedText()).not.toContain(CANARY);
+  });
+
+  it("sanitizes a failed client creation", async () => {
+    mocks.createPublicOperationClient.mockRejectedValue(new Error(CANARY));
+
+    const error = await captureError(submitPublicFeedback(validSubmission()));
+
+    expect(error.code).toBe("UNAVAILABLE");
+    expect(loggedText()).not.toContain(CANARY);
+  });
+
+  it.each([{ data: "MAYBE" }, { data: null }])(
+    "never reports success for an unexpected RPC result %j",
+    async (response) => {
+      mocks.rpc.mockResolvedValue({ error: null, ...response });
+
+      const error = await captureError(submitPublicFeedback(validSubmission()));
+
+      expect(error.code).toBe("UNAVAILABLE");
+    },
+  );
 });
 
 describe("Provider feedback", () => {
@@ -194,50 +290,107 @@ describe("Provider feedback", () => {
     },
   );
 
-  it("denies removed or anonymous callers before the budget or any write", async () => {
-    mocks.requireProviderContext.mockRejectedValue(
-      Object.assign(new Error("no membership"), { code: "NO_MEMBERSHIP" }),
-    );
+  it.each(["NO_MEMBERSHIP", "UNAUTHENTICATED"])(
+    "maps expected %s to FORBIDDEN before the budget",
+    async (code) => {
+      mocks.requireProviderContext.mockRejectedValue(
+        new AuthError("expected", code),
+      );
+
+      const error = await captureError(
+        submitProviderFeedback(validSubmission()),
+      );
+
+      expect(error.code).toBe("FORBIDDEN");
+      expect(mocks.checkClientRateLimit).not.toHaveBeenCalled();
+      expect(mocks.rpc).not.toHaveBeenCalled();
+    },
+  );
+
+  it.each([
+    [
+      "an infrastructure AuthError",
+      new AuthError("db", "INFRASTRUCTURE_FAILURE"),
+    ],
+    ["an unexpected throw", new Error(CANARY)],
+  ])("maps %s to UNAVAILABLE without the message", async (_label, thrown) => {
+    mocks.requireProviderContext.mockRejectedValue(thrown);
 
     const error = await captureError(submitProviderFeedback(validSubmission()));
 
-    expect(error.code).toBe("FORBIDDEN");
-    expect(mocks.checkClientRateLimit).not.toHaveBeenCalled();
-    expect(mocks.rpc).not.toHaveBeenCalled();
+    expect(error.code).toBe("UNAVAILABLE");
+    expect(error.message).not.toContain(CANARY);
+    expect(loggedText()).not.toContain(CANARY);
   });
 });
 
-describe("Internal feedback reads", () => {
-  it("performs no privileged query for a non-operator", async () => {
-    mocks.requireInternalOperator.mockResolvedValue({ status: "FORBIDDEN" });
+describe("Internal operations: guard denial", () => {
+  const cases = {
+    list: () => listInternalFeedback({}),
+    detail: () => getInternalFeedback(FEEDBACK_ID),
+    summary: () =>
+      getFeedbackAggregateSummary({
+        startDate: "2026-10-01",
+        endDateExclusive: "2026-10-02",
+      }),
+    review: () =>
+      recordFeedbackReview(FEEDBACK_ID, { status: "NOPE" }, "not-a-version"),
+  } as const;
 
-    const error = await captureError(listInternalFeedback({}));
+  it.each(Object.keys(cases) as Array<keyof typeof cases>)(
+    "%s is FORBIDDEN before any query, audit, or input parse",
+    async (name) => {
+      mocks.requireInternalOperator.mockResolvedValue({ status: "FORBIDDEN" });
 
-    expect(error.code).toBe("FORBIDDEN");
-    expect(mocks.recordSensitiveInternalAccess).not.toHaveBeenCalled();
-    expect(mocks.createInternalOpsClient).not.toHaveBeenCalled();
-  });
+      const error = await captureError(cases[name]());
 
-  it("withholds protected data when the access audit fails", async () => {
-    mocks.requireInternalOperator.mockResolvedValue({
-      status: "ALLOWED",
-      userId: REVIEWER_ID,
-    });
-    mocks.recordSensitiveInternalAccess.mockResolvedValue(false);
+      expect(error.code).toBe("FORBIDDEN");
+      expect(mocks.createInternalOpsClient).not.toHaveBeenCalled();
+      expect(mocks.recordSensitiveInternalAccess).not.toHaveBeenCalled();
+    },
+  );
 
-    const error = await captureError(getFeedbackAggregateSummary({}));
+  it.each(Object.keys(cases) as Array<keyof typeof cases>)(
+    "%s is UNAVAILABLE when the guard itself is unavailable",
+    async (name) => {
+      mocks.requireInternalOperator.mockResolvedValue({
+        status: "UNAVAILABLE",
+      });
 
-    expect(error.code).toBe("UNAVAILABLE");
+      const error = await captureError(cases[name]());
+
+      expect(error.code).toBe("UNAVAILABLE");
+      expect(mocks.createInternalOpsClient).not.toHaveBeenCalled();
+    },
+  );
+
+  it.each(["list", "detail", "summary"] as const)(
+    "%s withholds protected data when the access audit fails",
+    async (name) => {
+      allowOperator();
+      mocks.recordSensitiveInternalAccess.mockResolvedValue(false);
+
+      const error = await captureError(cases[name]());
+
+      expect(error.code).toBe("UNAVAILABLE");
+      expect(mocks.recordSensitiveInternalAccess).toHaveBeenCalledWith(
+        "INTERNAL_ACCESS_VIEW",
+      );
+      expect(mocks.createInternalOpsClient).not.toHaveBeenCalled();
+    },
+  );
+
+  it("returns null for a malformed detail identifier after the guard", async () => {
+    allowOperator();
+
+    await expect(getInternalFeedback("not-a-uuid")).resolves.toBeNull();
     expect(mocks.createInternalOpsClient).not.toHaveBeenCalled();
   });
 });
 
 describe("Feedback review", () => {
   beforeEach(() => {
-    mocks.requireInternalOperator.mockResolvedValue({
-      status: "ALLOWED",
-      userId: REVIEWER_ID,
-    });
+    allowOperator();
   });
 
   it("rejects a stale version before any review write", async () => {
@@ -246,11 +399,7 @@ describe("Feedback review", () => {
     );
 
     const error = await captureError(
-      recordFeedbackReview(
-        FEEDBACK_ID,
-        { status: "REVIEWING", priority: "NORMAL" },
-        1,
-      ),
+      recordFeedbackReview(FEEDBACK_ID, reviewDecision(), 1),
     );
 
     expect(error.code).toBe("CONFLICT");
@@ -265,7 +414,7 @@ describe("Feedback review", () => {
     const error = await captureError(
       recordFeedbackReview(
         FEEDBACK_ID,
-        { status: "PLANNED", priority: "NORMAL" },
+        reviewDecision({ status: "PLANNED" }),
         1,
       ),
     );
@@ -280,15 +429,37 @@ describe("Feedback review", () => {
     );
 
     const error = await captureError(
-      recordFeedbackReview(
-        FEEDBACK_ID,
-        { status: "REVIEWING", priority: "NORMAL" },
-        3,
-      ),
+      recordFeedbackReview(FEEDBACK_ID, reviewDecision(), 3),
     );
 
     expect(error.code).toBe("INVALID_INPUT");
     expect(mocks.rpc).not.toHaveBeenCalled();
+  });
+
+  it.each([
+    ["absent", {}],
+    ["null", { internalNotes: null, linkedIssueUrl: null, reason: null }],
+    ["blank", { internalNotes: "  ", linkedIssueUrl: "", reason: " " }],
+  ])("clears optional fields that are %s", async (_label, optional) => {
+    mocks.createInternalOpsClient.mockResolvedValue(
+      currentStateClient({ status: "NEW", row_version: 1 }),
+    );
+    mocks.rpc.mockResolvedValue({ data: 2, error: null });
+
+    await recordFeedbackReview(
+      FEEDBACK_ID,
+      reviewDecision({ status: "DISMISSED", ...optional }),
+      1,
+    );
+
+    expect(mocks.rpc).toHaveBeenCalledWith(
+      "record_feedback_review",
+      expect.objectContaining({
+        p_internal_notes: null,
+        p_linked_issue_url: null,
+        p_reason: null,
+      }),
+    );
   });
 
   it("records a legal review with the verified operator identity", async () => {
@@ -323,20 +494,110 @@ describe("Feedback review", () => {
       }),
     );
   });
+
+  it.each([
+    [{ data: 1, error: null }],
+    [{ data: 3, error: null }],
+    [{ data: "2", error: null }],
+    [{ data: null, error: null }],
+  ])("rejects a malformed or non-incremented result %j", async (response) => {
+    mocks.createInternalOpsClient.mockResolvedValue(
+      currentStateClient({ status: "NEW", row_version: 1 }),
+    );
+    mocks.rpc.mockResolvedValue(response);
+
+    const error = await captureError(
+      recordFeedbackReview(FEEDBACK_ID, reviewDecision(), 1),
+    );
+
+    expect(error.code).toBe("UNAVAILABLE");
+  });
+
+  it.each([
+    ["FEEDBACK_VERSION_CONFLICT", "CONFLICT"],
+    ["FEEDBACK_NOT_FOUND", "NOT_FOUND"],
+    ["FEEDBACK_INVALID_TRANSITION", "INVALID_INPUT"],
+    ["Internal operator access required", "FORBIDDEN"],
+  ])("maps the review exception %s to %s", async (token, code) => {
+    mocks.createInternalOpsClient.mockResolvedValue(
+      currentStateClient({ status: "NEW", row_version: 1 }),
+    );
+    mocks.rpc.mockResolvedValue({
+      data: null,
+      error: { message: `ERROR: ${token}`, code: "P0001" },
+    });
+
+    const error = await captureError(
+      recordFeedbackReview(FEEDBACK_ID, reviewDecision(), 1),
+    );
+
+    expect(error.code).toBe(code);
+  });
+
+  it("sanitizes an unrecognized review exception", async () => {
+    mocks.createInternalOpsClient.mockResolvedValue(
+      currentStateClient({ status: "NEW", row_version: 1 }),
+    );
+    mocks.rpc.mockResolvedValue({
+      data: null,
+      error: { message: `column "x" ${CANARY}`, code: "42703" },
+    });
+
+    const error = await captureError(
+      recordFeedbackReview(FEEDBACK_ID, reviewDecision(), 1),
+    );
+
+    expect(error.code).toBe("UNAVAILABLE");
+    expect(loggedText()).toContain("42703");
+    expect(loggedText()).not.toContain(CANARY);
+  });
+
+  it.each([
+    ["an out-of-range version", FEEDBACK_ID, reviewDecision(), 2_147_483_648],
+    [
+      "a NUL in notes",
+      FEEDBACK_ID,
+      reviewDecision({ internalNotes: "a\u0000b" }),
+      1,
+    ],
+    [
+      "an over-long link",
+      FEEDBACK_ID,
+      reviewDecision({
+        linkedIssueUrl: `https://github.com/Jacinth091/Tracknologia/issues/${"1".repeat(2050)}`,
+      }),
+      1,
+    ],
+    [
+      "a link with a query",
+      FEEDBACK_ID,
+      reviewDecision({
+        linkedIssueUrl:
+          "https://github.com/Jacinth091/Tracknologia/issues/12?x=1",
+      }),
+      1,
+    ],
+  ])("rejects %s before any query", async (_label, id, decision, version) => {
+    const error = await captureError(
+      recordFeedbackReview(id, decision, version),
+    );
+
+    expect(error.code).toBe("INVALID_INPUT");
+    expect(mocks.createInternalOpsClient).not.toHaveBeenCalled();
+  });
 });
 
 describe("Feedback schemas", () => {
   it("counts code points, not UTF-16 units, for the message bound", () => {
-    const atLimit = "😀".repeat(2000);
-    const overLimit = "😀".repeat(2001);
-
     expect(
-      submitFeedbackSchema.safeParse(validSubmission({ message: atLimit }))
-        .success,
+      submitFeedbackSchema.safeParse(
+        validSubmission({ message: "😀".repeat(2000) }),
+      ).success,
     ).toBe(true);
     expect(
-      submitFeedbackSchema.safeParse(validSubmission({ message: overLimit }))
-        .success,
+      submitFeedbackSchema.safeParse(
+        validSubmission({ message: "😀".repeat(2001) }),
+      ).success,
     ).toBe(false);
   });
 
@@ -345,44 +606,57 @@ describe("Feedback schemas", () => {
       validSubmission({ message: " kept\tinside " }),
     );
 
-    expect(parsed.success).toBe(true);
-    if (parsed.success) {
-      expect(parsed.data.message).toBe(" kept\tinside ");
+    expect(parsed.success && parsed.data.message).toBe(" kept\tinside ");
+  });
+
+  it("rejects NUL and other forbidden controls in participant text", () => {
+    for (const message of ["bad\u0000", "bad\u0007"]) {
+      expect(
+        submitFeedbackSchema.safeParse(validSubmission({ message })).success,
+      ).toBe(false);
     }
   });
 
-  it("rejects disallowed control characters and stores blank titles as null", () => {
-    expect(
-      submitFeedbackSchema.safeParse(validSubmission({ message: "bad\u0007" }))
-        .success,
-    ).toBe(false);
-
-    const parsed = submitFeedbackSchema.safeParse(
-      validSubmission({ title: "   " }),
-    );
-    expect(parsed.success && parsed.data.title).toBe(null);
+  it("stores null for a null or blank title", () => {
+    for (const title of [null, "   "]) {
+      const parsed = submitFeedbackSchema.safeParse(validSubmission({ title }));
+      expect(parsed.success && parsed.data.title).toBe(null);
+    }
   });
 
-  it("accepts only canonical GitHub issue links for this repository", () => {
-    const decision = (linkedIssueUrl: string) =>
+  it("accepts only the exact canonical GitHub issue link", () => {
+    const linked = (linkedIssueUrl: string) =>
       feedbackReviewDecisionSchema.safeParse({
         status: "PLANNED",
         priority: "NORMAL",
         linkedIssueUrl,
       }).success;
 
-    expect(
-      decision("https://github.com/Jacinth091/Tracknologia/issues/12"),
-    ).toBe(true);
-    expect(
-      decision("https://github.com/Jacinth091/Tracknologia/issues/12?x=1"),
-    ).toBe(false);
-    expect(
-      decision("http://github.com/Jacinth091/Tracknologia/issues/12"),
-    ).toBe(false);
-    expect(
-      decision("https://github.com/Jacinth091/Tracknologia/issues/0"),
-    ).toBe(false);
+    expect(linked("https://github.com/Jacinth091/Tracknologia/issues/12")).toBe(
+      true,
+    );
+    for (const value of [
+      "https://github.com/Jacinth091/Tracknologia/issues/12?x=1",
+      "https://github.com/Jacinth091/Tracknologia/issues/12#top",
+      "https://user@github.com/Jacinth091/Tracknologia/issues/12",
+      "http://github.com/Jacinth091/Tracknologia/issues/12",
+      "https://github.com/Jacinth091/Tracknologia/issues/0",
+      "not a url",
+    ]) {
+      expect(linked(value)).toBe(false);
+    }
+  });
+
+  it("validates the keyset cursor semantically", () => {
+    const cursor = (value: string) =>
+      feedbackListOptionsSchema.safeParse({ cursor: value }).success;
+
+    expect(cursor(`2026-10-30T09:00:00.123456+00:00|${FEEDBACK_ID}`)).toBe(
+      true,
+    );
+    expect(cursor(`2026-13-40T09:00:00Z|${FEEDBACK_ID}`)).toBe(false);
+    expect(cursor(`yesterday|${FEEDBACK_ID}`)).toBe(false);
+    expect(cursor("2026-10-30T09:00:00Z|not-a-uuid")).toBe(false);
   });
 
   it("limits summary windows to 1 to 31 UTC days", () => {
@@ -398,5 +672,35 @@ describe("Feedback schemas", () => {
         endDateExclusive: "2026-11-02",
       }).success,
     ).toBe(false);
+  });
+});
+
+describe("Count summary projection", () => {
+  it("zero-fills empty groups and days, and keeps day order", () => {
+    const summary = buildFeedbackCountSummary(
+      [
+        { dimension: "CATEGORY", bucket: "BUG", row_count: 2 },
+        { dimension: "SOURCE", bucket: "PUBLIC_TRACKING", row_count: 2 },
+        { dimension: "STATUS", bucket: "NEW", row_count: 2 },
+        { dimension: "DAY", bucket: "2026-10-01", row_count: 2 },
+        { dimension: "DAY", bucket: "2026-10-03", row_count: 0 },
+      ],
+      { startDate: "2026-10-01", endDateExclusive: "2026-10-04", days: 3 },
+      "2026-10-29T00:00:00.000Z",
+    );
+
+    expect(summary.total).toBe(2);
+    expect(summary.byCategory.GENERAL).toBe(0);
+    expect(summary.bySource.PROVIDER_WORKSPACE).toBe(0);
+    expect(summary.byStatus.REVIEWING).toBe(0);
+    expect(summary.daily).toEqual([
+      { date: "2026-10-01", count: 2 },
+      { date: "2026-10-02", count: 0 },
+      { date: "2026-10-03", count: 0 },
+    ]);
+    expect(summary.retention).toEqual({
+      policy: "UNAPPROVED",
+      coverage: "RETAINED_ROWS_ONLY",
+    });
   });
 });

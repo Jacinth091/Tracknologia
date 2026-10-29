@@ -1,6 +1,9 @@
-// Public Interface for src/features/feedback. Route adapters pass only
+// Server-only Interface for src/features/feedback. Route adapters pass only
 // browser input; trusted identity, source, and reviewer come from the
-// server-side guards inside these functions.
+// server-side guards inside these functions. Client code imports the
+// client-safe schemas and types directly from ./schemas and ./types.
+import "server-only";
+
 export {
   submitPublicFeedback,
   submitProviderFeedback,
@@ -14,31 +17,13 @@ export {
 } from "./queries";
 
 export {
-  feedbackIdSchema,
-  feedbackReviewDecisionSchema,
-  submitFeedbackSchema,
-  type FeedbackReviewDecisionInput,
-  type SubmitFeedbackInput,
-} from "./schemas";
-
-export {
-  FEEDBACK_CATEGORIES,
-  FEEDBACK_PRIORITIES,
-  FEEDBACK_SOURCES,
-  FEEDBACK_STATUSES,
   FeedbackError,
-  PUBLIC_FEEDBACK_SOURCES,
-  type FeedbackCategory,
   type FeedbackCountSummary,
   type FeedbackDetail,
   type FeedbackErrorCode,
-  type FeedbackParticipantClass,
   type FeedbackPreview,
   type FeedbackPreviewPage,
-  type FeedbackPriority,
   type FeedbackReceipt,
   type FeedbackReviewResult,
-  type FeedbackSource,
-  type FeedbackStatus,
   type PublicFeedbackSource,
 } from "./types";
