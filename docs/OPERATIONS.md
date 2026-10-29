@@ -227,6 +227,159 @@ This is not full anonymization. Retention, redaction and purge policy stays
 pending owner approval (issue #87) and is not implemented. The FK action runs as
 the table owner; no client grant is required or added.
 
+### Feedback redaction and deletion
+
+Participant feedback lives in private tables with no client write path and no
+linked business identity. Redaction and purge are two separate, owner-only
+procedures in the trusted SQL connection (the same context as the Grant/Revoke
+steps). Each is one transaction, and each must have an owner-approved ticket
+and the policy approval of issue #87 before it touches participant data. Do not
+combine them, and do not treat one as the other: redaction keeps the record,
+purge erases it.
+
+Both blocks share the same rules:
+
+- Replace every `<...>` placeholder with a verified Auth UUID or a bounded
+  approval reference (letters, digits and `#._/:-`, 3-80 characters). An
+  unreplaced or malformed value raises before any write.
+- `<actor-auth-user-uuid>` is the Auth UUID of the administrator who executes
+  this block, entered as the actor. Enter the executing person's own UUID. Do
+  not substitute the approver's UUID unless the approver is also the person
+  executing it. Owner approval is recorded separately in `<approval-ref>`, the
+  ticket reference, and in the ticket outside the product.
+- The target row is locked with `FOR UPDATE` and must exist. Each mutation must
+  affect exactly the expected rows, or the block raises.
+- The `feedback_privacy_audit` insert is part of the same transaction. If it
+  fails (for example an unknown actor UUID), every change in that block rolls
+  back.
+- The block runs as the table owner. No client role can call or write these
+  statements, and the audit row never holds participant text.
+- The block ends with `rollback;`. This is the rehearsal default and discards
+  everything. Change that final statement to `commit;` only after a rehearsal
+  has been reviewed and the approval is recorded.
+
+Redaction removes prohibited participant free text and internal notes, and it
+also removes free-text reasons from review history. It keeps the row, status,
+priority, linked issue URL, timestamps and review history. It bumps `row_version`
+so that any triage form loaded before the redaction is rejected as a version
+conflict and cannot restore the erased text. The review stamp is filled only
+where it is null, so existing triage attribution is never overwritten. The
+version change itself is recorded as a `FEEDBACK_REDACTED` event in the privacy
+audit.
+
+On a row that was never reviewed (`row_version` 1), the redaction is the first
+touch. It fills `reviewed_at` and `reviewed_by` with the actor and time to
+satisfy the existing review-stamp CHECK. Those stamps are administrative
+metadata and do not mean triage occurred: `status` stays `NEW`, `priority`
+stays `NORMAL`, and the review history stays empty. Real triage is shown by
+review events and status. The block does not change the schema.
+
+```sql
+-- runbook: feedback-redaction
+-- Owner-approved redaction of one Feedback submission's participant text. Keeps
+-- the row, status, priority, linked issue, timestamps and review history.
+-- Rehearsal default ends with rollback;. Change the final statement to commit;
+-- only after review and the #87 approval.
+begin;
+do $$
+declare
+  v_feedback_id uuid := '<feedback-submission-uuid>'::uuid;
+  v_actor_user_id uuid := '<actor-auth-user-uuid>'::uuid;
+  v_approval_ref text := '<approval-ref>';
+  v_rows integer;
+begin
+  if v_approval_ref !~ '^[A-Za-z0-9#._/:-]{3,80}$' then
+    raise exception 'Approval reference is missing or out of bounds';
+  end if;
+
+  perform 1
+  from public.feedback_submissions
+  where id = v_feedback_id
+  for update;
+  if not found then
+    raise exception 'Target feedback submission not found';
+  end if;
+
+  update public.feedback_submissions
+  set title = case when title is null then null else '[redacted]' end,
+      message = '[redacted]',
+      internal_notes = null,
+      row_version = row_version + 1,
+      reviewed_at = coalesce(reviewed_at, now()),
+      reviewed_by = coalesce(reviewed_by, v_actor_user_id)
+  where id = v_feedback_id;
+  get diagnostics v_rows = row_count;
+  if v_rows <> 1 then
+    raise exception 'Redaction must affect exactly one submission, affected %', v_rows;
+  end if;
+
+  update public.feedback_review_events
+  set reason = null
+  where feedback_id = v_feedback_id
+    and reason is not null;
+
+  insert into public.feedback_privacy_audit
+    (operation, target_feedback_id, actor_user_id, approval_ref)
+  values
+    ('FEEDBACK_REDACTED', v_feedback_id, v_actor_user_id, v_approval_ref);
+end $$;
+rollback;
+```
+
+Purge erases one submission and its review history. It is destructive and cannot
+be undone after `commit;`. The purge audit row keeps only the fixed operation,
+the target UUID (which has no foreign key and so survives the purge), the actor,
+and the approval reference:
+
+```sql
+-- runbook: feedback-purge
+-- Owner-approved erasure of one Feedback submission and its review history.
+-- Destructive: irreversible after commit;. Rehearsal default ends with
+-- rollback;. Change the final statement to commit; only after review and the
+-- #87 approval.
+begin;
+do $$
+declare
+  v_feedback_id uuid := '<feedback-submission-uuid>'::uuid;
+  v_actor_user_id uuid := '<actor-auth-user-uuid>'::uuid;
+  v_approval_ref text := '<approval-ref>';
+  v_rows integer;
+begin
+  if v_approval_ref !~ '^[A-Za-z0-9#._/:-]{3,80}$' then
+    raise exception 'Approval reference is missing or out of bounds';
+  end if;
+
+  perform 1
+  from public.feedback_submissions
+  where id = v_feedback_id
+  for update;
+  if not found then
+    raise exception 'Target feedback submission not found';
+  end if;
+
+  delete from public.feedback_review_events
+  where feedback_id = v_feedback_id;
+
+  delete from public.feedback_submissions
+  where id = v_feedback_id;
+  get diagnostics v_rows = row_count;
+  if v_rows <> 1 then
+    raise exception 'Purge must affect exactly one submission, affected %', v_rows;
+  end if;
+
+  insert into public.feedback_privacy_audit
+    (operation, target_feedback_id, actor_user_id, approval_ref)
+  values
+    ('FEEDBACK_PURGED', v_feedback_id, v_actor_user_id, v_approval_ref);
+end $$;
+rollback;
+```
+
+Routine triage is unaffected: `INTERNAL_ACCESS_VIEW` stays an access-only event
+with a null reason, and neither block writes to `internal_access_audit`. There
+is no public or Provider path to feedback lookups, and no automated GitHub
+posting; the linked-issue field in triage is a written reference only.
+
 ### What is out of scope
 
 ```text
