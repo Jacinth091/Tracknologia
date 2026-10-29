@@ -394,7 +394,7 @@ npx supabase db push
   the enabled mapping and appends the provision/revoke audit event; an invalid
   actor fails the audit FK after the mapping write and rolls the whole
   transaction back. `record_internal_operation_access(operator_user_id,
-  category)` is also service-role-only, accepts only the fixed
+category)` is also service-role-only, accepts only the fixed
   `INTERNAL_ACCESS_VIEW` category, and rechecks the enabled mapping under
   `FOR SHARE`, which conflicts with the revocation `UPDATE`. Ordinary clients
   cannot execute either function, so there is no publishable-key write surface.

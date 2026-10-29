@@ -236,9 +236,7 @@ describe("recordSensitiveInternalAccess", () => {
   it("fails closed when the audit append throws", async () => {
     mocks.requireUser.mockResolvedValue(authenticatedUser("ops-user"));
     mocks.findInternalOperator.mockResolvedValue({ status: "ENABLED" });
-    mocks.appendInternalAccessAudit.mockRejectedValue(
-      new Error("audit down"),
-    );
+    mocks.appendInternalAccessAudit.mockRejectedValue(new Error("audit down"));
 
     await expect(
       recordSensitiveInternalAccess("INTERNAL_ACCESS_VIEW"),

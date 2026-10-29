@@ -30,14 +30,11 @@ export async function findInternalOperator(
     .maybeSingle();
 
   if (error) {
-    console.error(
-      "[INTERNAL_ACCESS_FAILURE] internal operator lookup failed",
-      {
-        code: error.code,
-        message: error.message,
-        timestamp: new Date().toISOString(),
-      },
-    );
+    console.error("[INTERNAL_ACCESS_FAILURE] internal operator lookup failed", {
+      code: error.code,
+      message: error.message,
+      timestamp: new Date().toISOString(),
+    });
     return { status: "ERROR" };
   }
 
@@ -46,9 +43,7 @@ export async function findInternalOperator(
   }
 
   const row = data as unknown as InternalOperatorRow;
-  return row.enabled === true
-    ? { status: "ENABLED" }
-    : { status: "DISABLED" };
+  return row.enabled === true ? { status: "ENABLED" } : { status: "DISABLED" };
 }
 
 /**
