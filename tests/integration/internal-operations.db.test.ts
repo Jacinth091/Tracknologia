@@ -355,7 +355,7 @@ describe("Internal operator access and audit", () => {
     expect(afterRevoke.error).not.toBeNull();
   });
 
-  it("auth deletion removes mapping and anonymizes audit", async () => {
+  it("auth deletion removes the mapping and nulls direct audit user references", async () => {
     const { user } = await createUser("internal-delete");
     await changeAccess(user.id, user.id, true);
     await changeAccess(user.id, user.id, false);

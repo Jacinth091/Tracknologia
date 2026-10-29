@@ -127,8 +127,10 @@ roles, not `user_metadata`, and not inferred from owning or joining a Provider:
 - `internal_access_audit` is append-only. `service_role` may read but cannot
   insert, update, or delete directly; no ordinary client can execute the audit
   or admin functions, so operator access is not a publishable-key write
-  surface. Auth deletion removes the live mapping and anonymizes retained audit
-  rows through `ON DELETE SET NULL`.
+  surface. Auth deletion removes the live mapping and nulls the direct user
+  references on retained audit rows through `ON DELETE SET NULL`; operation,
+  reason and timestamp remain and may stay linkable to external approval
+  records, so this is not full anonymization.
 - Internal audit retention/purge remains unapproved and is deliberately not
   implemented (issue #87).
 
@@ -407,5 +409,5 @@ At minimum test:
   required audit append even for an existing session;
 - an invalid audit actor rolls back the mapping change and the required audit
   event together;
-- Auth identity deletion removes the live mapping and anonymizes retained audit
-  events.
+- Auth identity deletion removes the live mapping and nulls the direct user
+  references on retained audit events, leaving operation, reason and timestamp.

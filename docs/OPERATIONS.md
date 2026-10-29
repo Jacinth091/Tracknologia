@@ -129,7 +129,8 @@ Before any change, require explicit owner approval for:
 ```text
 target Auth user
 grant or revoke
-bounded reason (3-200 characters)
+concise non-PII approval reference as the bounded reason (3-200 characters),
+for example a ticket id; never a name, email address, or raw payload
 approver and date recorded outside the product (issue/ticket)
 ```
 
@@ -218,10 +219,13 @@ sensitive view is attributed to the actor recorded at write time.
 
 ### Auth identity deletion
 
-Deleting the Auth user cascades the live `internal_operators` row away and
-anonymizes retained audit FKs (`operator_user_id`/`actor_user_id` become null)
-while preserving the non-identifying event. The FK action runs as the table
-owner; no client grant is required or added.
+Deleting the Auth user cascades the live `internal_operators` row away and sets
+the retained audit `operator_user_id`/`actor_user_id` references to null. The
+operation, reason and timestamp of each retained event remain, and a reason that
+names an external ticket can still be linked to that person through the ticket.
+This is not full anonymization. Retention, redaction and purge policy stays
+pending owner approval (issue #87) and is not implemented. The FK action runs as
+the table owner; no client grant is required or added.
 
 ### What is out of scope
 

@@ -48,9 +48,9 @@ CREATE TABLE public.internal_access_audit (
 );
 
 COMMENT ON TABLE public.internal_access_audit IS
-  'Append-only internal access audit. No Provider/Repair/Customer identifiers, email, path, or payload. Auth deletion anonymizes the FKs (ON DELETE SET NULL) and preserves the non-identifying event.';
+  'Append-only internal access audit. No Provider/Repair/Customer identifiers, email, path, or payload. Auth deletion sets the direct operator/actor user references to NULL (ON DELETE SET NULL); operation, reason and timestamp remain and may stay linkable through external approval records. This is not full anonymization.';
 COMMENT ON COLUMN public.internal_access_audit.reason IS
-  'Bounded reason for deliberate provision/revoke events only; null for application access events.';
+  'Bounded reason for deliberate provision/revoke events only; null for application access events. Use a concise non-PII approval reference (for example a ticket id), never names, emails, or raw payloads.';
 
 ALTER TABLE public.internal_operators ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.internal_access_audit ENABLE ROW LEVEL SECURITY;
