@@ -42,7 +42,7 @@ Tracknologia must not implement its own password hashing or JWT system.
 
 ### Login return paths
 
-`/login?redirectTo=` targets are untrusted input. One helper, `getSafeInternalRedirectUrl`, is shared by the login page, `loginAction`, the auth callback, and `proxy`: it accepts only single-leading-slash local paths of at most 2048 characters, trims boundary whitespace, preserves safe query/fragment values, and falls back to `/dashboard` for absolute, protocol-relative, backslash, control-character, or oversized targets. The login form re-posts only the sanitized target and the Server Action re-sanitizes it, so a forged form field cannot redirect off-site. `proxy` treats `/internal` and `/internal/...` (not lookalikes such as `/internally`) as coarse authenticated destinations only; that redirect is not operator authorization, which remains future guard plus feature/RLS enforcement.
+`/login?redirectTo=` targets are untrusted input. One helper, `getSafeInternalRedirectUrl`, is shared by the login page, `loginAction`, the auth callback, and `proxy`: it accepts only single-leading-slash local paths of at most 2048 characters, trims boundary whitespace, preserves safe query/fragment values, and falls back to `/dashboard` for absolute, protocol-relative, backslash, control-character, or oversized targets. The login form re-posts only the sanitized target and the Server Action re-sanitizes it, so a forged form field cannot redirect off-site. `proxy` treats `/internal` and `/internal/...` (not lookalikes such as `/internally`) as coarse authenticated destinations only; that redirect is not operator authorization, which is enforced by the `/internal` guard and the service-role-only internal seams described below.
 
 ## Authorization
 
@@ -98,6 +98,39 @@ maintains `completed_at` in one transaction. Cross-Provider identifiers are
 hidden as not found. Customer Updates are Provider-scoped and append-only;
 authenticated users cannot edit/delete them, and anonymous roles cannot read
 the raw table.
+
+## Internal operator access
+
+Internal operators are a separate private privilege layer. They are not Provider
+roles, not `user_metadata`, and not inferred from owning or joining a Provider:
+
+- `internal_operators` is a private allow-list keyed by Auth user with an
+  `enabled` flag. It is provisioned only by a deliberate, owner-approved
+  service-role runbook operation (see `docs/OPERATIONS.md`); there is no seed
+  identity, signup trigger, metadata flag, or self-service grant.
+- `src/features/internal-operations` owns the guard.
+  `requireInternalOperator()` derives the user only from the authenticated
+  session, performs an exact-user lookup with no process/global cache, and
+  returns `ALLOWED`, `UNAUTHENTICATED`, `FORBIDDEN`, or `UNAVAILABLE`.
+  Missing/disabled mappings and Provider-backed users without a mapping are
+  `FORBIDDEN`; Auth/database faults are `UNAVAILABLE`.
+- The `/internal` layout and every sensitive internal page operation run the
+  guard. Anonymous visitors return to login with the sanitized `/internal`
+  destination; `FORBIDDEN` renders a 404 without internal data; `UNAVAILABLE`
+  renders a safe unavailable state without signing the user out.
+- Sensitive internal renders require `recordSensitiveInternalAccess(...)` to
+  succeed first. It re-runs the guard itself, refuses every non-`ALLOWED`
+  outcome, and then appends the audit event through a service-role-only
+  `SECURITY DEFINER` function. That function accepts only fixed operation
+  categories and rechecks the enabled mapping under `FOR SHARE` at write time,
+  so a revocation wins over a delayed append. Audit failure denies the render.
+- `internal_access_audit` is append-only. `service_role` may read but cannot
+  insert, update, or delete directly; no ordinary client can execute the audit
+  or admin functions, so operator access is not a publishable-key write
+  surface. Auth deletion removes the live mapping and anonymizes retained audit
+  rows through `ON DELETE SET NULL`.
+- Internal audit retention/purge remains unapproved and is deliberately not
+  implemented (issue #87).
 
 ## Public Provider and invitation projections
 
@@ -365,4 +398,14 @@ At minimum test:
   valid outcome;
 - Customer Updates are Provider-scoped, append-only, and independent of status;
 - concurrent lifecycle changes leave one consistent status/event outcome;
-- completed Repairs cannot be reopened and have a matching completion time.
+- completed Repairs cannot be reopened and have a matching completion time;
+- internal access is denied to anonymous, Provider OWNER/STAFF, and any user
+  without an enabled mapping, and the denial renders no internal data;
+- ordinary clients cannot execute the internal admin or audit functions, and
+  `service_role` can only read the private tables (no direct mutation);
+- revoking an internal mapping denies the next guarded request and the next
+  required audit append even for an existing session;
+- an invalid audit actor rolls back the mapping change and the required audit
+  event together;
+- Auth identity deletion removes the live mapping and anonymizes retained audit
+  events.
