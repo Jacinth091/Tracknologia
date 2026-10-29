@@ -23,33 +23,35 @@ import {
 // pilot-shaped row count proves the plan shape and its magnitude.
 //
 // One psql session runs the whole script inside a REPEATABLE READ transaction
-// that ends with ROLLBACK, so no fixture persists. The window sits at fixed
-// future instants (Manila days 2026-11-01..2026-11-03) no other suite touches,
-// so the exact absolute counts are deterministic.
+// that ends with ROLLBACK, so no fixture persists. The window is a fixed past
+// range (Manila days 2026-10-19..21), so no other suite touches it and the
+// exact counts are deterministic. Each RPC call returns one as_of timestamp
+// captured database-side; every row of that call carries the same value.
 
 requireDbConfig();
 
 const admin = createAdminClient();
 const DB_CASE_TIMEOUT_MS = 120_000;
+const DAY_MS = 86_400_000;
 
 function ts(instant: string): string {
   return `'${instant}'::timestamptz`;
 }
 
-// Manila boundaries: d1 starts 2026-10-31T16:00Z; AFTER is the exclusive end.
+// Manila boundaries: d1 starts 2026-10-18T16:00Z; AFTER is the exclusive end.
 const WINDOW = {
-  start: "2026-10-31T16:00:00.000Z",
-  end: "2026-11-03T16:00:00.000Z",
+  start: "2026-10-18T16:00:00.000Z",
+  end: "2026-10-21T16:00:00.000Z",
 };
-const BEFORE = "2026-10-31T14:00:00.000Z";
-const BEFORE_LATE = "2026-10-31T15:59:00.000Z"; // excluded: 23:59 PHT Oct 31
-const D1A = "2026-10-31T16:00:00.000Z"; // 00:00 PHT Nov 1, inclusive edge
-const D1B = "2026-10-31T17:00:00.000Z";
-const D2A = "2026-11-01T16:00:00.000Z"; // 00:00 PHT Nov 2
-const D2B = "2026-11-01T17:00:00.000Z";
-const D3A = "2026-11-02T16:00:00.000Z"; // 00:00 PHT Nov 3
-const D3B = "2026-11-02T17:00:00.000Z";
-const AFTER = "2026-11-03T16:00:00.000Z"; // 00:00 PHT Nov 4, exclusive end
+const BEFORE = "2026-10-18T14:00:00.000Z";
+const BEFORE_LATE = "2026-10-18T15:59:00.000Z"; // excluded: 23:59 PHT Oct 18
+const D1A = "2026-10-18T16:00:00.000Z"; // 00:00 PHT Oct 19, inclusive edge
+const D1B = "2026-10-18T17:00:00.000Z";
+const D2A = "2026-10-19T16:00:00.000Z"; // 00:00 PHT Oct 20
+const D2B = "2026-10-19T17:00:00.000Z";
+const D3A = "2026-10-20T16:00:00.000Z"; // 00:00 PHT Oct 21
+const D3B = "2026-10-20T17:00:00.000Z";
+const AFTER = "2026-10-21T16:00:00.000Z"; // 00:00 PHT Oct 22, exclusive end
 
 const fresh = () => randomUUID();
 const P_SHOP1 = { id: fresh(), slug: `metrics-a-${randomUUID().slice(0, 8)}` };
@@ -57,6 +59,9 @@ const P_SHOP2 = { id: fresh(), slug: `metrics-b-${randomUUID().slice(0, 8)}` };
 const P_INDEP1 = { id: fresh(), slug: `metrics-c-${randomUUID().slice(0, 8)}` };
 const P_SHOP3 = { id: fresh(), slug: `metrics-d-${randomUUID().slice(0, 8)}` };
 const P_INDEP2 = { id: fresh(), slug: `metrics-e-${randomUUID().slice(0, 8)}` };
+// Pre-existing global state: a provider and a SUBMITTED request that exist
+// before the BEFORE snapshot, as in an upgraded database.
+const P_BASE = { id: fresh(), slug: `metrics-base-${randomUUID().slice(0, 8)}` };
 
 // TN-[0-9]{4}-[A-F0-9]{10} and TRK-[A-F0-9]{24}: a UUID hex without dashes is
 // a safe deterministic source for both.
@@ -125,6 +130,35 @@ function metricsSql(
   return `SELECT '${marker} ' || coalesce((SELECT json_agg(row_to_json(s))::text FROM public.get_internal_validation_metrics(${sqlUuidLiteral(operatorId)}, ${ts(window.start)}, ${ts(window.end)}) AS s), '[]');`;
 }
 
+// Exact decision seconds inside the window: an additive sum, so the fixture
+// delta divided by the fixture decision count is exact without subtracting
+// any mean.
+function decisionSumSql(marker: string): string {
+  return `SELECT '${marker} ' || coalesce(sum(EXTRACT(EPOCH FROM (COALESCE(rr.accepted_at, rr.declined_at) - rr.submitted_at))), 0)::text FROM public.repair_requests rr WHERE COALESCE(rr.accepted_at, rr.declined_at) >= ${ts(WINDOW.start)} AND COALESCE(rr.accepted_at, rr.declined_at) < ${ts(WINDOW.end)};`;
+}
+
+// The Asia/Manila calendar day that contains the database clock, as a window.
+function todayMetricsSql(operatorId: string, marker: string): string {
+  const start =
+    "(date_trunc('day', now() AT TIME ZONE 'Asia/Manila') AT TIME ZONE 'Asia/Manila')";
+  const end =
+    "((date_trunc('day', now() AT TIME ZONE 'Asia/Manila') + interval '1 day') AT TIME ZONE 'Asia/Manila')";
+  return `SELECT '${marker} ' || coalesce((SELECT json_agg(row_to_json(s))::text FROM public.get_internal_validation_metrics(${sqlUuidLiteral(operatorId)}, ${start}, ${end}) AS s), '[]');`;
+}
+
+// Asia/Manila calendar date for an instant, and the Manila midnight that
+// follows it. Used only to build test-time instants, never as expected output.
+function manilaDate(instant: Date): string {
+  return new Intl.DateTimeFormat("en-CA", { timeZone: "Asia/Manila" }).format(
+    instant,
+  );
+}
+
+function nextManilaMidnight(instant: Date): Date {
+  const today = manilaDate(instant);
+  return new Date(Date.parse(`${today}T00:00:00+08:00`) + DAY_MS);
+}
+
 async function provisionOperator(prefix: string): Promise<string> {
   const created = await createTestUser(admin, uniqueEmail(prefix));
   assertSupabaseSuccess(
@@ -149,16 +183,21 @@ type MetricsRowJson = {
   bucket: string;
   row_count: number;
   interval_seconds: number | null;
+  as_of: string;
 };
 
-function readMarker(output: string, marker: string): MetricsRowJson[] {
+function readLine(output: string, marker: string): string {
   const line = output
     .split("\n")
     .find((entry) => entry.startsWith(`${marker} `));
   if (line === undefined) {
     throw new Error(`The snapshot script produced no ${marker} output`);
   }
-  return JSON.parse(line.slice(marker.length + 1)) as MetricsRowJson[];
+  return line.slice(marker.length + 1);
+}
+
+function readMarker(output: string, marker: string): MetricsRowJson[] {
+  return JSON.parse(readLine(output, marker)) as MetricsRowJson[];
 }
 
 function count(
@@ -170,6 +209,15 @@ function count(
     rows.find((row) => row.dimension === dimension && row.bucket === bucket)
       ?.row_count ?? 0
   );
+}
+
+// Every row of one RPC call shares the single as_of the function captured.
+function singleAsOf(rows: MetricsRowJson[]): string {
+  const asOfValues = new Set(rows.map((row) => row.as_of));
+  expect(asOfValues.size).toBe(1);
+  const [asOf] = asOfValues;
+  expect(Number.isFinite(Date.parse(asOf))).toBe(true);
+  return asOf;
 }
 
 describe("get_internal_validation_metrics grants", () => {
@@ -242,6 +290,53 @@ describe("get_internal_validation_metrics grants", () => {
   );
 });
 
+describe("get_internal_validation_metrics window bounds (PostgreSQL)", () => {
+  it(
+    "accepts exactly 90 Manila days and rejects invalid, misaligned, future and infinite bounds",
+    async () => {
+      const operatorId = await provisionOperator("internal-metrics-bounds");
+      // Each case is one rolled-back statement, so a rejected call leaves no
+      // state behind and cannot affect another test.
+      const runWindow = (startSql: string, endSql: string) =>
+        runLocalSql(
+          testUrl,
+          `BEGIN;\nSELECT count(*) FROM public.get_internal_validation_metrics(${sqlUuidLiteral(operatorId)}, ${startSql}, ${endSql});\nROLLBACK;`,
+        );
+
+      // Exactly 90 Manila days: 2026-07-20T16:00Z .. 2026-10-18T16:00Z.
+      await expect(
+        runWindow(ts("2026-07-20T16:00:00.000Z"), ts(WINDOW.start)),
+      ).resolves.toMatch(/^\d+$/);
+
+      const tomorrowMidnight = nextManilaMidnight(new Date());
+      const rejected: Array<[string, string]> = [
+        // 91 Manila days.
+        [ts("2026-07-19T16:00:00.000Z"), ts(WINDOW.start)],
+        // End not after start.
+        [ts(WINDOW.end), ts(WINDOW.start)],
+        // Start not on a Manila midnight.
+        [ts("2026-10-18T16:30:00.000Z"), ts(WINDOW.end)],
+        // Start in the future.
+        [
+          ts(tomorrowMidnight.toISOString()),
+          ts(new Date(tomorrowMidnight.getTime() + DAY_MS).toISOString()),
+        ],
+        // End beyond the next Manila midnight.
+        [
+          ts(WINDOW.start),
+          ts(new Date(tomorrowMidnight.getTime() + 3_600_000).toISOString()),
+        ],
+        // Infinite bound.
+        [ts(WINDOW.start), "'infinity'::timestamptz"],
+      ];
+      for (const [startSql, endSql] of rejected) {
+        await expect(runWindow(startSql, endSql)).rejects.toThrow();
+      }
+    },
+    DB_CASE_TIMEOUT_MS,
+  );
+});
+
 describe("internal validation metrics (PostgreSQL snapshot)", () => {
   it(
     "computes exact seeded metrics across Manila midnights",
@@ -274,7 +369,21 @@ describe("internal validation metrics (PostgreSQL snapshot)", () => {
         r4: fresh(),
         r5: fresh(),
         r6: fresh(),
+        baseline: fresh(),
       };
+
+      // Baseline: a pre-existing global provider and SUBMITTED request, created
+      // before the BEFORE snapshot in the same transaction. It is outside the
+      // window, so only the global snapshots see it.
+      const nowIso = new Date().toISOString();
+      const baselineFixture = [
+        providerSql(P_BASE, "SHOP", nowIso),
+        requestFixture({
+          id: ids.baseline,
+          providerId: P_BASE.id,
+          submitted: nowIso,
+        }),
+      ].join("\n");
 
       const fixtures = [
         // Providers: shop1/shop2/indep1 inside the window, shop3 just before
@@ -395,11 +504,29 @@ describe("internal validation metrics (PostgreSQL snapshot)", () => {
         `INSERT INTO public.tracking_events (repair_id, viewed_at) VALUES (${sqlUuidLiteral(ids.r1)}, ${ts(D1B)}), (${sqlUuidLiteral(ids.r1)}, ${ts(D2B)}), (${sqlUuidLiteral(ids.r3)}, ${ts(D2B)}), (${sqlUuidLiteral(ids.r4)}, ${ts(BEFORE_LATE)});`,
       ].join("\n");
 
+      // A Repair created in the last second of today in Asia/Manila is future
+      // relative to the RPC's as_of, so today's window must not count it.
+      const futureRepair = repairFixture({
+        id: fresh(),
+        providerId: P_SHOP1.id,
+        origin: "PROVIDER_CREATED",
+        created: new Date(
+          nextManilaMidnight(new Date()).getTime() - 1000,
+        ).toISOString(),
+        status: "IN_PROGRESS",
+      });
+
       const script = [
         "BEGIN ISOLATION LEVEL REPEATABLE READ;",
+        `DO $$ BEGIN\n${baselineFixture}\nEND $$;`,
         metricsSql(operatorId, "METRICS_BEFORE", WINDOW),
+        decisionSumSql("DECISION_SUM_BEFORE"),
         `DO $$ BEGIN\n${fixtures}\nEND $$;`,
         metricsSql(operatorId, "METRICS_AFTER", WINDOW),
+        decisionSumSql("DECISION_SUM_AFTER"),
+        todayMetricsSql(operatorId, "FUTURE_PROBE_BEFORE"),
+        `DO $$ BEGIN\n${futureRepair}\nEND $$;`,
+        todayMetricsSql(operatorId, "FUTURE_PROBE_AFTER"),
         // Pilot-shaped volume for the EXPLAIN proof: 400 extra repairs.
         `DO $$ BEGIN\nINSERT INTO public.repairs (provider_id, origin, ticket_number, tracking_code, customer_name, customer_phone, device_type, reported_problem, current_status, created_at, created_by_user_id)\nSELECT ${sqlUuidLiteral(P_SHOP1.id)}, 'PROVIDER_CREATED', 'TN-0400-' || lpad(gs::text, 10, '0'), 'TRK-' || lpad(gs::text, 24, '0'), 'Bulk Customer', '+639170000001', 'Phone', 'Bulk problem', 'IN_PROGRESS', now(), ${sqlUuidLiteral(creatorId)}\nFROM generate_series(1, 400) gs;\nEND $$;`,
         "EXPLAIN (ANALYZE, COSTS OFF, TIMING OFF, SUMMARY ON) SELECT 1 FROM public.get_internal_validation_metrics(" +
@@ -416,9 +543,10 @@ describe("internal validation metrics (PostgreSQL snapshot)", () => {
       const before = readMarker(output, "METRICS_BEFORE");
       const after = readMarker(output, "METRICS_AFTER");
 
-      // No business identifier leaks through the fixed output shape.
+      // The strict row shape: no business identifier, and as_of on every row.
       for (const row of after) {
         expect(Object.keys(row).sort()).toEqual([
+          "as_of",
           "bucket",
           "dimension",
           "interval_seconds",
@@ -427,13 +555,24 @@ describe("internal validation metrics (PostgreSQL snapshot)", () => {
       }
       expect(output).not.toContain("provider_id");
 
-      // All assertions below use after-minus-before deltas, so pre-existing
-      // state from other suites cannot shift the expected values.
+      // Each RPC call returns one snapshot timestamp, and a later call in the
+      // same transaction captures a timestamp no earlier than the first.
+      const asOfBefore = singleAsOf(before);
+      const asOfAfter = singleAsOf(after);
+      expect(Date.parse(asOfBefore)).toBeLessThanOrEqual(Date.parse(asOfAfter));
+
+      // Global baseline: the pre-existing pending request is visible to the
+      // full projection, and the fixture adds exactly three more.
+      const pendingBefore = count(before, "REQUEST_PENDING_NOW", "TOTAL");
+      expect(pendingBefore).toBeGreaterThanOrEqual(1);
+
+      // Fixture deltas are additive, so they cannot be shifted by pre-existing
+      // global rows.
       const delta = (dimension: string, bucket: string): number =>
         count(after, dimension, bucket) - count(before, dimension, bucket);
 
       // Providers: onboarding split inside the window, cumulative separately.
-      // shop3 created Oct 31 23:59 PHT stays outside the inclusive start.
+      // shop3 created Oct 18 23:59 PHT stays outside the inclusive start.
       expect(delta("PROVIDER_ONBOARDED_IN_PERIOD", "SHOP")).toBe(2);
       expect(delta("PROVIDER_ONBOARDED_IN_PERIOD", "INDEPENDENT")).toBe(1);
       expect(delta("PROVIDER_ONBOARDED_ALL_TIME", "SHOP")).toBe(3);
@@ -443,10 +582,10 @@ describe("internal validation metrics (PostgreSQL snapshot)", () => {
       // Activity: shop1 on d1+d2, indep1 on d2+d3, shop2 only on d3.
       expect(delta("ACTIVE_PROVIDER_IN_PERIOD", "TOTAL")).toBe(3);
       expect(delta("ACTIVE_PROVIDER_IN_PERIOD", "REPEAT")).toBe(2);
-      expect(delta("ACTIVE_DAY", "2026-11-01")).toBe(1);
-      expect(delta("ACTIVE_DAY", "2026-11-02")).toBe(2);
-      expect(delta("ACTIVE_DAY", "2026-11-03")).toBe(2);
-      expect(delta("ACTIVE_DAY", "2026-11-04")).toBe(0);
+      expect(delta("ACTIVE_DAY", "2026-10-19")).toBe(1);
+      expect(delta("ACTIVE_DAY", "2026-10-20")).toBe(2);
+      expect(delta("ACTIVE_DAY", "2026-10-21")).toBe(2);
+      expect(delta("ACTIVE_DAY", "2026-10-22")).toBe(0);
 
       // Staff footprint snapshots.
       expect(delta("STAFF_MEMBERSHIP_ACTIVE", "TOTAL")).toBe(3);
@@ -464,8 +603,7 @@ describe("internal validation metrics (PostgreSQL snapshot)", () => {
       expect(delta("READY_REACHED_IN_PERIOD", "TOTAL")).toBe(1);
       expect(delta("STATUS_MAINTAINED_IN_PERIOD", "TOTAL")).toBe(3);
 
-      // Requests: received vs decided vs cohort conversion, decisions and
-      // pending snapshot, and the exact mean decision lag.
+      // Requests: received vs decided vs cohort, and the pending snapshot.
       expect(delta("REQUEST_RECEIVED_IN_PERIOD", "TOTAL")).toBe(5);
       expect(delta("REQUEST_DECIDED_IN_PERIOD", "TOTAL")).toBe(5);
       expect(delta("REQUEST_DECIDED_IN_PERIOD", "ACCEPTED")).toBe(4);
@@ -481,128 +619,170 @@ describe("internal validation metrics (PostgreSQL snapshot)", () => {
       expect(delta("TRACKING_ALL_TIME", "TOTAL")).toBe(4);
       expect(delta("TRACKING_ALL_TIME", "REPAIRS")).toBe(3);
 
-      // The decision lag averages the five in-window decisions exactly.
-      const decisionRow = after.find(
+      // Mean decision seconds is not additive, so it is derived from the sum
+      // and count deltas, which are additive.
+      const sumBefore = Number(readLine(output, "DECISION_SUM_BEFORE"));
+      const sumAfter = Number(readLine(output, "DECISION_SUM_AFTER"));
+      const decisionCount = delta("REQUEST_DECISION_SECONDS", "MEAN");
+      expect(decisionCount).toBe(5);
+      expect((sumAfter - sumBefore) / decisionCount).toBe(
+        DECISION_MEAN_SECONDS,
+      );
+
+      // Current-day future exclusion: the Repair created after as_of is absent.
+      expect(
+        count(
+          readMarker(output, "FUTURE_PROBE_AFTER"),
+          "REPAIR_CREATED_IN_PERIOD",
+          "TOTAL",
+        ) -
+          count(
+            readMarker(output, "FUTURE_PROBE_BEFORE"),
+            "REPAIR_CREATED_IN_PERIOD",
+            "TOTAL",
+          ),
+      ).toBe(0);
+
+      // Full projection of the complete raw rows, with the baseline included.
+      // Ratios, means and the daily series are derived from raw rows, never
+      // from deltas.
+      const rawCount = (dimension: string, bucket: string): number =>
+        count(after, dimension, bucket);
+      const rawPercent = (numerator: number, denominator: number) =>
+        denominator > 0 ? Math.round((numerator / denominator) * 100) : null;
+      const rawDecision = after.find(
         (row) =>
           row.dimension === "REQUEST_DECISION_SECONDS" && row.bucket === "MEAN",
       );
-      expect(decisionRow).toMatchObject({
-        row_count: 5,
-        interval_seconds: DECISION_MEAN_SECONDS,
+
+      const complete = metricsRowSchema.array().parse(after);
+      expect(complete).toHaveLength(after.length);
+      expect(() =>
+        metricsRowSchema.parse({
+          dimension: "ACTIVE_DAY",
+          bucket: "2026-10-19",
+          row_count: 1,
+          interval_seconds: null,
+        }),
+      ).toThrow();
+
+      const window = {
+        mode: "custom" as const,
+        startDate: "2026-10-19",
+        endDateExclusive: "2026-10-22",
+        days: 3,
+        timeZone: "Asia/Manila" as const,
+        startUtc: WINDOW.start,
+        endUtc: WINDOW.end,
+      };
+      const metrics = buildValidationMetrics(
+        complete,
+        window,
+        null as never,
+        asOfAfter,
+      );
+
+      expect(metrics.asOf).toBe(asOfAfter);
+      expect(metrics.providers.onboardedInPeriod).toEqual({
+        shop: rawCount("PROVIDER_ONBOARDED_IN_PERIOD", "SHOP"),
+        independent: rawCount("PROVIDER_ONBOARDED_IN_PERIOD", "INDEPENDENT"),
+        total:
+          rawCount("PROVIDER_ONBOARDED_IN_PERIOD", "SHOP") +
+          rawCount("PROVIDER_ONBOARDED_IN_PERIOD", "INDEPENDENT"),
+      });
+      expect(metrics.providers.allTime).toEqual({
+        shop: rawCount("PROVIDER_ONBOARDED_ALL_TIME", "SHOP"),
+        independent: rawCount("PROVIDER_ONBOARDED_ALL_TIME", "INDEPENDENT"),
+        total: rawCount("PROVIDER_ONBOARDED_ALL_TIME", "TOTAL"),
+      });
+      expect(metrics.activity).toEqual({
+        distinctProviders: rawCount("ACTIVE_PROVIDER_IN_PERIOD", "TOTAL"),
+        repeatProviders: rawCount("ACTIVE_PROVIDER_IN_PERIOD", "REPEAT"),
+        daily: ["2026-10-19", "2026-10-20", "2026-10-21"].map((date) => ({
+          date,
+          distinctProviders: rawCount("ACTIVE_DAY", date),
+        })),
+      });
+      expect(metrics.staff).toEqual({
+        memberships: rawCount("STAFF_MEMBERSHIP_ACTIVE", "TOTAL"),
+        shopsWithStaff: rawCount("SHOP_WITH_STAFF", "TOTAL"),
+      });
+      expect(metrics.repairs.created).toEqual({
+        total: rawCount("REPAIR_CREATED_IN_PERIOD", "TOTAL"),
+        customerRequest: rawCount(
+          "REPAIR_CREATED_IN_PERIOD",
+          "CUSTOMER_REQUEST",
+        ),
+        providerCreated: rawCount(
+          "REPAIR_CREATED_IN_PERIOD",
+          "PROVIDER_CREATED",
+        ),
+      });
+      expect(metrics.requests).toMatchObject({
+        received: rawCount("REQUEST_RECEIVED_IN_PERIOD", "TOTAL"),
+        decided: {
+          total: rawCount("REQUEST_DECIDED_IN_PERIOD", "TOTAL"),
+          accepted: rawCount("REQUEST_DECIDED_IN_PERIOD", "ACCEPTED"),
+          declined: rawCount("REQUEST_DECIDED_IN_PERIOD", "DECLINED"),
+        },
+        pendingNow: pendingBefore + 3,
+        cohortAccepted: rawCount("REQUEST_COHORT_IN_PERIOD", "ACCEPTED"),
+        conversionPercent: rawPercent(
+          rawCount("REQUEST_COHORT_IN_PERIOD", "ACCEPTED"),
+          rawCount("REQUEST_COHORT_IN_PERIOD", "RECEIVED"),
+        ),
+        meanDecisionSeconds: rawDecision?.interval_seconds ?? null,
+      });
+      expect(metrics.tracking).toMatchObject({
+        periodViews: rawCount("TRACKING_VIEWS_IN_PERIOD", "TOTAL"),
+        periodRepairsViewed: rawCount("TRACKING_VIEWS_IN_PERIOD", "REPAIRS"),
+        allTimeViews: rawCount("TRACKING_ALL_TIME", "TOTAL"),
+        allTimeRepairsViewed: rawCount("TRACKING_ALL_TIME", "REPAIRS"),
+        allTimeRepairs: rawCount("REPAIR_ALL_TIME", "TOTAL"),
+        adoptionPercent: rawPercent(
+          rawCount("TRACKING_ALL_TIME", "REPAIRS"),
+          rawCount("REPAIR_ALL_TIME", "TOTAL"),
+        ),
       });
 
-      // Full-circle Typed projection: the fixed rows validate against the
-      // application schema and project into the exact documented output.
-      const projected = metricsRowSchema.array().parse(
-        after.map((row) => ({
-          ...row,
-          interval_seconds: row.interval_seconds ?? null,
-        })),
-      );
-      const metrics = buildValidationMetrics(
-        projected,
-        {
-          mode: "custom",
-          startDate: "2026-11-01",
-          endDateExclusive: "2026-11-04",
-          days: 3,
-          timeZone: "Asia/Manila",
-          startUtc: WINDOW.start,
-          endUtc: WINDOW.end,
-        },
-        null as never,
-        "2026-11-04T00:00:00.000Z",
-      );
-      expect(metrics.providers.onboardedInPeriod).toEqual({
-        shop: 2,
-        independent: 1,
-        total: 3,
-      });
-      // All-time onboarding counts include pre-existing rows, so the typed
-      // projection is checked against the fixture deltas.
+      // All-time onboarding in sparse typed delta rows, carrying the same
+      // as_of, so the projection is checked against fixture deltas.
       const deltaAllTimeRows: MetricsRowJson[] = [
         {
           dimension: "PROVIDER_ONBOARDED_ALL_TIME",
           bucket: "SHOP",
           row_count: delta("PROVIDER_ONBOARDED_ALL_TIME", "SHOP"),
           interval_seconds: null,
+          as_of: asOfAfter,
         },
         {
           dimension: "PROVIDER_ONBOARDED_ALL_TIME",
           bucket: "INDEPENDENT",
           row_count: delta("PROVIDER_ONBOARDED_ALL_TIME", "INDEPENDENT"),
           interval_seconds: null,
+          as_of: asOfAfter,
         },
         {
           dimension: "PROVIDER_ONBOARDED_ALL_TIME",
           bucket: "TOTAL",
           row_count: delta("PROVIDER_ONBOARDED_ALL_TIME", "TOTAL"),
           interval_seconds: null,
+          as_of: asOfAfter,
         },
       ];
-      const deltaAllTime = buildValidationMetrics(
-        deltaAllTimeRows,
+      const deltaProjection = buildValidationMetrics(
+        metricsRowSchema.array().parse(deltaAllTimeRows),
         metrics.window,
         metrics.feedback,
         metrics.asOf,
       );
-      expect(deltaAllTime.providers.allTime).toEqual({
-        shop: delta("PROVIDER_ONBOARDED_ALL_TIME", "SHOP"),
-        independent: delta("PROVIDER_ONBOARDED_ALL_TIME", "INDEPENDENT"),
-        total: delta("PROVIDER_ONBOARDED_ALL_TIME", "TOTAL"),
-      });
-      expect(metrics.activity).toEqual({
-        distinctProviders: 3,
-        repeatProviders: 2,
-        daily: [
-          { date: "2026-11-01", distinctProviders: 1 },
-          { date: "2026-11-02", distinctProviders: 2 },
-          { date: "2026-11-03", distinctProviders: 2 },
-        ],
-      });
-      expect(metrics.staff).toEqual({ memberships: 3, shopsWithStaff: 2 });
-      expect(metrics.repairs.created).toEqual({
-        total: 3,
-        customerRequest: 2,
-        providerCreated: 1,
-      });
-      expect(metrics.requests).toMatchObject({
-        received: 5,
-        decided: { total: 5, accepted: 4, declined: 1 },
-        pendingNow: 3,
-        cohortAccepted: 3,
-        conversionPercent: 60,
-        meanDecisionSeconds: DECISION_MEAN_SECONDS,
-      });
-      expect(metrics.tracking).toMatchObject({
-        periodViews: 3,
-        periodRepairsViewed: 2,
-        allTimeViews: 4,
-        allTimeRepairsViewed: 3,
-        allTimeRepairs: 6,
-        adoptionPercent: 50,
+      expect(deltaProjection.providers.allTime).toEqual({
+        shop: 3,
+        independent: 2,
+        total: 5,
       });
 
-      // EXPLAIN under the seeded pilot-shaped load: one plan, executed fast.
-      const planLines = output
-        .split("\n")
-        .filter((line) =>
-          /^(Function Scan|Execution Time|Planning Time)/.test(line),
-        );
-      expect(planLines.some((line) => line.startsWith("Function Scan"))).toBe(
-        true,
-      );
-      const executionLine = planLines.find((line) =>
-        line.startsWith("Execution Time"),
-      );
-      expect(executionLine).toBeDefined();
-      const ms = Number(
-        executionLine?.match(/Execution Time: ([0-9.]+) ms/)?.[1] ?? NaN,
-      );
-      expect(Number.isFinite(ms)).toBe(true);
-      expect(ms).toBeLessThan(5000);
-
-      // The transaction rolled back, so none of the fixtures persisted.
+      // The rolled-back fixtures left nothing persistent.
       const persisted = assertSupabaseSuccess(
         await admin
           .from("repairs")
