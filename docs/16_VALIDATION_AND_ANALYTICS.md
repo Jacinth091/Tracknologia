@@ -32,6 +32,37 @@ as statistically representative.
 Failed or rolled-back operations do not create contradictory analytics because
 the queries read only committed authoritative state.
 
+## Internal operator metrics (O2)
+
+The internal aggregate metrics behind the operator dashboard are computed by the
+service-role-only `public.get_internal_validation_metrics(p_operator_user_id,
+p_window_start, p_window_end)` function over the authoritative tables above. This
+section fixes the canonical definitions the function implements; no competing
+formula may be introduced.
+
+- **Periods:** `today`, `7d`, `30d`, or a bounded custom interval of 1–90 Asia/Manila
+  days; start inclusive, end exclusive, bounds converted to UTC. An empty
+  denominator is reported as an explicit `N/A`, never zero.
+- **Providers onboarded:** created inside the period, split `SHOP` / `INDEPENDENT`
+  with a separate cumulative all-time split. A Provider created at the inclusive
+  start edge is inside the period.
+- **Providers doing real work:** distinct providers with ≥1 Repair creation, Request
+  decision, non-initial status change, or Customer Update during the period.
+- **Repeat activity:** those providers active on ≥2 distinct Asia/Manila calendar
+  days in the period.
+- **Staff footprint:** current `STAFF` memberships and distinct shops with staff
+  (snapshots, not windowed).
+- **Current Repair statuses:** snapshot by `current_status`, as of now.
+- **Repair lifecycle:** created inside the period (with `CUSTOMER_REQUEST` /
+  `PROVIDER_CREATED` split and cumulative all-time), completed inside the period,
+  distinct repairs reaching `READY` inside the period, and distinct repairs with a
+  non-initial status event inside the period.
+- **Requests:** received inside the window; decisions inside the window
+  (`ACCEPTED` / `DECLINED`); undecided snapshot; conversion computed over the
+  submission cohort (submitted in window and accepted), independent of when the
+  decision landed; mean submitted→decision seconds over decisions made in the
+  window.
+
 ## Provider metrics
 
 ### Provider creation and type split
