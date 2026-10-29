@@ -4,12 +4,14 @@ on:
   pull_request:
     branches:
       - "feature/**"
+      - "release/**"
       - staging
       - master
 
   push:
     branches:
       - "feature/**"
+      - "release/**"
       - staging
       - master
 

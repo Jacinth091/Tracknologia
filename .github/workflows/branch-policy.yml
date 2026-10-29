@@ -4,6 +4,7 @@ on:
   pull_request:
     branches:
       - "feature/**"
+      - "release/**"
       - staging
       - master
     types:
@@ -46,8 +47,30 @@ jobs:
               fix/*|hotfix/*|chore/*|dependabot/*)
                 echo "Valid maintenance promotion into staging."
                 ;;
+              release/*)
+                echo "Valid release promotion into staging."
+                ;;
               *)
                 echo "::error::Invalid source branch for staging."
+                echo "Expected feature/NN/name, fix/*, hotfix/*, chore/*, dependabot/*, or release/*."
+                exit 1
+                ;;
+            esac
+
+            exit 0
+          fi
+
+          # Release integration branches accept the same approved sources as staging.
+          if [[ "$BASE_BRANCH" == release/* ]]; then
+            case "$HEAD_BRANCH" in
+              feature/[0-9][0-9]/*)
+                echo "Valid feature integration into release branch."
+                ;;
+              fix/*|hotfix/*|chore/*|dependabot/*)
+                echo "Valid maintenance integration into release branch."
+                ;;
+              *)
+                echo "::error::Invalid source branch for release branch."
                 echo "Expected feature/NN/name, fix/*, hotfix/*, chore/*, or dependabot/*."
                 exit 1
                 ;;
