@@ -18,7 +18,11 @@ High-value examples:
 - public tracking projection excludes private fields;
 - successful Tracking records one minimal analytics observation;
 - the Tracking action returns before an unresolved deferred Analytics task;
-- Analytics failure does not log the credential/database detail.
+- Analytics failure does not log the credential/database detail;
+- the internal-operator guard denies missing/disabled mappings and Provider
+  roles, fails closed on Auth/database/audit faults, and the sensitive audit
+  path re-runs the guard and appends only the fixed category for the verified
+  operator.
 
 ### Rendered UI contracts — Vitest
 
@@ -127,10 +131,14 @@ tests/integration/
   repair-requests.db.test.ts   — RepairRequest lifecycle & Provider isolation
   repairs.db.test.ts           — Repair lifecycle & Provider isolation
   tracking.db.test.ts          — Public tracking & observation
+  internal-operations.db.test.ts — Internal operator grants, audit, denials
+  internal-operations-overlap.db.test.ts — Overlapping audit/revoke and grant sessions
   load-stress.db.test.ts       — Burst invariants (Plan 10)
   helpers/
     supabase-test-context.ts   — client setup, user/fixture lifecycle
     shared-test-utils.ts       — reusable DB fixture helpers
+tests/helpers/
+  local-postgres.ts            — loopback-guarded local psql via Docker (test-only)
 ```
 
 Any shared fixture logic lives in `tests/integration/helpers/` as a small test-only
@@ -152,6 +160,33 @@ exact concurrent threshold, shared state across separate service clients,
 operation isolation, expiry reset, bounded cleanup, opaque stored actor keys,
 and denial of limiter/public-operation RPC execution to both `anon` and
 authenticated roles.
+
+Issue #88 database coverage verifies that `anon`, authenticated, and
+`service_role` clients cannot directly insert/update/delete the private internal
+tables (service_role reads only), that the admin and audit functions are not
+executable by ordinary clients, that grant/revoke is atomic and idempotent,
+that an invalid actor rolls back the mapping plus required audit, that the audit
+RPC rechecks the enabled mapping so revocation wins over a delayed append, and
+that Auth deletion removes the mapping while nulling the direct user references
+on retained audit rows (not full anonymization).
+
+`tests/integration/internal-operations-overlap.db.test.ts` uses live psql
+sessions through the running local Supabase database container (matched by the
+host port bound to the API container, after loopback and local Docker endpoint
+checks). It holds an audit append open while a
+revoke waits on the observed `pg_blocking_pids` state, and it overlaps two
+first grants for one operator. Both assert one consistent outcome. Sessions
+carry lock, statement, and idle-transaction timeouts and close in `finally`.
+
+`tests/e2e/internal-operations.spec.ts` covers anonymous return-to-login,
+successful auth-only operator login to `/internal`, non-indexable rendering, a
+real `/internal` visit that persists a new `INTERNAL_ACCESS_VIEW` event, a
+temporary actor-scoped audit failure that shows only the unavailable state and
+persists no view event (the fault is dropped in `finally`), immediate denial
+after revocation, and 404 for Provider OWNER/STAFF/INDEPENDENT accounts that
+have no internal mapping. The E2E fixture reaches the local database through
+`tests/helpers/local-postgres.ts`, which refuses non-loopback Supabase URLs and
+non-local Docker endpoints before any SQL runs.
 
 ## Load & resilience harness
 

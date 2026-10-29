@@ -11,13 +11,25 @@ import {
   CardTitle,
 } from "@/components/ui/card";
 import { LoginForm } from "../_components/login-form";
+import { getSafeInternalRedirectUrl } from "@/lib/utils";
 
 export const metadata: Metadata = {
   title: "Sign In — Tracknologia",
-  description: "Sign in to your Tracknologia Provider account",
+  description: "Sign in to your Tracknologia account",
 };
 
-export default function LoginPage() {
+export default async function LoginPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ redirectTo?: string | string[] }>;
+}) {
+  const { redirectTo } = await searchParams;
+  // Only a scalar target is trusted; repeated/lookup values fall back.
+  const safeRedirectTo = getSafeInternalRedirectUrl(
+    typeof redirectTo === "string" ? redirectTo : undefined,
+    "/dashboard",
+  );
+
   return (
     <Card>
       <CardHeader>
@@ -33,11 +45,11 @@ export default function LoginPage() {
           Welcome back
         </CardTitle>
         <CardDescription>
-          Sign in with your email and password to access your dashboard
+          Sign in with your email and password to continue
         </CardDescription>
       </CardHeader>
       <CardContent>
-        <LoginForm />
+        <LoginForm redirectTo={safeRedirectTo} />
       </CardContent>
       <CardFooter className="justify-center border-t border-border/50 pt-4 text-xs text-muted-foreground">
         Don&apos;t have an account?{" "}

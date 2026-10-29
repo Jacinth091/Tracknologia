@@ -223,6 +223,18 @@ Do not place service-role/secret keys in public browser environment variables.
 
 Never commit `supabase/.temp/` CLI state.
 
+### Internal operator access
+
+`20261029090000_add_internal_operator_access.sql` creates private
+`internal_operators` and `internal_access_audit` tables plus service-role-only
+functions. It seeds no identities: after migration, ordinary accounts, Provider
+OWNERs, and staff still have no `/internal` access.
+
+Provisioning and revocation are manual, owner-approved operations documented in
+`docs/OPERATIONS.md`. Use the service-role credential locally only with
+disposable test identities; the E2E/DB fixtures create and delete those
+identities themselves.
+
 ## Native Node fallback
 
 Docker is canonical. If a developer temporarily needs to run the application directly on the host, use the Node major version documented by the repository and run:

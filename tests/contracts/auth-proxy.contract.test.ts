@@ -102,6 +102,70 @@ describe("Proxy & Route Protection Contract (AUTH-R18, AUTH-R20)", () => {
     });
   });
 
+  describe("Internal route coarse protection", () => {
+    it("returns unauthenticated /internal visitors to login", async () => {
+      mockGetUser.mockResolvedValue({
+        data: { user: null },
+        error: {
+          name: "AuthSessionMissingError",
+          message: "Auth session missing!",
+        },
+      });
+
+      const request = new NextRequest("https://tracknologia.com/internal");
+      const response = await proxy(request);
+
+      expect(response.status).toBe(307);
+      expect(response.headers.get("location")).toBe(
+        "https://tracknologia.com/login?redirectTo=%2Finternal",
+      );
+    });
+
+    it("preserves the login return path and query", async () => {
+      mockGetUser.mockResolvedValue({
+        data: { user: null },
+        error: {
+          name: "AuthSessionMissingError",
+          message: "Auth session missing!",
+        },
+      });
+
+      const request = new NextRequest(
+        "https://tracknologia.com/internal/queue?tab=open",
+      );
+      const response = await proxy(request);
+
+      expect(response.headers.get("location")).toBe(
+        "https://tracknologia.com/login?redirectTo=%2Finternal%2Fqueue%3Ftab%3Dopen",
+      );
+    });
+
+    it("treats /internally as a public route", async () => {
+      const request = new NextRequest("https://tracknologia.com/internally");
+
+      await proxy(request);
+
+      expect(mockGetUser).not.toHaveBeenCalled();
+    });
+
+    it("does not redirect /internal during an auth outage", async () => {
+      mockGetUser.mockResolvedValue({
+        data: { user: null },
+        error: {
+          name: "AuthRetryableFetchError",
+          status: 500,
+          message: "Internal Server Error",
+        },
+      });
+
+      const request = new NextRequest("https://tracknologia.com/internal");
+      const response = await proxy(request);
+
+      expect(response.status).not.toBe(307);
+      expect(response.headers.get("location")).toBeNull();
+    });
+  });
+
   describe("Auth Entry Route Redirection", () => {
     it("redirects authenticated users from /login to /dashboard", async () => {
       mockGetUser.mockResolvedValue({
@@ -116,6 +180,78 @@ describe("Proxy & Route Protection Contract (AUTH-R18, AUTH-R20)", () => {
       expect(response.status).toBe(307);
       expect(response.headers.get("location")).toBe(
         "https://tracknologia.com/dashboard",
+      );
+    });
+
+    it("honors a safe internal destination", async () => {
+      mockGetUser.mockResolvedValue({
+        data: { user: { id: "user-123", email: "test@example.com" } },
+        error: null,
+      });
+
+      const request = new NextRequest(
+        "https://tracknologia.com/login?redirectTo=%2Finternal",
+      );
+      const response = await proxy(request);
+
+      expect(response.headers.get("location")).toBe(
+        "https://tracknologia.com/internal",
+      );
+    });
+
+    it("keeps a destination query string as a query string", async () => {
+      mockGetUser.mockResolvedValue({
+        data: { user: { id: "user-123", email: "test@example.com" } },
+        error: null,
+      });
+
+      const request = new NextRequest(
+        "https://tracknologia.com/login?redirectTo=%2Finternal%3Ftab%3Drepairs",
+      );
+      const response = await proxy(request);
+
+      expect(response.headers.get("location")).toBe(
+        "https://tracknologia.com/internal?tab=repairs",
+      );
+    });
+
+    it("falls back to /dashboard for unsafe destinations", async () => {
+      mockGetUser.mockResolvedValue({
+        data: { user: { id: "user-123", email: "test@example.com" } },
+        error: null,
+      });
+
+      const unsafeTargets = [
+        "https%3A%2F%2Fevil.example",
+        "%2F%2Fevil.example",
+        "%2F%5Cevil.example",
+      ];
+
+      for (const target of unsafeTargets) {
+        const request = new NextRequest(
+          `https://tracknologia.com/login?redirectTo=${target}`,
+        );
+        const response = await proxy(request);
+
+        expect(response.headers.get("location")).toBe(
+          "https://tracknologia.com/dashboard",
+        );
+      }
+    });
+
+    it("does not leak the login query into the destination", async () => {
+      mockGetUser.mockResolvedValue({
+        data: { user: { id: "user-123", email: "test@example.com" } },
+        error: null,
+      });
+
+      const request = new NextRequest(
+        "https://tracknologia.com/login?redirectTo=%2Finternal&next=%2Fregister",
+      );
+      const response = await proxy(request);
+
+      expect(response.headers.get("location")).toBe(
+        "https://tracknologia.com/internal",
       );
     });
   });

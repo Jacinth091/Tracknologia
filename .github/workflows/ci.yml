@@ -4,12 +4,14 @@ on:
   pull_request:
     branches:
       - "feature/**"
+      - "release/**"
       - staging
       - master
 
   push:
     branches:
       - "feature/**"
+      - "release/**"
       - staging
       - master
 
@@ -210,4 +212,6 @@ jobs:
       # needs no dev stack, so it runs only after the dev stack has stopped
       # to keep the runner from running two Supabase stacks at once.
       - name: Rehearse pending-only migration upgrade
+        env:
+          REHEARSAL_BASE_REF: ${{ github.base_ref || 'staging' }}
         run: pnpm rehearse:migrations

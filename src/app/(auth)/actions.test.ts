@@ -25,7 +25,7 @@ vi.mock("@/lib/config/server", () => ({
 vi.mock("next/navigation", () => ({ redirect: mocks.redirect }));
 vi.mock("next/headers", () => ({ cookies: mocks.cookies }));
 
-import { forgotPasswordAction, registerAction } from "./actions";
+import { forgotPasswordAction, loginAction, registerAction } from "./actions";
 
 function registerFormData() {
   const formData = new FormData();
@@ -33,6 +33,16 @@ function registerFormData() {
   formData.set("email", "owner@shop.com");
   formData.set("password", "password123");
   formData.set("confirmPassword", "password123");
+  return formData;
+}
+
+function loginFormData(redirectTo?: string) {
+  const formData = new FormData();
+  formData.set("email", "owner@shop.com");
+  formData.set("password", "password123");
+  if (redirectTo !== undefined) {
+    formData.set("redirectTo", redirectTo);
+  }
   return formData;
 }
 
@@ -44,6 +54,38 @@ beforeEach(() => {
       signInWithPassword: mocks.signInWithPassword,
       resetPasswordForEmail: mocks.resetPasswordForEmail,
     },
+  });
+});
+
+describe("loginAction", () => {
+  beforeEach(() => {
+    mocks.signInWithPassword.mockResolvedValue({ data: {}, error: null });
+  });
+
+  it("returns the user to a valid local target", async () => {
+    await loginAction(null, loginFormData("/internal/queue?tab=open"));
+
+    expect(mocks.redirect).toHaveBeenCalledWith("/internal/queue?tab=open");
+  });
+
+  it("falls back to the dashboard when no target is posted", async () => {
+    await loginAction(null, loginFormData());
+
+    expect(mocks.redirect).toHaveBeenCalledWith("/dashboard");
+  });
+
+  it("falls back for a forged external target", async () => {
+    await loginAction(null, loginFormData("https://evil.example/internal"));
+
+    expect(mocks.redirect).toHaveBeenCalledWith("/dashboard");
+  });
+
+  it("falls back for protocol-relative and backslash targets", async () => {
+    await loginAction(null, loginFormData("//evil.example"));
+    expect(mocks.redirect).toHaveBeenLastCalledWith("/dashboard");
+
+    await loginAction(null, loginFormData("/\\evil.example"));
+    expect(mocks.redirect).toHaveBeenLastCalledWith("/dashboard");
   });
 });
 

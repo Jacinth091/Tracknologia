@@ -25,6 +25,10 @@ tracking_events
 
 Short-lived operational security state:
 public_operation_rate_limits
+
+Private internal operations (issue #88):
+internal_operators
+internal_access_audit
 ```
 
 Authentication identities live in Supabase-managed `auth.users`.
@@ -242,6 +246,46 @@ Minimal internal validation telemetry for successful public Tracking views.
 - no Tracking Code, customer/Provider snapshot, contact, network, browser,
   fingerprint, Auth, or arbitrary metadata is stored
 
+### 12. `internal_operators`
+
+Private allow-list mapping for internal operators. It is **not** a Provider role,
+not an Auth-metadata flag, and not derived from `provider_memberships`.
+
+- `user_id` (uuid, PK, FK $\to$ `auth.users.id`, cascading delete)
+- `enabled` (boolean, not null, default `false`)
+- `created_at` (timestamptz, server default)
+- `provisioned_at`, `revoked_at` (timestamptz, nullable)
+- `reason` (bounded 3–200 characters after trimming)
+- actor identity is intentionally **not** duplicated here; it lives only in the
+  append-only audit event
+- one mapping per Auth user; deleting the Auth identity removes live permission
+  immediately
+- no seed rows, no signup trigger, no Provider/owner automatic grant
+
+### 13. `internal_access_audit`
+
+Append-only audit for internal-operator grants, revocations, and sensitive
+internal access events.
+
+- `event_id` (uuid, PK)
+- `operator_user_id`, `actor_user_id` (uuid, nullable FKs $\to$ `auth.users.id`,
+  `ON DELETE SET NULL`; the FK action runs as the table owner, so nulling the
+  direct references does not require client grants)
+- `operation` (text, fixed check: `OPERATOR_PROVISIONED`, `OPERATOR_REVOKED`,
+  `INTERNAL_ACCESS_VIEW`)
+- `reason` (bounded 3–200 characters when present; null for application access
+  events)
+- `created_at` (timestamptz, server default)
+- Auth deletion nulls only the direct user references; `operation`, `reason`,
+  and `created_at` remain and may stay linkable through external approval
+  records. This is not full anonymization.
+- stores no Provider, Repair, Repair Request, Customer, email, path, or payload
+  data
+- `service_role` can read but cannot insert, update, or delete rows directly;
+  writes happen only through the owner-executed functions below
+- retention/purge policy remains deliberately undefined pending owner approval
+  (issue #87)
+
 ### Public Tracking projection
 
 `lookup_public_repair(text)` is a read-only `SECURITY DEFINER` function rather
@@ -341,6 +385,26 @@ npx supabase db push
   `submit_repair_request` is revoked from `anon`/`authenticated` and granted to
   `service_role` only, so the publishable key cannot invoke them directly. The
   application server calls them through the server-only service client.
+- **Internal operator tables are private**: RLS is enabled on
+  `internal_operators` and `internal_access_audit` with no policies. Supabase
+  default table privileges already include `service_role`, so the migration
+  explicitly revokes `PUBLIC`, `anon`, `authenticated`, and `service_role` from
+  both tables and then grants `service_role` `SELECT` only. Direct
+  `INSERT`/`UPDATE`/`DELETE` by any client role, including `service_role`, is
+  denied.
+- **Internal operator functions are narrow and authenticated by grant**:
+  `change_internal_operator_access(...)` (service-role-only) atomically changes
+  the enabled mapping and appends the provision/revoke audit event; an invalid
+  actor fails the audit FK after the mapping write and rolls the whole
+  transaction back. `record_internal_operation_access(operator_user_id,
+category)` is also service-role-only, accepts only the fixed
+  `INTERNAL_ACCESS_VIEW` category, and rechecks the enabled mapping under
+  `FOR SHARE`, which conflicts with the revocation `UPDATE`. Ordinary clients
+  cannot execute either function, so there is no publishable-key write surface.
+- **Audit is append-only**: audit writes occur only inside the
+  `SECURITY DEFINER` owner functions; `service_role` has no direct
+  mutation privilege, and Auth deletion nulls the direct user references on
+  retained events through the FK `ON DELETE SET NULL`.
 - **Durable public-operation abuse control**:
   `check_public_operation_rate_limit(...)` atomically increments one fixed
   window keyed by operation and a server-generated opaque HMAC actor digest.
@@ -375,5 +439,8 @@ npx supabase db push
 Do not add without a validated requirement:
 
 - `customers`, `devices`, `technicians`, `branches`, `inventory`, `parts`, `payments`, `invoices`, `appointments`, `ratings/reviews`.
+- Internal access audit retention/purge windows, archive targets, and reporting
+  projections: these need explicit owner approval (issue #87) and a retention
+  policy decision before any table, job, or query surface is added.
 
 Customer and device details remain point-in-time snapshots attached to a Repair or Repair Request.

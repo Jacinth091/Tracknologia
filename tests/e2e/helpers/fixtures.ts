@@ -236,6 +236,70 @@ export async function cleanupActors(
   }
 }
 
+export interface InternalOperatorActor {
+  email: string;
+  password: string;
+  userId: string;
+}
+
+/**
+ * Seeds a disposable auth-only internal operator: no Provider, no membership,
+ * no profile. The mapping is created through the service-role-only admin
+ * function, never through an application action.
+ */
+export async function seedInternalOperator(
+  admin: SupabaseClient,
+): Promise<InternalOperatorActor> {
+  const email = uniqueEmail("internal-ops");
+  const password = "TestPassword123!";
+
+  const { data, error } = await admin.auth.admin.createUser({
+    email,
+    password,
+    email_confirm: true,
+  });
+  assertOk({ error }, `create internal operator ${email}`);
+  const userId = data.user?.id;
+  if (!userId) {
+    throw new Error("[E2E fixture] create internal operator returned no id");
+  }
+
+  const grant = await admin.rpc("change_internal_operator_access", {
+    p_operator_user_id: userId,
+    p_actor_user_id: userId,
+    p_enabled: true,
+    p_reason: "e2e disposable internal operator grant",
+  });
+  assertOk(grant, `grant internal operator ${email}`);
+
+  return { email, password, userId };
+}
+
+export async function revokeInternalOperator(
+  admin: SupabaseClient,
+  operatorUserId: string,
+): Promise<void> {
+  const revoke = await admin.rpc("change_internal_operator_access", {
+    p_operator_user_id: operatorUserId,
+    p_actor_user_id: operatorUserId,
+    p_enabled: false,
+    p_reason: "e2e disposable internal operator revoke",
+  });
+  assertOk(revoke, `revoke internal operator ${operatorUserId}`);
+}
+
+/**
+ * Deletes the disposable operator identity. The live mapping is removed by the
+ * auth FK cascade; append-only audit rows remain anonymized by design.
+ */
+export async function cleanupInternalOperator(
+  admin: SupabaseClient,
+  operatorUserId: string,
+): Promise<void> {
+  const { error } = await admin.auth.admin.deleteUser(operatorUserId);
+  assertOk({ error }, `delete internal operator ${operatorUserId}`);
+}
+
 /** Captures the Tracking Code displayed on the Repair detail page. */
 export async function readTrackingCode(page: Page): Promise<string> {
   const dd = page.locator('dt:has-text("Tracking Code") + dd');
