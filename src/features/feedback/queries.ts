@@ -101,10 +101,18 @@ export async function getInternalFeedback(
   }
 }
 
+// Asia/Manila has no daylight saving time, so a fixed +08:00 offset converts
+// its calendar-day boundaries to the UTC instants the database compares with.
+const MANILA_OFFSET = "+08:00";
+
+function manilaMidnightUtc(date: string): string {
+  return new Date(`${date}T00:00:00${MANILA_OFFSET}`).toISOString();
+}
+
 /**
- * Count-only summary of submissions created in a UTC window (end exclusive,
- * at most 31 days). Status counts are a current snapshot, and coverage is
- * limited to rows still retained.
+ * Count-only summary of submissions created in Asia/Manila calendar days (start
+ * inclusive, end exclusive, at most 31 days). Status counts are a current
+ * snapshot, and coverage is limited to rows still retained.
  */
 export async function getFeedbackAggregateSummary(
   window: unknown,
@@ -128,14 +136,14 @@ export async function getFeedbackAggregateSummary(
       await createInternalOpsClient(),
       operatorUserId,
       {
-        start: `${startDate}T00:00:00.000Z`,
-        endExclusive: `${endDateExclusive}T00:00:00.000Z`,
+        start: manilaMidnightUtc(startDate),
+        endExclusive: manilaMidnightUtc(endDateExclusive),
       },
     );
 
     return buildFeedbackCountSummary(
       rows,
-      { startDate, endDateExclusive, days },
+      { timeZone: "Asia/Manila", startDate, endDateExclusive, days },
       new Date().toISOString(),
     );
   } catch (error) {

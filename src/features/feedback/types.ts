@@ -111,10 +111,19 @@ export interface FeedbackReviewResult {
   rowVersion: number;
 }
 
+// Summary periods are Asia/Manila calendar days. Manila keeps no daylight
+// saving time, so the conversion to UTC instants is a fixed +08:00 offset.
+export interface FeedbackSummaryWindowLabel {
+  timeZone: "Asia/Manila";
+  startDate: string;
+  endDateExclusive: string;
+  days: number;
+}
+
 /** Count-only summary. Coverage is limited to rows still retained. */
 export interface FeedbackCountSummary {
   asOf: string;
-  window: { startDate: string; endDateExclusive: string; days: number };
+  window: FeedbackSummaryWindowLabel;
   snapshot: "CURRENT_STATUS";
   retention: { policy: "UNAPPROVED"; coverage: "RETAINED_ROWS_ONLY" };
   total: number;

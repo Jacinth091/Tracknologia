@@ -1,7 +1,9 @@
 -- Issue #90: set-based, count-only Feedback summary for internal operators.
 --
 -- get_feedback_count_summary returns fixed count groups for submissions created
--- in a bounded UTC window (start inclusive, end exclusive, at most 31 days).
+-- in a bounded window (start inclusive, end exclusive, at most 31 days). The
+-- window bounds are UTC instants; the application derives them from Asia/Manila
+-- calendar days. DAY buckets are Asia/Manila calendar dates.
 -- It returns no message, notes, nonce, identity, or row identifier, and it
 -- performs one aggregate scan instead of fetching rows into the application.
 --
@@ -67,15 +69,15 @@ BEGIN
   GROUP BY wr.status
   UNION ALL
   SELECT 'DAY'::TEXT,
-         to_char((wr.created_at AT TIME ZONE 'UTC')::date, 'YYYY-MM-DD'),
+         to_char((wr.created_at AT TIME ZONE 'Asia/Manila')::date, 'YYYY-MM-DD'),
          count(*)::BIGINT
   FROM window_rows wr
-  GROUP BY (wr.created_at AT TIME ZONE 'UTC')::date;
+  GROUP BY (wr.created_at AT TIME ZONE 'Asia/Manila')::date;
 END;
 $$;
 
 COMMENT ON FUNCTION public.get_feedback_count_summary(UUID, TIMESTAMPTZ, TIMESTAMPTZ) IS
-  'Service-role-only count-only Feedback summary for a bounded UTC creation window. STATUS is the current status snapshot. Returns fixed groups only, never row text or identifiers.';
+  'Service-role-only count-only Feedback summary for a bounded window with Asia/Manila DAY buckets. STATUS is the current status snapshot. Returns fixed groups only, never row text or identifiers.';
 
 REVOKE ALL ON FUNCTION public.get_feedback_count_summary(
   UUID, TIMESTAMPTZ, TIMESTAMPTZ
