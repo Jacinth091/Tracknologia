@@ -162,6 +162,33 @@ export async function resolveLocalDbContainer(apiUrl: string): Promise<string> {
   return dbName;
 }
 
+const BLOCK_DEADLINE_MS = 10_000;
+
+/**
+ * Waits on a wall-clock deadline for the server to report the blocker. The
+ * deciding evidence is pg_blocking_pids; elapsed time only bounds the wait.
+ */
+export async function waitUntilBlockedBy(
+  control: LocalSqlSession,
+  waitingPid: number,
+  blockerPid: number,
+): Promise<void> {
+  const deadline = Date.now() + BLOCK_DEADLINE_MS;
+  while (Date.now() < deadline) {
+    const blockers = await control.query(
+      `SELECT pg_blocking_pids(${waitingPid});`,
+    );
+    const pids = blockers.replace(/[{}]/g, "").split(",").map(Number);
+    if (pids.includes(blockerPid)) {
+      return;
+    }
+    await new Promise((resolve) => setTimeout(resolve, 100));
+  }
+  throw new Error(
+    `session ${waitingPid} did not wait on ${blockerPid} within ${BLOCK_DEADLINE_MS} ms`,
+  );
+}
+
 /** Runs one SQL string (may hold several statements) and returns raw stdout. */
 export async function runLocalSql(
   apiUrl: string,

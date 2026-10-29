@@ -37,6 +37,8 @@ beforeEach(() => {
   delete process.env.PUBLIC_ABUSE_TRACKING_LOOKUP_WINDOW_SECONDS;
   delete process.env.PUBLIC_ABUSE_REPAIR_REQUEST_MAX;
   delete process.env.PUBLIC_ABUSE_REPAIR_REQUEST_WINDOW_SECONDS;
+  delete process.env.PUBLIC_ABUSE_FEEDBACK_MAX;
+  delete process.env.PUBLIC_ABUSE_FEEDBACK_WINDOW_SECONDS;
   mocks.createPublicOperationClient.mockResolvedValue({ rpc: mocks.rpc });
 });
 
@@ -49,7 +51,22 @@ describe("durable public-operation abuse control", () => {
     expect(getRateLimitConfig().operations).toEqual({
       tracking_lookup: { max: 30, windowSeconds: 60 },
       repair_request_submit: { max: 5, windowSeconds: 600 },
+      feedback_submit: { max: 5, windowSeconds: 600 },
     });
+  });
+
+  it("accepts bounded feedback overrides independently of other operations", () => {
+    process.env.PUBLIC_ABUSE_FEEDBACK_MAX = "3";
+    process.env.PUBLIC_ABUSE_FEEDBACK_WINDOW_SECONDS = "120";
+    const operations = getRateLimitConfig().operations;
+    expect(operations.feedback_submit).toEqual({ max: 3, windowSeconds: 120 });
+    expect(operations.repair_request_submit).toEqual({
+      max: 5,
+      windowSeconds: 600,
+    });
+
+    process.env.PUBLIC_ABUSE_FEEDBACK_WINDOW_SECONDS = "86401";
+    expect(() => getRateLimitConfig()).toThrow();
   });
 
   it("rejects a missing or weak keyed-digest secret", () => {
