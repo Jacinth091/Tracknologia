@@ -156,9 +156,10 @@ describe("Feedback projections through PostgREST (persistence)", () => {
       });
       expect(version).toBe(2);
 
-      // 100 same-status edits bring history to 101 events, so the read must
-      // report truncation at the 100-event bound. The last edit clears the
-      // notes and the link with null.
+      // 100 same-status edits bring history to 101 events. The read returns the
+      // newest 100, so the oldest event (version 2) is the one left out and the
+      // current version (102) must be present. The last edit clears the notes
+      // and the link with null.
       for (let index = 0; index < 100; index += 1) {
         const last = index === 99;
         version = await review(id, operatorId, version, {
@@ -193,13 +194,18 @@ describe("Feedback projections through PostgREST (persistence)", () => {
       const history = detail?.history;
       expect(history?.truncated).toBe(true);
       expect(history?.items).toHaveLength(100);
+      // Newest 100 by version, presented oldest-first: versions 3 through 102.
       expect(history?.items.map((event) => event.rowVersion)).toEqual(
-        Array.from({ length: 100 }, (_, index) => index + 2),
+        Array.from({ length: 100 }, (_, index) => index + 3),
       );
-      expect(history?.items[0]).toMatchObject({
-        fromStatus: "NEW",
+      expect(history?.items.at(-1)).toMatchObject({
+        fromStatus: "REVIEWING",
         toStatus: "REVIEWING",
+        rowVersion: 102,
       });
+      expect(history?.items.some((event) => event.rowVersion === 2)).toBe(
+        false,
+      );
       const occurred = history?.items.map((event) =>
         Date.parse(event.occurredAt),
       );
