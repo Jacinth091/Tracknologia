@@ -57,15 +57,25 @@ export async function requireInternalOperator(): Promise<InternalAccess> {
 }
 
 /**
- * Appends the audit event a sensitive internal operation requires. Any failure
- * returns false so callers deny the operation instead of rendering protected
- * content unrecorded.
+ * Appends the audit event a sensitive internal operation requires.
+ *
+ * This function re-runs requireInternalOperator() itself and refuses every
+ * non-ALLOWED outcome before touching the privileged append, deriving the
+ * operator UUID there rather than accepting caller-supplied context. Any
+ * failure returns false so callers deny the operation instead of rendering
+ * protected content unrecorded.
  */
 export async function recordSensitiveInternalAccess(
   category: InternalOperationCategory,
 ): Promise<boolean> {
   try {
-    return await appendInternalAccessAudit(category);
+    const access = await requireInternalOperator();
+
+    if (access.status !== "ALLOWED") {
+      return false;
+    }
+
+    return await appendInternalAccessAudit(access.userId, category);
   } catch (err) {
     console.error("[INTERNAL_AUDIT_FAILURE] access audit append threw", {
       message: err instanceof Error ? err.message : "unknown",

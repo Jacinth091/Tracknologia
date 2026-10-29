@@ -14,9 +14,7 @@ CREATE TABLE public.internal_operators (
   enabled BOOLEAN NOT NULL DEFAULT FALSE,
   created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
   provisioned_at TIMESTAMPTZ,
-  provisioned_by UUID REFERENCES auth.users (id) ON DELETE SET NULL,
   revoked_at TIMESTAMPTZ,
-  revoked_by UUID REFERENCES auth.users (id) ON DELETE SET NULL,
   reason TEXT,
   CONSTRAINT internal_operators_reason_bounded CHECK (
     reason IS NULL
@@ -25,7 +23,7 @@ CREATE TABLE public.internal_operators (
 );
 
 COMMENT ON TABLE public.internal_operators IS
-  'Private internal-operator mapping. Not a Provider role. Auth deletion removes the live permission.';
+  'Private internal-operator mapping. Not a Provider role. Auth deletion removes the live permission. Timestamps and reason describe the latest deliberate change; actor identity lives only in the append-only audit.';
 COMMENT ON COLUMN public.internal_operators.reason IS
   'Bounded reason for the most recent deliberate provision/revoke operation.';
 
@@ -58,11 +56,14 @@ ALTER TABLE public.internal_operators ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.internal_access_audit ENABLE ROW LEVEL SECURITY;
 
 -- No RLS policies are created: ordinary clients are denied by grants plus the
--- absence of policies. The table owner (SECURITY DEFINER functions below) and
--- the service role can still read; service_role receives SELECT only.
-REVOKE ALL ON TABLE public.internal_operators FROM PUBLIC, anon, authenticated;
+-- absence of policies. Supabase's default table privileges also cover
+-- service_role, so service_role must be revoked explicitly before receiving
+-- SELECT only. The table owner (the SECURITY DEFINER functions below) performs
+-- every write, including the FK ON DELETE SET NULL anonymization.
+REVOKE ALL ON TABLE public.internal_operators
+  FROM PUBLIC, anon, authenticated, service_role;
 REVOKE ALL ON TABLE public.internal_access_audit
-  FROM PUBLIC, anon, authenticated;
+  FROM PUBLIC, anon, authenticated, service_role;
 
 GRANT SELECT ON TABLE public.internal_operators TO service_role;
 GRANT SELECT ON TABLE public.internal_access_audit TO service_role;
@@ -71,10 +72,11 @@ GRANT SELECT ON TABLE public.internal_access_audit TO service_role;
 -- the required provision/revoke audit event, or roll everything back.
 -- Repeated grant/revoke of the same state is an explicit no-op returning FALSE
 -- and appends no duplicate event. Revoking an absent mapping never grants
--- access. Actor existence is enforced by the audit FK at write time, in the
--- same transaction as the mapping change, so an invalid actor rolls back the
--- mapping too. Service-role execution only: this is a runbook surface, never a
--- public HTTP action.
+-- access. Actor identity is recorded only in the append-only audit event, so
+-- the audit FK enforces actor existence at write time; an invalid actor fails
+-- the required audit insert after the mapping write and rolls the whole
+-- transaction back. Service-role execution only: this is a runbook surface,
+-- never a public HTTP action.
 CREATE OR REPLACE FUNCTION public.change_internal_operator_access(
   p_operator_user_id UUID,
   p_actor_user_id UUID,
@@ -121,26 +123,20 @@ BEGIN
       user_id,
       enabled,
       provisioned_at,
-      provisioned_by,
       revoked_at,
-      revoked_by,
       reason
     )
     VALUES (
       p_operator_user_id,
       TRUE,
       now(),
-      p_actor_user_id,
-      NULL,
       NULL,
       v_reason
     )
     ON CONFLICT (user_id) DO UPDATE
     SET enabled = TRUE,
         provisioned_at = now(),
-        provisioned_by = EXCLUDED.provisioned_by,
         revoked_at = NULL,
-        revoked_by = NULL,
         reason = EXCLUDED.reason;
 
     INSERT INTO public.internal_access_audit (
@@ -166,7 +162,6 @@ BEGIN
   UPDATE public.internal_operators
   SET enabled = FALSE,
       revoked_at = now(),
-      revoked_by = p_actor_user_id,
       reason = v_reason
   WHERE user_id = p_operator_user_id;
 
@@ -203,14 +198,17 @@ GRANT EXECUTE ON FUNCTION public.change_internal_operator_access(
   TEXT
 ) TO service_role;
 
--- Application access audit: authenticated only, actor always derived from the
--- authenticated session, category restricted to the fixed sensitive-operation
--- set, and the enabled mapping rechecked under a row lock that serializes
--- against a concurrent revocation (enabled is mutable, so FOR SHARE is used
--- rather than FOR KEY SHARE). Provision/revoke categories cannot be forged
--- here. Any failure raises, so callers fail closed instead of rendering
--- protected content without an audit event.
+-- Application access audit: service-role-only narrow RPC. The application
+-- passes the operator UUID it derived from requireInternalOperator(); ordinary
+-- clients (including enabled operators) can never execute this function, so it
+-- is not a publishable-key write surface. The category is restricted to the
+-- fixed sensitive-operation set, and the enabled mapping is rechecked under a
+-- shared row lock that serializes against a concurrent revocation (enabled is
+-- mutable, so FOR SHARE is used rather than FOR KEY SHARE). Provision/revoke
+-- categories cannot be forged here. Any failure raises, so callers fail closed
+-- instead of rendering protected content without an audit event.
 CREATE OR REPLACE FUNCTION public.record_internal_operation_access(
+  p_operator_user_id UUID,
   p_operation_category TEXT
 )
 RETURNS UUID
@@ -219,13 +217,11 @@ SECURITY DEFINER
 SET search_path = public, pg_temp
 AS $$
 DECLARE
-  v_user_id UUID;
   v_enabled BOOLEAN;
   v_event_id UUID;
 BEGIN
-  v_user_id := auth.uid();
-  IF v_user_id IS NULL THEN
-    RAISE EXCEPTION 'Authentication required';
+  IF p_operator_user_id IS NULL THEN
+    RAISE EXCEPTION 'Operator identity is required';
   END IF;
 
   IF p_operation_category IS NULL
@@ -236,7 +232,7 @@ BEGIN
   SELECT io.enabled
   INTO v_enabled
   FROM public.internal_operators io
-  WHERE io.user_id = v_user_id
+  WHERE io.user_id = p_operator_user_id
   FOR SHARE;
 
   IF v_enabled IS NOT TRUE THEN
@@ -249,8 +245,8 @@ BEGIN
     operation
   )
   VALUES (
-    v_user_id,
-    v_user_id,
+    p_operator_user_id,
+    p_operator_user_id,
     p_operation_category
   )
   RETURNING event_id INTO v_event_id;
@@ -259,10 +255,10 @@ BEGIN
 END;
 $$;
 
-COMMENT ON FUNCTION public.record_internal_operation_access(TEXT) IS
-  'Authenticated append-only internal access audit. Derives the actor itself, accepts only fixed sensitive-operation categories, rechecks the enabled mapping under a shared row lock, and raises on any denial or failure.';
+COMMENT ON FUNCTION public.record_internal_operation_access(UUID, TEXT) IS
+  'Service-role-only append-only internal access audit. Accepts only fixed sensitive-operation categories, rechecks the enabled mapping under a shared row lock, records operator and actor from the one verified UUID, and raises on any denial or failure.';
 
-REVOKE ALL ON FUNCTION public.record_internal_operation_access(TEXT)
-  FROM PUBLIC, anon;
-GRANT EXECUTE ON FUNCTION public.record_internal_operation_access(TEXT)
-  TO authenticated;
+REVOKE ALL ON FUNCTION public.record_internal_operation_access(UUID, TEXT)
+  FROM PUBLIC, anon, authenticated;
+GRANT EXECUTE ON FUNCTION public.record_internal_operation_access(UUID, TEXT)
+  TO service_role;

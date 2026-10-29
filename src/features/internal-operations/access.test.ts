@@ -154,7 +154,50 @@ describe("requireInternalOperator", () => {
 });
 
 describe("recordSensitiveInternalAccess", () => {
-  it("appends the fixed category with the trusted session identity", async () => {
+  it("refuses to append for a non-ALLOWED access outcome", async () => {
+    const outcomes = [
+      {
+        authError: new mocks.FakeAuthError(
+          "Authentication required",
+          "UNAUTHENTICATED",
+        ),
+        lookup: null,
+      },
+      {
+        authError: null,
+        lookup: { status: "MISSING" },
+      },
+      {
+        authError: null,
+        lookup: { status: "DISABLED" },
+      },
+      {
+        authError: null,
+        lookup: { status: "ERROR" },
+      },
+    ];
+
+    for (const outcome of outcomes) {
+      vi.clearAllMocks();
+      vi.spyOn(console, "error").mockImplementation(() => undefined);
+
+      if (outcome.authError) {
+        mocks.requireUser.mockRejectedValue(outcome.authError);
+      } else {
+        mocks.requireUser.mockResolvedValue(authenticatedUser("ops-user"));
+        mocks.findInternalOperator.mockResolvedValue(outcome.lookup);
+      }
+
+      await expect(
+        recordSensitiveInternalAccess("INTERNAL_ACCESS_VIEW"),
+      ).resolves.toBe(false);
+      expect(mocks.appendInternalAccessAudit).not.toHaveBeenCalled();
+    }
+  });
+
+  it("appends the fixed category for the verified operator", async () => {
+    mocks.requireUser.mockResolvedValue(authenticatedUser("ops-user"));
+    mocks.findInternalOperator.mockResolvedValue({ status: "ENABLED" });
     mocks.appendInternalAccessAudit.mockResolvedValue(true);
 
     await expect(
@@ -162,11 +205,14 @@ describe("recordSensitiveInternalAccess", () => {
     ).resolves.toBe(true);
     expect(mocks.appendInternalAccessAudit).toHaveBeenCalledTimes(1);
     expect(mocks.appendInternalAccessAudit).toHaveBeenCalledWith(
+      "ops-user",
       "INTERNAL_ACCESS_VIEW",
     );
   });
 
   it("fails closed when the audit append fails", async () => {
+    mocks.requireUser.mockResolvedValue(authenticatedUser("ops-user"));
+    mocks.findInternalOperator.mockResolvedValue({ status: "ENABLED" });
     mocks.appendInternalAccessAudit.mockResolvedValue(false);
 
     await expect(
@@ -175,7 +221,11 @@ describe("recordSensitiveInternalAccess", () => {
   });
 
   it("fails closed when the audit append throws", async () => {
-    mocks.appendInternalAccessAudit.mockRejectedValue(new Error("audit down"));
+    mocks.requireUser.mockResolvedValue(authenticatedUser("ops-user"));
+    mocks.findInternalOperator.mockResolvedValue({ status: "ENABLED" });
+    mocks.appendInternalAccessAudit.mockRejectedValue(
+      new Error("audit down"),
+    );
 
     await expect(
       recordSensitiveInternalAccess("INTERNAL_ACCESS_VIEW"),

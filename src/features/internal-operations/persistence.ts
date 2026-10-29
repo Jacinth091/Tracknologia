@@ -1,6 +1,5 @@
 import "server-only";
-import { createClient } from "@/lib/supabase/server";
-import { createInternalOperationsClient } from "@/lib/supabase/internal";
+import { createInternalOpsClient } from "@/lib/supabase/internal";
 import type { InternalOperationCategory } from "./types";
 
 interface InternalOperatorRow {
@@ -23,7 +22,7 @@ export type InternalOperatorLookup =
 export async function findInternalOperator(
   userId: string,
 ): Promise<InternalOperatorLookup> {
-  const client = await createInternalOperationsClient();
+  const client = await createInternalOpsClient();
   const { data, error } = await client
     .from("internal_operators")
     .select("user_id, enabled")
@@ -47,19 +46,24 @@ export async function findInternalOperator(
   }
 
   const row = data as unknown as InternalOperatorRow;
-  return row.enabled === true ? { status: "ENABLED" } : { status: "DISABLED" };
+  return row.enabled === true
+    ? { status: "ENABLED" }
+    : { status: "DISABLED" };
 }
 
 /**
- * Appends the required append-only audit event through the authenticated
- * database function. The actor is derived from the session inside the
- * function; callers cannot supply an operator identity or a category.
+ * Appends the required append-only audit event through the service-role-only
+ * database function. The caller must pass the operator UUID it derived from
+ * requireInternalOperator(); the database rechecks that the enabled mapping
+ * still exists at write time.
  */
 export async function appendInternalAccessAudit(
+  operatorUserId: string,
   category: InternalOperationCategory,
 ): Promise<boolean> {
-  const client = await createClient();
+  const client = await createInternalOpsClient();
   const { error } = await client.rpc("record_internal_operation_access", {
+    p_operator_user_id: operatorUserId,
     p_operation_category: category,
   });
 
