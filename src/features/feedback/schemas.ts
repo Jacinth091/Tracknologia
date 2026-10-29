@@ -8,9 +8,13 @@ import {
   PUBLIC_FEEDBACK_SOURCES,
 } from "./types";
 
+// Client-safe: import these directly from this file. The feature barrel is
+// server-only and does not re-export them.
+
 // Mirrors the feedback_submissions CHECK constraints: edge trimming covers only
 // ASCII space, tab, LF, CR, FF, and VT, and length counts code points.
 const ASCII_EDGE_WHITESPACE = /^[ \t\n\r\f\v]+|[ \t\n\r\f\v]+$/g;
+const POSTGRES_INTEGER_MAX = 2_147_483_647;
 
 export function asciiTrim(value: string): string {
   return value.replace(ASCII_EDGE_WHITESPACE, "");
@@ -20,12 +24,13 @@ function codePointLength(value: string): number {
   return [...value].length;
 }
 
-// U+0001-U+0008, U+000E-U+001F, and U+007F are rejected; TAB, LF, VT, FF,
-// and CR are permitted inside participant text.
+// NUL cannot be stored in PostgreSQL text. U+0001-U+0008, U+000E-U+001F, and
+// U+007F are rejected by the table. TAB, LF, VT, FF, and CR remain allowed.
 function hasForbiddenControl(value: string): boolean {
   return [...value].some((character) => {
     const code = character.codePointAt(0) ?? 0;
     return (
+      code === 0x00 ||
       (code >= 0x01 && code <= 0x08) ||
       (code >= 0x0e && code <= 0x1f) ||
       code === 0x7f
@@ -51,12 +56,12 @@ function boundedText(min: number, max: number, label: string) {
     );
 }
 
-// Optional fields: absent or blank input becomes null, so the stored value
-// is either a bounded non-blank string or NULL, matching the table.
+// Optional fields: absent, null, or blank input becomes null. A non-blank
+// value must satisfy the bounds that the table enforces for the stored text.
 function optionalBoundedText(min: number, max: number, label: string) {
   return z
     .string()
-    .optional()
+    .nullish()
     .transform((value) => asciiTrim(value ?? ""))
     .refine(
       (value) =>
@@ -73,40 +78,45 @@ function optionalBoundedText(min: number, max: number, label: string) {
 
 const TRACKED_ISSUE_PATH = /^\/Jacinth091\/Tracknologia\/issues\/[1-9][0-9]*$/;
 
-// Accepts only canonical https://github.com/<repo>/issues/<n> links with no
-// credentials, port, query, or fragment. The stored value is the normalized href.
-function canonicalTrackedIssueUrl(value: string): string | null {
+// Exact canonical link only: the raw value must equal the parsed href, so
+// query strings, fragments, credentials, ports, and alternate spellings are
+// rejected rather than normalized into a different stored value.
+function isCanonicalTrackedIssueUrl(value: string): boolean {
+  if (value.includes("?") || value.includes("#")) {
+    return false;
+  }
+
   let url: URL;
   try {
     url = new URL(value);
   } catch {
-    return null;
+    return false;
   }
 
-  const allowed =
+  return (
+    url.href === value &&
     url.protocol === "https:" &&
     url.hostname === "github.com" &&
     url.username === "" &&
     url.password === "" &&
     url.port === "" &&
-    url.search === "" &&
-    url.hash === "" &&
-    TRACKED_ISSUE_PATH.test(url.pathname);
-
-  return allowed ? url.href : null;
+    TRACKED_ISSUE_PATH.test(url.pathname)
+  );
 }
 
 const linkedIssueUrlSchema = z
   .string()
-  .optional()
+  .nullish()
   .transform((value) => asciiTrim(value ?? ""))
   .refine(
-    (value) => value === "" || canonicalTrackedIssueUrl(value) !== null,
+    (value) => codePointLength(value) <= 2000,
+    "Linked issue must be 2000 characters or fewer",
+  )
+  .refine(
+    (value) => value === "" || isCanonicalTrackedIssueUrl(value),
     "Linked issue must be a GitHub issue link for this repository",
   )
-  .transform((value) =>
-    value === "" ? null : canonicalTrackedIssueUrl(value),
-  );
+  .transform((value) => (value === "" ? null : value));
 
 const submissionNonceSchema = z.uuid("Feedback could not be verified");
 
@@ -139,13 +149,27 @@ export type FeedbackReviewDecisionInput = z.output<
   typeof feedbackReviewDecisionSchema
 >;
 
-export const expectedRowVersionSchema = z.number().int().positive();
+export const expectedRowVersionSchema = z
+  .number()
+  .int()
+  .min(1)
+  .max(POSTGRES_INTEGER_MAX);
 
-// Keyset cursor: "<created_at>|<id>" as returned by PostgREST. The character
-// set excludes filter-syntax characters, so it is safe in an .or() filter.
-const feedbackCursorSchema = z
-  .string()
-  .regex(/^[0-9T:.+\-Z]{10,40}\|[0-9a-f-]{36}$/, "Feedback cursor is invalid");
+const CURSOR_TIMESTAMP =
+  /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(\.\d{1,6})?(Z|[+-]\d{2}:\d{2})$/;
+
+// Keyset cursor "<created_at>|<id>" as PostgREST returns it. Both halves are
+// checked semantically before the value can reach a filter.
+const feedbackCursorSchema = z.string().refine((value) => {
+  const [timestamp, id, ...rest] = value.split("|");
+  return (
+    rest.length === 0 &&
+    timestamp !== undefined &&
+    CURSOR_TIMESTAMP.test(timestamp) &&
+    !Number.isNaN(Date.parse(timestamp)) &&
+    z.uuid().safeParse(id).success
+  );
+}, "Feedback cursor is invalid");
 
 export const feedbackListOptionsSchema = z.strictObject({
   status: z.enum(FEEDBACK_STATUSES).optional(),

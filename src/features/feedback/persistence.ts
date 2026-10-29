@@ -1,26 +1,20 @@
 import "server-only";
 
 import type { SupabaseClient } from "@supabase/supabase-js";
+import { z } from "zod";
 
-import type {
-  FeedbackCategory,
-  FeedbackCountSummary,
-  FeedbackDetail,
-  FeedbackHistoryEvent,
-  FeedbackListOptions,
-  FeedbackParticipantClass,
-  FeedbackPreview,
-  FeedbackPriority,
-  FeedbackReviewResult,
-  FeedbackSource,
-  FeedbackStatus,
-  FeedbackPreviewPage,
-} from "./types";
+import { feedbackUnavailable } from "./errors";
+import type { FeedbackListOptions } from "./schemas";
 import {
   FEEDBACK_CATEGORIES,
+  FEEDBACK_PARTICIPANT_CLASSES,
+  FEEDBACK_PRIORITIES,
   FEEDBACK_SOURCES,
   FEEDBACK_STATUSES,
   FeedbackError,
+  type FeedbackDetail,
+  type FeedbackPreviewPage,
+  type FeedbackReviewResult,
 } from "./types";
 
 const FEEDBACK_PAGE_SIZE = 50;
@@ -30,39 +24,63 @@ const PREVIEW_COLUMNS =
   "id, category, source, participant_class, title, status, priority, row_version, created_at, reviewed_at";
 const DETAIL_COLUMNS =
   "id, category, source, participant_class, title, message, created_at, status, priority, internal_notes, linked_issue_url, row_version, reviewed_at";
+const HISTORY_COLUMNS =
+  "event_id, from_status, to_status, priority_before, priority_after, row_version, reason, occurred_at";
 
-interface FeedbackRow {
-  id: string;
-  category: FeedbackCategory;
-  source: FeedbackSource;
-  participant_class: FeedbackParticipantClass;
-  title: string | null;
-  message?: string;
-  status: FeedbackStatus;
-  priority: FeedbackPriority;
-  internal_notes?: string | null;
-  linked_issue_url?: string | null;
-  row_version: number;
-  created_at: string;
-  reviewed_at: string | null;
-}
+const positiveVersion = z.number().int().positive();
+const timestamp = z.string();
 
-interface FeedbackEventRow {
-  event_id: string;
-  from_status: FeedbackStatus;
-  to_status: FeedbackStatus;
-  priority_before: FeedbackPriority;
-  priority_after: FeedbackPriority;
-  row_version: number;
-  reason: string | null;
-  occurred_at: string;
-}
+// Compact boundary schemas. Each one selects the fields it needs; z.object
+// strips anything else, so no extra column can flow past this file.
+const previewRowSchema = z.object({
+  id: z.uuid(),
+  category: z.enum(FEEDBACK_CATEGORIES),
+  source: z.enum(FEEDBACK_SOURCES),
+  participant_class: z.enum(FEEDBACK_PARTICIPANT_CLASSES),
+  title: z.string().nullable(),
+  status: z.enum(FEEDBACK_STATUSES),
+  priority: z.enum(FEEDBACK_PRIORITIES),
+  row_version: positiveVersion,
+  created_at: timestamp,
+  reviewed_at: timestamp.nullable(),
+});
+
+const detailRowSchema = previewRowSchema.extend({
+  message: z.string(),
+  internal_notes: z.string().nullable(),
+  linked_issue_url: z.string().nullable(),
+});
+
+const historyRowSchema = z.object({
+  event_id: z.uuid(),
+  from_status: z.enum(FEEDBACK_STATUSES),
+  to_status: z.enum(FEEDBACK_STATUSES),
+  priority_before: z.enum(FEEDBACK_PRIORITIES),
+  priority_after: z.enum(FEEDBACK_PRIORITIES),
+  row_version: positiveVersion,
+  reason: z.string().nullable(),
+  occurred_at: timestamp,
+});
+
+const stateRowSchema = z.object({
+  status: z.enum(FEEDBACK_STATUSES),
+  row_version: positiveVersion,
+});
+
+const summaryRowSchema = z.object({
+  dimension: z.enum(["CATEGORY", "SOURCE", "STATUS", "DAY"]),
+  bucket: z.string(),
+  row_count: z.number().int().nonnegative(),
+});
+
+export type FeedbackSummaryRow = z.output<typeof summaryRowSchema>;
+export type FeedbackPreviewRow = z.output<typeof previewRowSchema>;
 
 export interface FeedbackSubmissionRecord {
   nonce: string;
-  category: FeedbackCategory;
-  source: FeedbackSource;
-  participantClass: FeedbackParticipantClass;
+  category: (typeof FEEDBACK_CATEGORIES)[number];
+  source: (typeof FEEDBACK_SOURCES)[number];
+  participantClass: (typeof FEEDBACK_PARTICIPANT_CLASSES)[number];
   title: string | null;
   message: string;
 }
@@ -71,27 +89,15 @@ export interface FeedbackReviewRecord {
   feedbackId: string;
   operatorUserId: string;
   expectedRowVersion: number;
-  status: FeedbackStatus;
-  priority: FeedbackPriority;
+  status: (typeof FEEDBACK_STATUSES)[number];
+  priority: (typeof FEEDBACK_PRIORITIES)[number];
   internalNotes: string | null;
   linkedIssueUrl: string | null;
   reason: string | null;
 }
 
-// Logs only the SQLSTATE-style code, never the message, row content, or input.
-function logFeedbackFailure(operation: string, code: string | undefined) {
-  console.error(`[FEEDBACK_FAILURE] ${operation} failed`, {
-    code: code ?? "unknown",
-    timestamp: new Date().toISOString(),
-  });
-}
-
-function unavailable(operation: string, code: string | undefined): never {
-  logFeedbackFailure(operation, code);
-  throw new FeedbackError(
-    "Feedback is unavailable. Please try again.",
-    "UNAVAILABLE",
-  );
+function malformed(operation: string): FeedbackError {
+  return feedbackUnavailable(`${operation} response`);
 }
 
 export async function insertFeedbackSubmission(
@@ -108,13 +114,13 @@ export async function insertFeedbackSubmission(
   });
 
   if (error) {
-    unavailable("submit_feedback", error.code);
+    throw feedbackUnavailable("submit_feedback", error);
   }
 
-  // The RPC returns ACCEPTED only after the row is durable (or a same-nonce
-  // retry was a no-op). Any other value is not a success.
+  // ACCEPTED is returned only after the row is durable (or a same-nonce retry
+  // was a no-op). Any other value is not a success.
   if (data !== "ACCEPTED") {
-    unavailable("submit_feedback result", undefined);
+    throw malformed("submit_feedback");
   }
 }
 
@@ -147,15 +153,20 @@ export async function listFeedbackPreviews(
 
   const { data, error } = await query;
   if (error) {
-    unavailable("list feedback", error.code);
+    throw feedbackUnavailable("list feedback", error);
   }
 
-  const rows = (data ?? []) as unknown as FeedbackRow[];
+  const parsed = z.array(previewRowSchema).safeParse(data ?? []);
+  if (!parsed.success) {
+    throw malformed("list feedback");
+  }
+
+  const rows = parsed.data;
   const pageRows = rows.slice(0, FEEDBACK_PAGE_SIZE);
   const last = pageRows.at(-1);
 
   return {
-    items: pageRows.map(mapPreview),
+    items: pageRows.map(toPreview),
     nextCursor:
       rows.length > FEEDBACK_PAGE_SIZE && last
         ? `${last.created_at}|${last.id}`
@@ -173,49 +184,64 @@ export async function readFeedbackDetail(
     .eq("id", feedbackId)
     .maybeSingle();
   if (error) {
-    unavailable("read feedback", error.code);
+    throw feedbackUnavailable("read feedback", error);
   }
   if (!data) {
     return null;
   }
 
-  const row = data as unknown as FeedbackRow;
+  const row = detailRowSchema.safeParse(data);
+  if (!row.success) {
+    throw malformed("read feedback");
+  }
+
   const history = await client
     .from("feedback_review_events")
-    .select(
-      "event_id, from_status, to_status, priority_before, priority_after, row_version, reason, occurred_at",
-    )
+    .select(HISTORY_COLUMNS)
     .eq("feedback_id", feedbackId)
     .order("occurred_at", { ascending: true })
     .order("event_id", { ascending: true })
     .limit(FEEDBACK_HISTORY_LIMIT + 1);
   if (history.error) {
-    unavailable("read feedback history", history.error.code);
+    throw feedbackUnavailable("read feedback history", history.error);
   }
 
-  const events = (history.data ?? []) as unknown as FeedbackEventRow[];
+  const events = z.array(historyRowSchema).safeParse(history.data ?? []);
+  if (!events.success) {
+    throw malformed("read feedback history");
+  }
 
+  const shown = events.data.slice(0, FEEDBACK_HISTORY_LIMIT);
   return {
     original: {
-      id: row.id,
-      category: row.category,
-      source: row.source,
-      participantClass: row.participant_class,
-      title: row.title,
-      message: row.message ?? "",
-      createdAt: row.created_at,
+      id: row.data.id,
+      category: row.data.category,
+      source: row.data.source,
+      participantClass: row.data.participant_class,
+      title: row.data.title,
+      message: row.data.message,
+      createdAt: row.data.created_at,
     },
     review: {
-      status: row.status,
-      priority: row.priority,
-      internalNotes: row.internal_notes ?? null,
-      linkedIssueUrl: row.linked_issue_url ?? null,
-      rowVersion: row.row_version,
-      reviewedAt: row.reviewed_at,
+      status: row.data.status,
+      priority: row.data.priority,
+      internalNotes: row.data.internal_notes,
+      linkedIssueUrl: row.data.linked_issue_url,
+      rowVersion: row.data.row_version,
+      reviewedAt: row.data.reviewed_at,
     },
     history: {
-      items: events.slice(0, FEEDBACK_HISTORY_LIMIT).map(mapHistoryEvent),
-      truncated: events.length > FEEDBACK_HISTORY_LIMIT,
+      items: shown.map((event) => ({
+        eventId: event.event_id,
+        fromStatus: event.from_status,
+        toStatus: event.to_status,
+        priorityBefore: event.priority_before,
+        priorityAfter: event.priority_after,
+        rowVersion: event.row_version,
+        reason: event.reason,
+        occurredAt: event.occurred_at,
+      })),
+      truncated: events.data.length > FEEDBACK_HISTORY_LIMIT,
     },
   };
 }
@@ -223,24 +249,27 @@ export async function readFeedbackDetail(
 export async function readFeedbackCurrentState(
   client: SupabaseClient,
   feedbackId: string,
-): Promise<{ status: FeedbackStatus; rowVersion: number } | null> {
+): Promise<{
+  status: (typeof FEEDBACK_STATUSES)[number];
+  rowVersion: number;
+} | null> {
   const { data, error } = await client
     .from("feedback_submissions")
     .select("status, row_version")
     .eq("id", feedbackId)
     .maybeSingle();
   if (error) {
-    unavailable("read feedback state", error.code);
+    throw feedbackUnavailable("read feedback state", error);
   }
   if (!data) {
     return null;
   }
 
-  const row = data as unknown as {
-    status: FeedbackStatus;
-    row_version: number;
-  };
-  return { status: row.status, rowVersion: row.row_version };
+  const state = stateRowSchema.safeParse(data);
+  if (!state.success) {
+    throw malformed("read feedback state");
+  }
+  return { status: state.data.status, rowVersion: state.data.row_version };
 }
 
 export async function recordFeedbackReviewRecord(
@@ -259,26 +288,29 @@ export async function recordFeedbackReviewRecord(
   });
 
   if (error) {
-    throw mapReviewError(error.message, error.code);
+    throw mapReviewError(error.message, error);
   }
 
-  if (typeof data !== "number") {
-    unavailable("record_feedback_review result", undefined);
+  // The function returns the version it wrote: exactly one increment over the
+  // version the caller expected. Anything else is a malformed response.
+  const nextVersion = positiveVersion.safeParse(data);
+  if (
+    !nextVersion.success ||
+    nextVersion.data !== record.expectedRowVersion + 1
+  ) {
+    throw malformed("record_feedback_review");
   }
 
   return {
     status: record.status,
     priority: record.priority,
-    rowVersion: data,
+    rowVersion: nextVersion.data,
   };
 }
 
-// Maps only the fixed codes raised by the review function. Any other database
-// failure becomes a generic UNAVAILABLE without the database text.
-function mapReviewError(
-  message: string,
-  code: string | undefined,
-): FeedbackError {
+// Maps only the fixed exception tokens raised by the review function. Any
+// other database failure becomes a generic UNAVAILABLE without its text.
+function mapReviewError(message: string, error: unknown): FeedbackError {
   if (message.includes("FEEDBACK_VERSION_CONFLICT")) {
     return new FeedbackError(
       "This feedback changed since it was opened. Reload and review again.",
@@ -300,18 +332,7 @@ function mapReviewError(
   if (message.includes("Internal operator access required")) {
     return new FeedbackError("Internal access is not available", "FORBIDDEN");
   }
-
-  logFeedbackFailure("record_feedback_review", code);
-  return new FeedbackError(
-    "Feedback is unavailable. Please try again.",
-    "UNAVAILABLE",
-  );
-}
-
-export interface FeedbackSummaryRow {
-  dimension: "CATEGORY" | "SOURCE" | "STATUS" | "DAY";
-  bucket: string;
-  row_count: number;
+  return feedbackUnavailable("record_feedback_review", error);
 }
 
 export async function readFeedbackSummaryRows(
@@ -326,70 +347,17 @@ export async function readFeedbackSummaryRows(
   });
 
   if (error) {
-    unavailable("feedback count summary", error.code);
+    throw feedbackUnavailable("feedback count summary", error);
   }
 
-  return (data ?? []) as FeedbackSummaryRow[];
-}
-
-export function buildFeedbackCountSummary(
-  rows: FeedbackSummaryRow[],
-  window: FeedbackCountSummary["window"],
-  asOf: string,
-): FeedbackCountSummary {
-  const byCategory = countsFor(FEEDBACK_CATEGORIES, rows, "CATEGORY");
-  const bySource = countsFor(FEEDBACK_SOURCES, rows, "SOURCE");
-  const byStatus = countsFor(FEEDBACK_STATUSES, rows, "STATUS");
-  const dayCounts = new Map(
-    rows
-      .filter((row) => row.dimension === "DAY")
-      .map((row) => [row.bucket, row.row_count]),
-  );
-
-  return {
-    asOf,
-    window,
-    snapshot: "CURRENT_STATUS",
-    retention: { policy: "UNAPPROVED", coverage: "RETAINED_ROWS_ONLY" },
-    total: Object.values(byCategory).reduce((sum, count) => sum + count, 0),
-    byCategory,
-    bySource,
-    byStatus,
-    daily: enumerateDays(window.startDate, window.days).map((date) => ({
-      date,
-      count: dayCounts.get(date) ?? 0,
-    })),
-  };
-}
-
-function countsFor<T extends string>(
-  keys: readonly T[],
-  rows: FeedbackSummaryRow[],
-  dimension: FeedbackSummaryRow["dimension"],
-): Record<T, number> {
-  const counts = Object.fromEntries(keys.map((key) => [key, 0])) as Record<
-    T,
-    number
-  >;
-  for (const row of rows) {
-    if (
-      row.dimension === dimension &&
-      (keys as readonly string[]).includes(row.bucket)
-    ) {
-      counts[row.bucket as T] = row.row_count;
-    }
+  const rows = z.array(summaryRowSchema).safeParse(data ?? []);
+  if (!rows.success) {
+    throw malformed("feedback count summary");
   }
-  return counts;
+  return rows.data;
 }
 
-function enumerateDays(startDate: string, days: number): string[] {
-  const start = Date.parse(startDate);
-  return Array.from({ length: days }, (_, index) =>
-    new Date(start + index * 86_400_000).toISOString().slice(0, 10),
-  );
-}
-
-function mapPreview(row: FeedbackRow): FeedbackPreview {
+function toPreview(row: FeedbackPreviewRow) {
   return {
     id: row.id,
     category: row.category,
@@ -401,18 +369,5 @@ function mapPreview(row: FeedbackRow): FeedbackPreview {
     rowVersion: row.row_version,
     createdAt: row.created_at,
     reviewedAt: row.reviewed_at,
-  };
-}
-
-function mapHistoryEvent(row: FeedbackEventRow): FeedbackHistoryEvent {
-  return {
-    eventId: row.event_id,
-    fromStatus: row.from_status,
-    toStatus: row.to_status,
-    priorityBefore: row.priority_before,
-    priorityAfter: row.priority_after,
-    rowVersion: row.row_version,
-    reason: row.reason,
-    occurredAt: row.occurred_at,
   };
 }
