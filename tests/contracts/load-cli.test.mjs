@@ -75,7 +75,12 @@ beforeEach(async () => {
     if (req.url.includes("change_repair_status")) {
       if (mode === "expected" || mode === "error" || mode === "both-error") {
         statusAttempts += 1;
-        const fail = mode !== "expected" || statusAttempts % 2 === 0;
+        // In "expected" mode exactly one request, the second, is rejected, and
+        // the first is still in flight when it arrives, so the runner sees one
+        // genuine overlap with a successful same-Repair change. Alternating
+        // every request instead can leave a rejection with no successful
+        // overlap, which the runner correctly counts as unexpected.
+        const fail = mode !== "expected" || statusAttempts === 2;
         if (fail) res.statusCode = 400;
         const message =
           mode === "error" ? "database offline" : "INVALID_STATUS_TRANSITION";

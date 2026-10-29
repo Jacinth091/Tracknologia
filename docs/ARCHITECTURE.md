@@ -139,8 +139,8 @@ event through a service-role-only database function; the public Interface never
 accepts a caller-supplied operator identity.
 
 `access.ts` is the narrow public entry for this capability, not a pass-through.
-Future Feedback consumers must import the guard/audit entry from this Module
-instead of reaching into internal persistence. This keeps the dependency
+The Feedback Module (`src/features/feedback/`) imports the guard/audit entry from
+this Module instead of reaching into internal persistence. This keeps the dependency
 direction one-way when Operations reporting later depends on Feedback summaries:
 Operations -> Feedback summary -> Operations must never become a barrel cycle,
 so Feedback-adjacent code receives only the small guard/audit Interface and

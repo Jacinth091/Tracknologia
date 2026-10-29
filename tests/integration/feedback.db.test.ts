@@ -1305,3 +1305,87 @@ describe.runIf(process.env.REHEARSAL_UPGRADE_FIXTURE === "1")(
     );
   },
 );
+
+// Issue #90: the count-only summary RPC. Exact Asia/Manila period counts live in
+// feedback-summary-manila.db.test.ts; this block keeps the grant, denial, and
+// window-shape checks at the RPC boundary.
+const SUMMARY_SIGNATURE =
+  "public.get_feedback_count_summary(uuid,timestamptz,timestamptz)";
+
+async function readSummary(
+  operatorUserId: string,
+  window: Record<string, string>,
+) {
+  return admin.rpc("get_feedback_count_summary", {
+    p_operator_user_id: operatorUserId,
+    ...window,
+  });
+}
+
+describe("Feedback count summary (PostgreSQL)", () => {
+  it(
+    "grants the summary RPC to service_role only",
+    async () => {
+      expect(await functionGrantBits(SUMMARY_SIGNATURE)).toBe("001");
+    },
+    DB_CASE_TIMEOUT_MS,
+  );
+
+  it(
+    "denies unprovisioned and revoked operators before any aggregate",
+    async () => {
+      const window = {
+        p_window_start: "2026-10-31T16:00:00.000Z",
+        p_window_end: "2026-11-01T16:00:00.000Z",
+      };
+      const outsider = await createTestUser(
+        admin,
+        uniqueEmail("feedback-summary-outsider"),
+      );
+      const denied = await readSummary(outsider.user.id, window);
+      expect(denied.error?.message).toContain(
+        "Internal operator access required",
+      );
+      expect(denied.data).toBeNull();
+
+      const operatorId = await provisionOperator("feedback-summary-revoked");
+      assertSupabaseSuccess(
+        await admin.rpc("change_internal_operator_access", {
+          p_operator_user_id: operatorId,
+          p_actor_user_id: operatorId,
+          p_enabled: false,
+          p_reason: REVIEW_REASON,
+        }),
+        "revoke summary operator",
+      );
+      const revoked = await readSummary(operatorId, window);
+      expect(revoked.error?.message).toContain(
+        "Internal operator access required",
+      );
+      expect(revoked.data).toBeNull();
+    },
+    DB_CASE_TIMEOUT_MS,
+  );
+
+  it(
+    "rejects windows that are empty, inverted, or longer than 31 days",
+    async () => {
+      const operatorId = await provisionOperator("feedback-summary-window");
+      const start = "2026-10-31T16:00:00.000Z";
+      for (const end of [
+        "2026-10-31T16:00:00.000Z",
+        "2026-10-30T16:00:00.000Z",
+        "2026-12-02T16:00:00.000Z",
+      ]) {
+        const result = await readSummary(operatorId, {
+          p_window_start: start,
+          p_window_end: end,
+        });
+        expect(result.error?.message).toContain(
+          "FEEDBACK_SUMMARY_WINDOW_INVALID",
+        );
+      }
+    },
+    DB_CASE_TIMEOUT_MS,
+  );
+});
