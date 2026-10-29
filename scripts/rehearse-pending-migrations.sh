@@ -73,6 +73,35 @@ membership_self_check() {
 }
 membership_self_check
 
+# Evidence selectors for the verbose reporter. They are applied only to a copy
+# with ANSI escapes removed, so colored output cannot hide a verdict.
+strip_ansi() { sed -E 's/\x1b\[[0-9;]*[A-Za-z]//g' "$1"; }
+feedback_passed_pattern='(✓|√) tests/integration/feedback\.db\.test\.ts > '
+feedback_failed_pattern='(×|✗|X) tests/integration/feedback\.db\.test\.ts > '
+feedback_skipped_pattern='(↓|-) tests/integration/feedback\.db\.test\.ts > '
+upgrade_passed_pattern='(✓|√) tests/integration/feedback\.db\.test\.ts > pending-only upgrade preserves old-state data'
+
+# Offline check of the selectors against one colored and one plain verbose line
+# (the shape Vitest prints), so selector drift fails before any lab is created.
+selector_self_check() {
+  local colored plain stripped
+  colored=$'\e[32m✓\e[39m tests/integration/feedback.db.test.ts\e[2m > \e[22mFeedback private persistence > pending-only upgrade preserves old-state data'
+  plain='✓ tests/integration/feedback.db.test.ts > Feedback private persistence > pending-only upgrade preserves old-state data'
+  for line in "$colored" "$plain"; do
+    stripped="$(printf '%s\n' "$line" | sed -E 's/\x1b\[[0-9;]*[A-Za-z]//g')"
+    if ! grep -Eq "$feedback_passed_pattern" <<< "$stripped"; then
+      die "evidence self-check: passed Feedback case not counted"
+    fi
+    if ! grep -Eq "$upgrade_passed_pattern" <<< "$stripped"; then
+      die "evidence self-check: upgrade-only case not counted"
+    fi
+    if grep -Eq "$feedback_failed_pattern" <<< "$stripped"; then
+      die "evidence self-check: passed line matched the failed selector"
+    fi
+  done
+}
+selector_self_check
+
 supabase_bin="supabase"
 if ! command -v supabase >/dev/null 2>&1; then
   supabase_bin="npx supabase"
@@ -296,38 +325,28 @@ export REHEARSAL_UPGRADE_FIXTURE=1
 log "lab API URL: $SUPABASE_TEST_URL"
 
 results="$lab_root/db-suite.log"
+plain_results="$lab_root/db-suite.plain.log"
 log "running the database integration suite against the upgraded lab"
 set +e
-pnpm exec vitest run --reporter=verbose tests/integration >"$results" 2>&1
+NO_COLOR=1 FORCE_COLOR=0 pnpm exec vitest run --reporter=verbose tests/integration >"$results" 2>&1
 rc=$?
 set -e
+strip_ansi "$results" > "$plain_results"
 
-# Bounded per-case counts from the verbose reporter. Only names and verdicts
-# are read; nothing from the fixture or SQL payload is printed.
-count_lines() { grep -Ec "$1" "$results" || true; }
-feedback_passed="$(count_lines '(✓|√) tests/integration/feedback\.db\.test\.ts > ')"
-feedback_failed="$(count_lines '(×|✗|X) tests/integration/feedback\.db\.test\.ts > ')"
-feedback_skipped="$(count_lines '(↓|-) tests/integration/feedback\.db\.test\.ts > ')"
-upgrade_passed="$(count_lines '(✓|√) tests/integration/feedback\.db\.test\.ts > pending-only upgrade preserves old-state data')"
+# Bounded per-case counts from the plain copy of the verbose reporter. Only
+# names and verdicts are read; nothing from the fixture or SQL payload is
+# printed.
+count_lines() { grep -Ec "$1" "$plain_results" || true; }
+feedback_passed="$(count_lines "$feedback_passed_pattern")"
+feedback_failed="$(count_lines "$feedback_failed_pattern")"
+feedback_skipped="$(count_lines "$feedback_skipped_pattern")"
+upgrade_passed="$(count_lines "$upgrade_passed_pattern")"
 
-if [ "$rc" -eq 0 ]; then
-  # Fail closed: a successful run must include the Feedback cases, have no
-  # Feedback failures, and actually execute both upgrade-only cases.
-  if [ "$feedback_passed" -lt 1 ] || [ "$feedback_failed" -ne 0 ]; then
-    rc=1
-    log "Feedback suite evidence is missing or incomplete"
-  elif [ "$upgrade_passed" -lt 2 ]; then
-    rc=1
-    log "pending-only upgrade cases did not run (expected 2 passing, found $upgrade_passed)"
-  fi
-  if [ "$rc" -eq 0 ]; then
-    log "database integration suite PASSED against the upgraded lab"
-  fi
-elif [ "${REHEARSAL_ALLOW_ANON_QUIRK:-0}" = "1" ]; then
+if [ "$rc" -ne 0 ] && [ "${REHEARSAL_ALLOW_ANON_QUIRK:-0}" = "1" ]; then
   known_anon_failure=0
-  if grep -q "Tests  1 failed | " "$results" \
-     && grep -q "anon cannot SELECT raw providers" "$results" \
-     && ! grep -qE "Tests  [2-9][0-9]* failed" "$results"; then
+  if grep -q "Tests  1 failed | " "$plain_results" \
+     && grep -q "anon cannot SELECT raw providers" "$plain_results" \
+     && ! grep -qE "Tests  [2-9][0-9]* failed" "$plain_results"; then
     known_anon_failure=1
   fi
   if [ "$known_anon_failure" -eq 1 ]; then
@@ -338,9 +357,24 @@ elif [ "${REHEARSAL_ALLOW_ANON_QUIRK:-0}" = "1" ]; then
   fi
 fi
 
+# Evidence checks run after any tolerance above, so no flag can skip them. A
+# successful run must include the Feedback cases, have no Feedback failures,
+# and actually execute both upgrade-only cases.
+if [ "$rc" -eq 0 ]; then
+  if [ "$feedback_passed" -lt 1 ] || [ "$feedback_failed" -ne 0 ]; then
+    rc=1
+    log "Feedback suite evidence is missing or incomplete"
+  elif [ "$upgrade_passed" -lt 2 ]; then
+    rc=1
+    log "pending-only upgrade cases did not run (expected 2 passing, found $upgrade_passed)"
+  else
+    log "database integration suite PASSED against the upgraded lab"
+  fi
+fi
+
 if [ "$rc" -ne 0 ]; then
   log "database integration suite FAILED against the upgraded lab:"
-  sed -n '/RUN /,$p' "$results" | tail -40 >&2
+  sed -n '/RUN /,$p' "$plain_results" | tail -40 >&2
 fi
 
 printf '============ rehearsal summary ============\n'
