@@ -303,7 +303,12 @@ describe("buildValidationMetrics", () => {
       independent: 0,
       total: 0,
     });
-    expect(metrics.activity.daily).toEqual([]);
+    expect(metrics.activity.daily).toEqual(
+      ["10", "11", "12", "13", "14"].map((day) => ({
+        date: `2026-02-${day}`,
+        distinctProviders: 0,
+      })),
+    );
     expect(metrics.repairs.statusNow).toEqual({
       IN_PROGRESS: 0,
       WAITING_FOR_PARTS: 0,
@@ -369,8 +374,11 @@ describe("buildValidationMetrics", () => {
       distinctProviders: 4,
       repeatProviders: 1,
       daily: [
+        { date: "2026-02-10", distinctProviders: 0 },
         { date: "2026-02-11", distinctProviders: 3 },
         { date: "2026-02-12", distinctProviders: 2 },
+        { date: "2026-02-13", distinctProviders: 0 },
+        { date: "2026-02-14", distinctProviders: 0 },
       ],
     });
     expect(metrics.repairs.created).toEqual({
@@ -538,7 +546,40 @@ describe("getValidationMetrics guard and interface", () => {
       coverage: "RETAINED_ROWS_ONLY",
       snapshot: "CURRENT_STATE",
     });
-    expect(typeof metrics.coverage.domain.observedEndUtc).toBe("string");
+    // Today's requested end is the Oct 30 Manila midnight; the earlier as_of wins.
+    expect(metrics.coverage.domain.observedEndUtc).toBe(
+      "2026-10-29T13:55:00.000Z",
+    );
+  });
+
+  it("caps today's observedEndUtc at the requested end when the snapshot is later", async () => {
+    seams.rpc.mockImplementation(async (name: string) => {
+      if (name === "get_feedback_count_summary") {
+        return { data: [], error: null };
+      }
+      return {
+        data: completeRows([], "2026-10-29T17:00:00.000Z"),
+        error: null,
+      };
+    });
+
+    const metrics = await getValidationMetrics({ mode: "today" });
+
+    expect(metrics.coverage.domain.observedEndUtc).toBe(
+      "2026-10-29T16:00:00.000Z",
+    );
+  });
+
+  it("pins a past window's observedEndUtc to its period end", async () => {
+    const metrics = await getValidationMetrics({
+      mode: "custom",
+      startDate: "2026-10-19",
+      endDateExclusive: "2026-10-22",
+    });
+
+    expect(metrics.coverage.domain.observedEndUtc).toBe(
+      "2026-10-21T16:00:00.000Z",
+    );
   });
 
   it("splits a 90-day span into 31, 31 and 28-day Feedback batches without overlap", async () => {
@@ -662,6 +703,56 @@ describe("getValidationMetrics guard and interface", () => {
     });
     expect(metrics.providers.onboardedInPeriod.shop).toBe(2);
     // Neither the response nor the logs carry the raw Feedback payload message.
+    expect(JSON.stringify(metrics)).not.toContain(CANARY);
+    expect(JSON.stringify(logged.mock.calls)).not.toContain(CANARY);
+  });
+
+  it("drops a 62-day Feedback report when the second batch fails, keeping domain counts", async () => {
+    const logged = vi.spyOn(console, "error").mockImplementation(() => {});
+    let feedbackReads = 0;
+    seams.rpc.mockImplementation(async (name: string) => {
+      if (name === "get_feedback_count_summary") {
+        feedbackReads += 1;
+        if (feedbackReads === 1) {
+          return {
+            data: [{ dimension: "CATEGORY", bucket: "BUG", row_count: 1 }],
+            error: null,
+          };
+        }
+        return { data: null, error: { code: "XX000", message: CANARY } };
+      }
+      return {
+        data: completeRows([
+          {
+            dimension: "PROVIDER_ONBOARDED_IN_PERIOD",
+            bucket: "SHOP",
+            row_count: 2,
+          },
+        ]),
+        error: null,
+      };
+    });
+
+    const metrics = await getValidationMetrics({
+      mode: "custom",
+      startDate: "2026-07-01",
+      endDateExclusive: "2026-09-01",
+    });
+
+    expect(feedbackCalls()).toHaveLength(2);
+    // The first batch's BUG count is not reported as a partial period total.
+    expect(metrics.feedback).toBeNull();
+    expect(metrics.coverage.feedback).toEqual({
+      source: "FEEDBACK_MODULE",
+      coverage: "RETAINED_ROWS_ONLY",
+      status: "UNAVAILABLE",
+      asOfStart: null,
+      asOfEnd: null,
+      batches: 0,
+    });
+    expect(metrics.providers.onboardedInPeriod.shop).toBe(2);
+    expect(metrics.asOf).toBe(DOMAIN_AS_OF);
+    expect(JSON.stringify(metrics)).not.toContain("BUG");
     expect(JSON.stringify(metrics)).not.toContain(CANARY);
     expect(JSON.stringify(logged.mock.calls)).not.toContain(CANARY);
   });
