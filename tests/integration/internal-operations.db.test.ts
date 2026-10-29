@@ -115,10 +115,7 @@ describe("Internal operator access and audit", () => {
         );
 
         expectTablePermissionDenied(
-          await ordinary
-            .from(table)
-            .delete()
-            .eq(filter.column, filter.value),
+          await ordinary.from(table).delete().eq(filter.column, filter.value),
           `${roleName} delete ${table}`,
         );
       }
