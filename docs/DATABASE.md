@@ -269,8 +269,8 @@ internal access events.
 
 - `event_id` (uuid, PK)
 - `operator_user_id`, `actor_user_id` (uuid, nullable FKs $\to$ `auth.users.id`,
-  `ON DELETE SET NULL`; the FK action runs as the table owner, so anonymization
-  does not require client grants)
+  `ON DELETE SET NULL`; the FK action runs as the table owner, so nulling the
+  direct references does not require client grants)
 - `operation` (text, fixed check: `OPERATOR_PROVISIONED`, `OPERATOR_REVOKED`,
   `INTERNAL_ACCESS_VIEW`)
 - `reason` (bounded 3–200 characters when present; null for application access
@@ -400,8 +400,8 @@ category)` is also service-role-only, accepts only the fixed
   cannot execute either function, so there is no publishable-key write surface.
 - **Audit is append-only**: audit writes occur only inside the
   `SECURITY DEFINER` owner functions; `service_role` has no direct
-  mutation privilege, and Auth deletion anonymizes retained events through the
-  FK `ON DELETE SET NULL`.
+  mutation privilege, and Auth deletion nulls the direct user references on
+  retained events through the FK `ON DELETE SET NULL`.
 - **Durable public-operation abuse control**:
   `check_public_operation_rate_limit(...)` atomically increments one fixed
   window keyed by operation and a server-generated opaque HMAC actor digest.
