@@ -116,6 +116,106 @@ watch analytics storage
 
 Resume the next feature milestone only after no unresolved production P0/P1 remains.
 
+## Internal operator access runbook
+
+Internal operator access is private operational state, not a Provider role.
+Provisioning and revocation are deliberate manual operations, never a web
+action, seed, signup trigger, or `user_metadata` flag.
+
+### Approval gate
+
+Before any change, require explicit owner approval for:
+
+```text
+target Auth user
+grant or revoke
+bounded reason (3-200 characters)
+approver and date recorded outside the product (issue/ticket)
+```
+
+Do not grant access to a Provider owner/staff account merely because it manages
+a Provider. If the same person needs both, that is two separate authorizations.
+
+### Grant
+
+Run with the service-role credential only (never the publishable key), using
+placeholder values:
+
+```sql
+select public.change_internal_operator_access(
+  '<operator-auth-user-uuid>'::uuid,
+  '<approver-auth-user-uuid>'::uuid,
+  true,
+  'owner-approved internal operator grant <ticket>'
+);
+```
+
+The function returns `true` when the state changed and `false` for an idempotent
+repeat (no duplicate audit event). It refuses missing arguments and out-of-bound
+reasons, and it rolls everything back if the required audit insert fails (for
+example an invalid actor identity).
+
+Verify:
+
+```sql
+select user_id, enabled, provisioned_at, revoked_at, reason
+from public.internal_operators
+where user_id = '<operator-auth-user-uuid>'::uuid;
+
+select event_id, operator_user_id, actor_user_id, operation, reason, created_at
+from public.internal_access_audit
+where operator_user_id = '<operator-auth-user-uuid>'::uuid
+order by created_at desc;
+```
+
+Then have the operator sign in and confirm `/internal` renders. A successful
+sensitive render appends an `INTERNAL_ACCESS_VIEW` event; no application session
+inherits access merely from an Auth login.
+
+### Revoke
+
+```sql
+select public.change_internal_operator_access(
+  '<operator-auth-user-uuid>'::uuid,
+  '<approver-auth-user-uuid>'::uuid,
+  false,
+  'owner-approved internal operator revoke <ticket>'
+);
+```
+
+Revocation takes effect on the next guarded request; there is no process/global
+permission cache. The signed-in browser session is not destroyed, but every
+internal render and every required audit append rechecks `enabled` and is
+denied. Confirm by reloading `/internal` and expecting the private 404.
+
+### Rotation and break-glass
+
+```text
+normal rotation: revoke the old operator mapping, grant the replacement
+lost device/session: revoke plus standard Auth password/session reset
+suspected compromise: revoke immediately, then review audit events and Auth logs
+break-glass: temporary grant with an explicit reason, revoked immediately after use
+```
+
+Never share one operator identity between people. Every grant/revoke and every
+sensitive view is attributed to the actor recorded at write time.
+
+### Auth identity deletion
+
+Deleting the Auth user cascades the live `internal_operators` row away and
+anonymizes retained audit FKs (`operator_user_id`/`actor_user_id` become null)
+while preserving the non-identifying event. The FK action runs as the table
+owner; no client grant is required or added.
+
+### What is out of scope
+
+```text
+audit retention/purge window, archive, or reporting surface (issue #87 approval)
+Provider/owner automatic internal access
+internal provisioning UI or Server Action
+publishable-key access to the audit or admin functions
+```
+
 ## Exit criteria
 
 ```text

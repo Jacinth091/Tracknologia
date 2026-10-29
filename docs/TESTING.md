@@ -18,7 +18,11 @@ High-value examples:
 - public tracking projection excludes private fields;
 - successful Tracking records one minimal analytics observation;
 - the Tracking action returns before an unresolved deferred Analytics task;
-- Analytics failure does not log the credential/database detail.
+- Analytics failure does not log the credential/database detail;
+- the internal-operator guard denies missing/disabled mappings and Provider
+  roles, fails closed on Auth/database/audit faults, and the sensitive audit
+  path re-runs the guard and appends only the fixed category for the verified
+  operator.
 
 ### Rendered UI contracts — Vitest
 
@@ -127,6 +131,7 @@ tests/integration/
   repair-requests.db.test.ts   — RepairRequest lifecycle & Provider isolation
   repairs.db.test.ts           — Repair lifecycle & Provider isolation
   tracking.db.test.ts          — Public tracking & observation
+  internal-operations.db.test.ts — Internal operator grants, audit, denials
   load-stress.db.test.ts       — Burst invariants (Plan 10)
   helpers/
     supabase-test-context.ts   — client setup, user/fixture lifecycle
@@ -152,6 +157,19 @@ exact concurrent threshold, shared state across separate service clients,
 operation isolation, expiry reset, bounded cleanup, opaque stored actor keys,
 and denial of limiter/public-operation RPC execution to both `anon` and
 authenticated roles.
+
+Issue #88 database coverage verifies that `anon`, authenticated, and
+`service_role` clients cannot directly insert/update/delete the private internal
+tables (service_role reads only), that the admin and audit functions are not
+executable by ordinary clients, that grant/revoke is atomic and idempotent,
+that an invalid actor rolls back the mapping plus required audit, that the audit
+RPC rechecks the enabled mapping so revocation wins over a delayed append, and
+that Auth deletion removes the mapping while anonymizing retained audit rows.
+
+`tests/e2e/internal-operations.spec.ts` covers anonymous return-to-login,
+successful auth-only operator login to `/internal`, non-indexable rendering,
+immediate denial after revocation, and 404 for Provider OWNER/STAFF/INDEPENDENT
+accounts that have no internal mapping.
 
 ## Load & resilience harness
 
