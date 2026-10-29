@@ -327,7 +327,7 @@ describe("get_internal_validation_metrics window bounds (PostgreSQL)", () => {
         // End beyond the next Manila midnight.
         [
           ts(WINDOW.start),
-          ts(new Date(tomorrowMidnight.getTime() + 3_600_000).toISOString()),
+          ts(new Date(tomorrowMidnight.getTime() + DAY_MS).toISOString()),
         ],
         // Infinite bound.
         [ts(WINDOW.start), "'infinity'::timestamptz"],
