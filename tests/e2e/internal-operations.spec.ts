@@ -7,6 +7,8 @@ import {
   revokeInternalOperator,
   seedActor,
   seedInternalOperator,
+  supabaseAnonKey,
+  supabaseUrl,
   type SeedOptions,
   type TestActor,
 } from "./helpers/fixtures";
@@ -20,6 +22,7 @@ const providerWithoutMapping: SeedOptions[] = [
 test.describe("E2E-08 Internal operator access", () => {
   test("only an enabled auth-only operator can reach the private internal area", async ({
     browser,
+    request,
   }) => {
     const admin = createServiceClient();
     const operator = await seedInternalOperator(admin);
@@ -77,6 +80,25 @@ test.describe("E2E-08 Internal operator access", () => {
       for (const options of providerWithoutMapping) {
         const actor = await seedActor(admin, options);
         seededActors.push(actor);
+
+        // A browser holding only the publishable credential cannot forge the
+        // privileged admin RPC to grant itself access.
+        const forged = await request.post(
+          `${supabaseUrl}/rest/v1/rpc/change_internal_operator_access`,
+          {
+            headers: {
+              apikey: supabaseAnonKey,
+              Authorization: `Bearer ${supabaseAnonKey}`,
+            },
+            data: {
+              p_operator_user_id: actor.userId,
+              p_actor_user_id: actor.userId,
+              p_enabled: true,
+              p_reason: "forged e2e privilege attempt",
+            },
+          },
+        );
+        expect([401, 403]).toContain(forged.status());
 
         const context = await browser.newContext();
         const page = await context.newPage();
