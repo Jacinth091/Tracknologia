@@ -1306,23 +1306,40 @@ describe.runIf(process.env.REHEARSAL_UPGRADE_FIXTURE === "1")(
   },
 );
 
-// Issue #90: the count-only summary RPC. Fixtures land inside the current UTC
-// day, so the window is [today, tomorrow) and the expectations stay exact.
+// Issue #90: the count-only summary RPC. Each run uses its own historical UTC
+// window and sets created_at on only its own fixture ids, so exact counts do
+// not depend on the current day or on rows written by earlier tests.
 const SUMMARY_SIGNATURE =
   "public.get_feedback_count_summary(uuid,timestamptz,timestamptz)";
 const SUMMARY_CANARY = "feedback-summary-canary-text-7c1e";
+const SUMMARY_DAY_MS = 86_400_000;
 
-function summaryWindow() {
-  const start = new Date();
-  start.setUTCHours(0, 0, 0, 0);
-  const end = new Date(start.getTime() + 86_400_000);
-  return {
-    p_window_start: start.toISOString(),
-    p_window_end: end.toISOString(),
-  };
+function summaryTimestampLiteral(iso: string): string {
+  if (!/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\.\d{3}Z$/.test(iso)) {
+    throw new Error(`Refusing non-timestamp SQL literal: ${iso}`);
+  }
+  return `'${iso}'::timestamptz`;
 }
 
-async function readSummary(operatorUserId: string, window = summaryWindow()) {
+// Only the test's own fixture id is updated; the statement is refused unless
+// the id is a UUID, and no other row is touched.
+async function setFixtureCreatedAt(feedbackId: string, iso: string) {
+  await runLocalSql(
+    testUrl,
+    `UPDATE public.feedback_submissions SET created_at = ${summaryTimestampLiteral(iso)} WHERE id = ${sqlUuidLiteral(feedbackId)};`,
+  );
+}
+
+async function summaryFixture(iso: string, overrides: Record<string, unknown>) {
+  const row = await createFeedback(overrides);
+  await setFixtureCreatedAt(row.id, iso);
+  return row;
+}
+
+async function readSummary(
+  operatorUserId: string,
+  window: Record<string, string>,
+) {
   return admin.rpc("get_feedback_count_summary", {
     p_operator_user_id: operatorUserId,
     ...window,
@@ -1341,11 +1358,15 @@ describe("Feedback count summary (PostgreSQL)", () => {
   it(
     "denies unprovisioned and revoked operators before any aggregate",
     async () => {
+      const window = {
+        p_window_start: "2026-10-01T00:00:00.000Z",
+        p_window_end: "2026-10-02T00:00:00.000Z",
+      };
       const outsider = await createTestUser(
         admin,
         uniqueEmail("feedback-summary-outsider"),
       );
-      const denied = await readSummary(outsider.user.id);
+      const denied = await readSummary(outsider.user.id, window);
       expect(denied.error?.message).toContain(
         "Internal operator access required",
       );
@@ -1361,10 +1382,11 @@ describe("Feedback count summary (PostgreSQL)", () => {
         }),
         "revoke summary operator",
       );
-      const revoked = await readSummary(operatorId);
+      const revoked = await readSummary(operatorId, window);
       expect(revoked.error?.message).toContain(
         "Internal operator access required",
       );
+      expect(revoked.data).toBeNull();
     },
     DB_CASE_TIMEOUT_MS,
   );
@@ -1392,28 +1414,56 @@ describe("Feedback count summary (PostgreSQL)", () => {
   );
 
   it(
-    "returns exact fixed counts for mixed fixtures without row text",
+    "returns exact groups for a historical window across days, boundaries, and an empty day",
     async () => {
       const operatorId = await provisionOperator("feedback-summary-counts");
-      const first = await createFeedback({
+      // Random historical day (1900-2000) keeps this run's window disjoint from
+      // the live fixtures and from the current UTC day.
+      const day0 =
+        Date.UTC(1900, 0, 1) +
+        Math.floor(Math.random() * 36_000) * SUMMARY_DAY_MS;
+      const at = (dayOffset: number, msIntoDay = 0) =>
+        new Date(day0 + dayOffset * SUMMARY_DAY_MS + msIntoDay).toISOString();
+
+      // Inside the window: two on day 0 (inclusive start and end of day),
+      // one on day 1 that is reviewed, one on day 3. Day 2 stays empty.
+      await summaryFixture(at(0), {
         p_category: "BUG",
         p_source: "PUBLIC_TRACKING",
-        p_message: `${SUMMARY_CANARY} tracking`,
+        p_message: `${SUMMARY_CANARY} first`,
       });
-      await createFeedback({
+      await summaryFixture(at(0, SUMMARY_DAY_MS - 1), {
         p_category: "BUG",
         p_source: "PUBLIC_FEEDBACK",
-        p_message: `${SUMMARY_CANARY} public`,
+        p_message: `${SUMMARY_CANARY} last-ms`,
       });
-      await createFeedback({
+      const reviewed = await summaryFixture(at(1, 12 * 3_600_000), {
         p_category: "FEATURE_REQUEST",
         p_source: "PROVIDER_WORKSPACE",
         p_participant_class: "SHOP_OWNER",
         p_message: `${SUMMARY_CANARY} provider`,
       });
+      await summaryFixture(at(3, 8 * 3_600_000), {
+        p_category: "GENERAL",
+        p_source: "PUBLIC_REQUEST",
+        p_message: `${SUMMARY_CANARY} day-three`,
+      });
+      // Outside the window: one just before the start, one exactly at the
+      // exclusive end.
+      await summaryFixture(new Date(day0 - 1).toISOString(), {
+        p_category: "GENERAL",
+        p_source: "PUBLIC_REQUEST",
+        p_message: `${SUMMARY_CANARY} before`,
+      });
+      await summaryFixture(at(4), {
+        p_category: "GENERAL",
+        p_source: "PUBLIC_REQUEST",
+        p_message: `${SUMMARY_CANARY} at-end`,
+      });
+
       assertSupabaseSuccess(
         await admin.rpc("record_feedback_review", {
-          p_feedback_id: first.id,
+          p_feedback_id: reviewed.id,
           p_operator_user_id: operatorId,
           p_expected_row_version: 1,
           p_target_status: "REVIEWING",
@@ -1425,27 +1475,37 @@ describe("Feedback count summary (PostgreSQL)", () => {
         "review summary fixture",
       );
 
-      const result = await readSummary(operatorId);
+      const result = await readSummary(operatorId, {
+        p_window_start: at(0),
+        p_window_end: at(4),
+      });
       const rows = assertSupabaseSuccess(result, "read feedback summary")
         .data as Array<{
         dimension: string;
         bucket: string;
         row_count: number;
-      }> | null;
-      const count = (dimension: string, bucket: string) =>
-        rows?.find(
-          (row) => row.dimension === dimension && row.bucket === bucket,
-        )?.row_count ?? 0;
-      const today = new Date().toISOString().slice(0, 10);
+      }>;
 
-      expect(count("CATEGORY", "BUG")).toBe(2);
-      expect(count("CATEGORY", "FEATURE_REQUEST")).toBe(1);
-      expect(count("SOURCE", "PUBLIC_TRACKING")).toBe(1);
-      expect(count("SOURCE", "PUBLIC_FEEDBACK")).toBe(1);
-      expect(count("SOURCE", "PROVIDER_WORKSPACE")).toBe(1);
-      expect(count("STATUS", "NEW")).toBe(2);
-      expect(count("STATUS", "REVIEWING")).toBe(1);
-      expect(count("DAY", today)).toBe(3);
+      expect(
+        rows
+          .map((row) => `${row.dimension}:${row.bucket}=${row.row_count}`)
+          .sort(),
+      ).toEqual(
+        [
+          "CATEGORY:BUG=2",
+          "CATEGORY:FEATURE_REQUEST=1",
+          "CATEGORY:GENERAL=1",
+          "DAY:" + at(0).slice(0, 10) + "=2",
+          "DAY:" + at(1).slice(0, 10) + "=1",
+          "DAY:" + at(3).slice(0, 10) + "=1",
+          "SOURCE:PROVIDER_WORKSPACE=1",
+          "SOURCE:PUBLIC_FEEDBACK=1",
+          "SOURCE:PUBLIC_REQUEST=1",
+          "SOURCE:PUBLIC_TRACKING=1",
+          "STATUS:NEW=3",
+          "STATUS:REVIEWING=1",
+        ].sort(),
+      );
       expect(JSON.stringify(rows)).not.toContain(SUMMARY_CANARY);
     },
     DB_CASE_TIMEOUT_MS,
