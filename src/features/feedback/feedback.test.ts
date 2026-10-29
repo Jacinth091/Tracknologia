@@ -1,4 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import type { SupabaseClient } from "@supabase/supabase-js";
 
 const mocks = vi.hoisted(() => ({
   checkClientRateLimit: vi.fn(),
@@ -41,7 +42,7 @@ vi.mock("@/features/internal-operations/access", () => ({
   requireInternalOperator: mocks.requireInternalOperator,
 }));
 
-import { AuthError } from "@/features/auth";
+import { AuthError, type AuthErrorCode } from "@/features/auth";
 
 import {
   buildFeedbackCountSummary,
@@ -61,6 +62,12 @@ import {
   submitFeedbackSchema,
 } from "./schemas";
 import { FeedbackError } from "./types";
+import {
+  listFeedbackPreviews,
+  readFeedbackCurrentState,
+  readFeedbackDetail,
+  readFeedbackSummaryRows,
+} from "./persistence";
 
 const NONCE = "5f0c6f7e-3b1a-4c5d-8e9f-0a1b2c3d4e5f";
 const REVIEWER_ID = "00000000-0000-4000-8000-0000000000aa";
@@ -290,7 +297,12 @@ describe("Provider feedback", () => {
     },
   );
 
-  it.each(["NO_MEMBERSHIP", "UNAUTHENTICATED"])(
+  const expectedMembershipCodes: AuthErrorCode[] = [
+    "NO_MEMBERSHIP",
+    "UNAUTHENTICATED",
+  ];
+
+  it.each(expectedMembershipCodes)(
     "maps expected %s to FORBIDDEN before the budget",
     async (code) => {
       mocks.requireProviderContext.mockRejectedValue(
@@ -673,6 +685,155 @@ describe("Feedback schemas", () => {
       }).success,
     ).toBe(false);
   });
+});
+
+// A query result that is both chainable and awaitable, so the persistence
+// functions see the same shape PostgREST returns.
+function queryResult(result: { data: unknown; error: unknown }) {
+  const chain: Record<string, unknown> = {};
+  for (const method of ["select", "order", "limit", "eq", "or"]) {
+    chain[method] = vi.fn(() => chain);
+  }
+  chain.maybeSingle = vi.fn(() => Promise.resolve(result));
+  chain.then = (
+    resolve: (value: unknown) => unknown,
+    reject: (reason: unknown) => unknown,
+  ) => Promise.resolve(result).then(resolve, reject);
+  return chain;
+}
+
+const VALID_DETAIL_ROW = {
+  id: FEEDBACK_ID,
+  category: "BUG",
+  source: "PUBLIC_TRACKING",
+  participant_class: "PUBLIC_SELF_REPORTED_CUSTOMER",
+  title: null,
+  message: "The tracking page shows an error.",
+  created_at: "2026-10-01T00:00:00+00:00",
+  status: "NEW",
+  priority: "NORMAL",
+  internal_notes: null,
+  linked_issue_url: null,
+  row_version: 1,
+  reviewed_at: null,
+};
+
+describe("Persistence response boundaries", () => {
+  it.each([[null], [undefined]])(
+    "fails closed when a successful list returns data %s",
+    async (data) => {
+      const client = {
+        from: vi.fn(() => queryResult({ data, error: null })),
+      } as unknown as SupabaseClient;
+
+      const error = await captureError(listFeedbackPreviews(client, {}));
+
+      expect(error.code).toBe("UNAVAILABLE");
+    },
+  );
+
+  it("returns an empty page only for a real empty array", async () => {
+    const client = {
+      from: vi.fn(() => queryResult({ data: [], error: null })),
+    } as unknown as SupabaseClient;
+
+    await expect(listFeedbackPreviews(client, {})).resolves.toEqual({
+      items: [],
+      nextCursor: null,
+    });
+  });
+
+  it.each([[null], [undefined]])(
+    "fails closed when the summary RPC returns data %s",
+    async (data) => {
+      const client = {
+        rpc: vi.fn(async () => ({ data, error: null })),
+      } as unknown as SupabaseClient;
+
+      const error = await captureError(
+        readFeedbackSummaryRows(client, REVIEWER_ID, {
+          start: "2026-10-01T00:00:00.000Z",
+          endExclusive: "2026-10-02T00:00:00.000Z",
+        }),
+      );
+
+      expect(error.code).toBe("UNAVAILABLE");
+    },
+  );
+
+  it("returns no summary rows only for a real empty array", async () => {
+    const client = {
+      rpc: vi.fn(async () => ({ data: [], error: null })),
+    } as unknown as SupabaseClient;
+
+    await expect(
+      readFeedbackSummaryRows(client, REVIEWER_ID, {
+        start: "2026-10-01T00:00:00.000Z",
+        endExclusive: "2026-10-02T00:00:00.000Z",
+      }),
+    ).resolves.toEqual([]);
+  });
+
+  it.each([[null], [undefined]])(
+    "fails closed when the review history returns data %s",
+    async (data) => {
+      const client = {
+        from: vi.fn((table: string) =>
+          table === "feedback_submissions"
+            ? queryResult({ data: VALID_DETAIL_ROW, error: null })
+            : queryResult({ data, error: null }),
+        ),
+      } as unknown as SupabaseClient;
+
+      const error = await captureError(readFeedbackDetail(client, FEEDBACK_ID));
+
+      expect(error.code).toBe("UNAVAILABLE");
+    },
+  );
+
+  it("returns an empty history only for a real empty array", async () => {
+    const client = {
+      from: vi.fn((table: string) =>
+        table === "feedback_submissions"
+          ? queryResult({ data: VALID_DETAIL_ROW, error: null })
+          : queryResult({ data: [], error: null }),
+      ),
+    } as unknown as SupabaseClient;
+
+    const detail = await readFeedbackDetail(client, FEEDBACK_ID);
+
+    expect(detail?.history).toEqual({ items: [], truncated: false });
+  });
+
+  it("treats only a null maybeSingle result as an authorized missing row", async () => {
+    const client = {
+      from: vi.fn(() => queryResult({ data: null, error: null })),
+    } as unknown as SupabaseClient;
+
+    await expect(readFeedbackDetail(client, FEEDBACK_ID)).resolves.toBeNull();
+    await expect(
+      readFeedbackCurrentState(client, FEEDBACK_ID),
+    ).resolves.toBeNull();
+  });
+
+  it.each([[undefined], [0], [""], [false]])(
+    "fails closed for a non-null maybeSingle value %j instead of reporting missing",
+    async (data) => {
+      const client = {
+        from: vi.fn(() => queryResult({ data, error: null })),
+      } as unknown as SupabaseClient;
+
+      const detail = await captureError(
+        readFeedbackDetail(client, FEEDBACK_ID),
+      );
+      const state = await captureError(
+        readFeedbackCurrentState(client, FEEDBACK_ID),
+      );
+
+      expect(detail.code).toBe("UNAVAILABLE");
+      expect(state.code).toBe("UNAVAILABLE");
+    },
+  );
 });
 
 describe("Count summary projection", () => {
