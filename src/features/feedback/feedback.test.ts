@@ -878,6 +878,32 @@ describe("Persistence response boundaries", () => {
   );
 });
 
+describe("Manila summary periods", () => {
+  it("sends Manila midnights to the RPC as UTC instants and labels the zone", async () => {
+    allowOperator();
+    mocks.createInternalOpsClient.mockResolvedValue({ rpc: mocks.rpc });
+    mocks.rpc.mockResolvedValue({ data: [], error: null });
+
+    const summary = await getFeedbackAggregateSummary({
+      startDate: "2026-11-01",
+      endDateExclusive: "2026-11-02",
+    });
+
+    expect(mocks.rpc).toHaveBeenCalledWith("get_feedback_count_summary", {
+      p_operator_user_id: REVIEWER_ID,
+      p_window_start: "2026-10-31T16:00:00.000Z",
+      p_window_end: "2026-11-01T16:00:00.000Z",
+    });
+    expect(summary.window).toEqual({
+      timeZone: "Asia/Manila",
+      startDate: "2026-11-01",
+      endDateExclusive: "2026-11-02",
+      days: 1,
+    });
+    expect(summary.daily).toEqual([{ date: "2026-11-01", count: 0 }]);
+  });
+});
+
 describe("Count summary projection", () => {
   it("zero-fills empty groups and days, and keeps day order", () => {
     const summary = buildFeedbackCountSummary(
