@@ -18,19 +18,14 @@ export async function recordFeedbackReviewAction(
   const feedbackId = formData.get("feedbackId")?.toString() ?? "";
   const expectedRowVersion = Number(formData.get("expectedRowVersion") ?? "");
 
-  // Absent fields arrive as undefined from FormData; send explicit nulls so
-  // the feature schema can distinguish "absent" from "clear this field".
-  const readField = (name: string) => {
-    const value = formData.get(name)?.toString();
-    return value === undefined ? null : value;
-  };
-
+  // Absent notes or link stay undefined so the feature schema rejects the
+  // decision before persistence; a submitted blank field clears the stored text.
   const reviewDecision = {
     status: formData.get("status")?.toString() ?? "",
     priority: formData.get("priority")?.toString() ?? "",
-    internalNotes: readField("internalNotes"),
-    linkedIssueUrl: readField("linkedIssueUrl"),
-    reason: readField("reason"),
+    internalNotes: formData.get("internalNotes")?.toString(),
+    linkedIssueUrl: formData.get("linkedIssueUrl")?.toString(),
+    reason: formData.get("reason")?.toString(),
   };
 
   try {
