@@ -85,7 +85,13 @@ function validSubmission(overrides: Record<string, unknown> = {}) {
 }
 
 function reviewDecision(overrides: Record<string, unknown> = {}) {
-  return { status: "REVIEWING", priority: "NORMAL", ...overrides };
+  return {
+    status: "REVIEWING",
+    priority: "NORMAL",
+    internalNotes: null,
+    linkedIssueUrl: null,
+    ...overrides,
+  };
 }
 
 async function captureError(promise: Promise<unknown>): Promise<FeedbackError> {
@@ -449,7 +455,6 @@ describe("Feedback review", () => {
   });
 
   it.each([
-    ["absent", {}],
     ["null", { internalNotes: null, linkedIssueUrl: null, reason: null }],
     ["blank", { internalNotes: "  ", linkedIssueUrl: "", reason: " " }],
   ])("clears optional fields that are %s", async (_label, optional) => {
@@ -599,6 +604,42 @@ describe("Feedback review", () => {
   });
 });
 
+describe("Review decision completeness", () => {
+  it.each([
+    ["internalNotes", { linkedIssueUrl: null }],
+    ["linkedIssueUrl", { internalNotes: null }],
+    ["either field", {}],
+  ])(
+    "rejects a decision that omits %s before any read or write",
+    async (_label, present) => {
+      allowOperator();
+
+      const error = await captureError(
+        recordFeedbackReview(
+          FEEDBACK_ID,
+          { status: "REVIEWING", priority: "NORMAL", ...present },
+          1,
+        ),
+      );
+
+      expect(error.code).toBe("INVALID_INPUT");
+      expect(mocks.createInternalOpsClient).not.toHaveBeenCalled();
+      expect(mocks.rpc).not.toHaveBeenCalled();
+    },
+  );
+
+  it("keeps reason optional while both review keys are explicit", () => {
+    expect(
+      feedbackReviewDecisionSchema.safeParse({
+        status: "REVIEWING",
+        priority: "NORMAL",
+        internalNotes: null,
+        linkedIssueUrl: null,
+      }).success,
+    ).toBe(true);
+  });
+});
+
 describe("Feedback schemas", () => {
   it("counts code points, not UTF-16 units, for the message bound", () => {
     expect(
@@ -641,6 +682,7 @@ describe("Feedback schemas", () => {
       feedbackReviewDecisionSchema.safeParse({
         status: "PLANNED",
         priority: "NORMAL",
+        internalNotes: null,
         linkedIssueUrl,
       }).success;
 
