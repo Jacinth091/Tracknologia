@@ -133,6 +133,7 @@ tests/integration/
   tracking.db.test.ts          — Public tracking & observation
   internal-operations.db.test.ts — Internal operator grants, audit, denials
   internal-operations-overlap.db.test.ts — Overlapping audit/revoke and grant sessions
+  feedback.db.test.ts          — Private Feedback grants, constraints, nonce retry, reviews, feedback budget, old-state upgrade check
   load-stress.db.test.ts       — Burst invariants (Plan 10)
   helpers/
     supabase-test-context.ts   — client setup, user/fixture lifecycle
@@ -169,6 +170,11 @@ that an invalid actor rolls back the mapping plus required audit, that the audit
 RPC rechecks the enabled mapping so revocation wins over a delayed append, and
 that Auth deletion removes the mapping while nulling the direct user references
 on retained audit rows (not full anonymization).
+
+`tests/integration/feedback.db.test.ts` uses the same live psql sessions for
+same-nonce submissions and same-version reviews, the review/revocation overlap,
+and a rolled-back history-trigger fault. The fault exists only inside an open
+transaction and is removed by its `ROLLBACK`.
 
 `tests/integration/internal-operations-overlap.db.test.ts` uses live psql
 sessions through the running local Supabase database container (matched by the

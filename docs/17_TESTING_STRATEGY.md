@@ -269,6 +269,6 @@ When a branch adds pending migrations, run the release-like upgrade rehearsal be
 pnpm rehearse:migrations
 ```
 
-`scripts/rehearse-pending-migrations.sh` boots a scratch Supabase lab on offset ports, applies only the shared (base) migration history, then applies exactly the branch's pending migrations (`supabase db push --local` on the lab) and runs the full `tests/integration/` suite against the upgraded lab. It fails if any already-shared migration was edited (forward-only enforcement). "Rehearsal B" evidence for the release plan.
+`scripts/rehearse-pending-migrations.sh` boots a scratch Supabase lab on offset ports, applies only the shared (base) migration history, then applies exactly the branch's pending migrations (`supabase db push --local` on the lab) and runs the full `tests/integration/` suite against the upgraded lab. It fails if any already-shared migration was edited (forward-only enforcement). Before the pending migrations apply, `scripts/rehearse-upgrade-fixture.sql` seeds old-state data (an abuse-control counter and a Provider) on the base history; with `REHEARSAL_UPGRADE_FIXTURE=1` the suite then verifies that data survives the upgrade and that old and new budgets stay independent. "Rehearsal B" evidence for the release plan.
 
 Keep `pnpm-lock.yaml` committed to ensure dependency resolution consistency.

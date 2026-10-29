@@ -29,6 +29,10 @@ public_operation_rate_limits
 Private internal operations (issue #88):
 internal_operators
 internal_access_audit
+
+Private Feedback (issue #89):
+feedback_submissions
+feedback_review_events
 ```
 
 Authentication identities live in Supabase-managed `auth.users`.
@@ -286,6 +290,55 @@ internal access events.
 - retention/purge policy remains deliberately undefined pending owner approval
   (issue #87)
 
+### 14. `feedback_submissions`
+
+Private submitted feedback (issue #89). Written only by the service-role
+`submit_feedback(...)` RPC and reviewed only by `record_feedback_review(...)`.
+
+- `id` (uuid, PK, database-generated; never a public lookup token)
+- `submission_nonce` (uuid, unique): client retry key, not identity or
+  authorization
+- `category` (fixed: `BUG`, `USABILITY`, `FEATURE_REQUEST`, `GENERAL`)
+- `source` (fixed: `PUBLIC_TRACKING`, `PUBLIC_REQUEST`, `PUBLIC_FEEDBACK`,
+  `PROVIDER_WORKSPACE`) and `participant_class` (fixed: `PUBLIC_SELF_REPORTED_CUSTOMER`,
+  `SHOP_OWNER`, `SHOP_STAFF`, `INDEPENDENT_REPAIRER`); public sources may store
+  only the public class, and the Provider source may store only the Provider
+  classes
+- `title` (nullable, trimmed, 1–120 characters) and `message` (required,
+  trimmed, 1–2,000 characters)
+- `status` (default `NEW`: `NEW`, `REVIEWING`, `PLANNED`, `RESOLVED`,
+  `DISMISSED`) and `priority` (default `NORMAL`: `NORMAL`, `HIGH`, `CRITICAL`)
+- `internal_notes` (nullable, trimmed, 1–2,000 characters) and
+  `linked_issue_url` (nullable; only `https://github.com/Jacinth091/Tracknologia/issues/<positive integer>`)
+- `created_at`, `reviewed_at`, `reviewed_by` (nullable FK to `auth.users`,
+  `ON DELETE RESTRICT`), `row_version` (starts at `1`, increases on each
+  review mutation)
+- Text is trimmed of ASCII edge whitespace only (space, tab, LF, CR, FF, VT);
+  lengths count PostgreSQL characters, not bytes; C0 control characters are
+  rejected. Original `title` and `message` are never changed after insert.
+- The review-stamp CHECK ties `row_version = 1` to no review and any later
+  version to a recorded `reviewed_at`/`reviewed_by`.
+- Indexes: `(created_at DESC, id DESC)` and `(status, created_at DESC, id DESC)`.
+- No participant identity, Provider ID, IP, browser metadata, Repair IDs,
+  tracking codes, or device fields are stored.
+
+### 15. `feedback_review_events`
+
+Append-only per-feedback review history (issue #89). It is separate from
+`internal_access_audit`, which deliberately carries no feedback identifiers.
+
+- `event_id` (uuid, PK), `feedback_id` (FK, `ON DELETE RESTRICT`),
+  `operator_user_id` (FK to `auth.users`, `ON DELETE RESTRICT`)
+- `from_status`, `to_status`, `priority_before`, `priority_after` (fixed
+  values), `row_version` (version after this event; greater than `1`)
+- `reason` (nullable, trimmed, 3–500 characters; required for reopening from
+  `RESOLVED` or `DISMISSED`)
+- `occurred_at` (server default); index `(feedback_id, occurred_at, event_id)`
+- Never copies `title`, `message`, or `internal_notes` text.
+- Referenced feedback and reviewer identities cannot be deleted while history
+  exists, so the audit trail is not removed by accident. Retention and erasure
+  remain unresolved launch gates (issue #87).
+
 ### Public Tracking projection
 
 `lookup_public_repair(text)` is a read-only `SECURITY DEFINER` function rather
@@ -408,6 +461,8 @@ category)` is also service-role-only, accepts only the fixed
 - **Durable public-operation abuse control**:
   `check_public_operation_rate_limit(...)` atomically increments one fixed
   window keyed by operation and a server-generated opaque HMAC actor digest.
+  The allowed operations are `tracking_lookup`, `repair_request_submit`, and
+  `feedback_submit` (issue #89, forward migration; existing rows are preserved).
   Its short-lived table stores no raw IP, Tracking Code, or customer data. Each
   later invocation deletes at most 100 expired rows. Expired rows are logically
   inactive immediately but may remain physically while there is no traffic;
