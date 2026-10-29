@@ -262,9 +262,17 @@ Redaction removes prohibited participant free text and internal notes, and it
 also removes free-text reasons from review history. It keeps the row, status,
 priority, linked issue URL, timestamps and review history. It bumps `row_version`
 so that any triage form loaded before the redaction is rejected as a version
-conflict and cannot restore the erased text. The review stamp is filled
-without overwriting existing triage attribution. The version change itself is
-recorded as a `FEEDBACK_REDACTED` event in the privacy audit:
+conflict and cannot restore the erased text. The review stamp is filled only
+where it is null, so existing triage attribution is never overwritten. The
+version change itself is recorded as a `FEEDBACK_REDACTED` event in the privacy
+audit.
+
+On a row that was never reviewed (`row_version` 1), the redaction is the first
+touch. It fills `reviewed_at` and `reviewed_by` with the actor and time to
+satisfy the existing review-stamp CHECK. Those stamps are administrative
+metadata and do not mean triage occurred: `status` stays `NEW`, `priority`
+stays `NORMAL`, and the review history stays empty. Real triage is shown by
+review events and status. The block does not change the schema.
 
 ```sql
 -- runbook: feedback-redaction

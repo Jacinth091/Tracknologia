@@ -137,8 +137,8 @@ async function provisionOperator(prefix: string): Promise<string> {
   return created.user.id;
 }
 
-/** Submits one fixture and reviews it once, so it has row_version 2 and a stamp. */
-async function seedReviewedFeedback(operatorId: string): Promise<string> {
+/** Submits one fixture through the real RPC and returns its id, never reviewed. */
+async function submitFeedbackFixture(): Promise<string> {
   const nonce = randomUUID();
   assertSupabaseSuccess(
     await admin.rpc("submit_feedback", {
@@ -159,7 +159,12 @@ async function seedReviewedFeedback(operatorId: string): Promise<string> {
       .single(),
     "read privacy fixture id",
   ).data as { id: string };
+  return id;
+}
 
+/** Submits one fixture and reviews it once, so it has row_version 2 and a stamp. */
+async function seedReviewedFeedback(operatorId: string): Promise<string> {
+  const id = await submitFeedbackFixture();
   assertSupabaseSuccess(
     await admin.rpc("record_feedback_review", {
       p_feedback_id: id,
@@ -320,6 +325,74 @@ describe("Feedback redaction runbook (PostgreSQL)", () => {
       });
       expect(stale.error?.message).toContain("FEEDBACK_VERSION_CONFLICT");
       expect(await readRow(feedbackId)).toEqual(after);
+    },
+    DB_CASE_TIMEOUT_MS,
+  );
+
+  it(
+    "redacts a never-reviewed submission without triage and rejects a stale v1 form",
+    async () => {
+      const operatorId = await provisionOperator("feedback-privacy-virgin");
+      const feedbackId = await submitFeedbackFixture();
+      const before = await readRow(feedbackId);
+      expect(before).toMatchObject({
+        title: TITLE,
+        message: MESSAGE,
+        status: "NEW",
+        priority: "NORMAL",
+        row_version: 1,
+        reviewed_by: null,
+        reviewed_at: null,
+      });
+      expect(await readReviewReasons(feedbackId)).toEqual([]);
+      expect(await readPrivacyAudit(feedbackId)).toEqual([]);
+
+      const block = fillRunbook(readRunbookBlock("feedback-redaction"), {
+        feedbackId,
+        actorId: operatorId,
+        approvalRef: APPROVAL,
+      });
+      await runLocalSql(testUrl, commitRunbook(block));
+
+      // The stamps are administrative metadata for the CHECK. Triage is still
+      // absent: status stays NEW, priority stays NORMAL, and history is empty.
+      const after = await readRow(feedbackId);
+      expect(after).toMatchObject({
+        title: "[redacted]",
+        message: "[redacted]",
+        internal_notes: null,
+        status: "NEW",
+        priority: "NORMAL",
+        row_version: 2,
+        reviewed_by: operatorId,
+      });
+      expect(Number.isNaN(Date.parse(after?.reviewed_at ?? ""))).toBe(false);
+      expect(await readReviewReasons(feedbackId)).toEqual([]);
+      expect(await readPrivacyAudit(feedbackId)).toEqual([
+        {
+          operation: "FEEDBACK_REDACTED",
+          target_feedback_id: feedbackId,
+          actor_user_id: operatorId,
+          approval_ref: APPROVAL,
+        },
+      ]);
+
+      // A form loaded before the redaction carries version 1. It must be rejected
+      // and must not write the erased text or create triage history.
+      const stale = await admin.rpc("record_feedback_review", {
+        p_feedback_id: feedbackId,
+        p_operator_user_id: operatorId,
+        p_expected_row_version: 1,
+        p_target_status: "REVIEWING",
+        p_target_priority: "HIGH",
+        p_internal_notes: NOTES,
+        p_linked_issue_url: LINK,
+        p_reason: REASON,
+      });
+      expect(stale.error?.message).toContain("FEEDBACK_VERSION_CONFLICT");
+      expect(await readRow(feedbackId)).toEqual(after);
+      expect(await readReviewReasons(feedbackId)).toEqual([]);
+      expect(await readPrivacyAudit(feedbackId)).toHaveLength(1);
     },
     DB_CASE_TIMEOUT_MS,
   );

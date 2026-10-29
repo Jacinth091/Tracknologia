@@ -324,10 +324,19 @@ trusts only the service-role caller.
   lengths count PostgreSQL characters, not bytes. Control characters
   U+0001–U+0008, U+000E–U+001F and U+007F are rejected inside `title` and
   `message`; TAB, LF, VT, FF and CR are permitted as content, and only the
-  ASCII edge set is trimmed. Original `title` and `message` are never changed
-  after insert.
+  ASCII edge set is trimmed. Original `title` and `message` are not changed
+  after insert under normal submission and triage. The one exception is an
+  owner-approved privacy redaction run from the trusted SQL runbook in
+  `docs/OPERATIONS.md`, which replaces them with `[redacted]` (issue #87 policy
+  gate).
 - The review-stamp CHECK ties `row_version = 1` to no review and any later
   version to a recorded `reviewed_at`/`reviewed_by`.
+- Schema semantics for a privacy touch on a never-reviewed row: the owner
+  redaction raises `row_version` to `2` and fills `reviewed_at`/`reviewed_by`
+  only where they are null, to satisfy the existing CHECK. Those stamps are
+  administrative metadata. They do not mean triage occurred. The row keeps
+  `status` `NEW`, `priority` `NORMAL`, and an empty review history. Existing
+  stamps are kept when present. Triage is shown by review events and status.
 - Indexes: `(created_at DESC, id DESC)` and `(status, created_at DESC, id DESC)`.
 - No participant identity, Provider ID, IP, browser metadata, Repair IDs,
   tracking codes, or device fields are stored.
