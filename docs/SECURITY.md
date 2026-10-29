@@ -154,7 +154,7 @@ roles, not `user_metadata`, and not inferred from owning or joining a Provider:
   tracking and Repair Request counters.
 - Feedback summary (issue #90): `get_feedback_count_summary(...)` is service-role
   only and rechecks the enabled operator mapping under `FOR SHARE`. It returns
-  fixed count groups for a bounded UTC window and never message, notes, nonce,
+  fixed count groups for a bounded Asia/Manila calendar window and never message, notes, nonce,
   identity, or row identifiers. Every internal Feedback read passes the operator
   guard and the required access audit before its privileged query.
 - The Feedback `feedback_submit` budget covers both public and Provider

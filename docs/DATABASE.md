@@ -348,7 +348,7 @@ Append-only per-feedback review history (issue #89). It is separate from
 
 `get_feedback_count_summary(p_operator_user_id, p_window_start, p_window_end)`
 (issue #90) is a service-role-only, set-based aggregate. It returns `(dimension,
-bucket, row_count)` rows for categories, sources, current statuses, and UTC days
+bucket, row_count)` rows for categories, sources, current statuses, and Asia/Manila days
 in a window of at most 31 days, with no row content or identifiers. It adds no
 table and no column.
 

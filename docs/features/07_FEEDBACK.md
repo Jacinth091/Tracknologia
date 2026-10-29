@@ -94,16 +94,19 @@ Validation matches the `feedback_submissions` constraints:
 - Length counts Unicode code points.
 - `title`: optional, 1–120 when present; absent, `null`, or blank becomes `null`.
 - `message`: required, 1–2,000.
-- `internalNotes`: optional, 1–2,000; absent, `null`, or blank clears them.
+- `internalNotes`: required key holding a string or an explicit `null`, 1–2,000
+  characters when text. `null` or blank clears the stored notes. An omitted key
+  is `INVALID_INPUT`.
 - `reason`: optional, 3–500; absent, `null`, or blank becomes `null`.
 - NUL (U+0000) cannot be stored in PostgreSQL text, so it is rejected. So are
   U+0001–U+0008, U+000E–U+001F, and U+007F. TAB, LF, VT, FF, and CR remain
   allowed.
-- `linkedIssueUrl`: optional, at most 2,000 code points. It must be exactly a
+- `linkedIssueUrl`: required key holding a string or an explicit `null`, at most
+  2,000 code points. It must be exactly a
   canonical `https://github.com/Jacinth091/Tracknologia/issues/<n>` link. The
   raw value must equal the parsed URL, so query strings, fragments,
   credentials, ports, and alternate spellings are rejected rather than
-  normalized. Absent, `null`, or blank clears it.
+  normalized. `null` or blank clears it; an omitted key is `INVALID_INPUT`.
 - `expectedRowVersion`: an integer from 1 to 2,147,483,647 (the PostgreSQL
   `INTEGER` range).
 - List cursor: `<created_at>|<id>`. The timestamp must parse as a real instant,
@@ -126,7 +129,8 @@ minimal status and version precondition.
 
 Previews exclude `message`, `internal_notes`, and `submission_nonce`. Detail
 returns the original submission, the review state, and history as separate
-blocks. History is bounded to 100 events and reports truncation explicitly.
+blocks. History returns the newest 100 events by `row_version`, presented oldest-first,
+and reports truncation when older events exist.
 Lists use keyset pagination on `(created_at, id)`, with a page size of 50.
 
 ## Review transitions
@@ -146,18 +150,22 @@ lock. Each review commits the row update and its history event together. The
 function returns the version it wrote. That value must be exactly the expected
 version plus one, or the response is treated as malformed.
 
-`internalNotes` and `linkedIssueUrl` are replaced on each review. A `null` or
-blank value clears them, so the form must send the full current values.
+Review is a full replacement. `internalNotes` and `linkedIssueUrl` are required
+keys in every decision: send the current text to keep it, or `null` to clear it.
+An omitted key is rejected before any read or write, so a status-only edit cannot
+erase stored text.
 Original submitted text is never modified.
 
 ## Count-only summary
 
-`getFeedbackAggregateSummary` takes a UTC window of 1–31 days
-(`startDate` inclusive, `endDateExclusive`). It makes one call to
+`getFeedbackAggregateSummary` takes Asia/Manila calendar dates: 1–31 days, with
+`startDate` inclusive and `endDateExclusive`. Each boundary is converted to a UTC
+instant with the fixed +08:00 offset (Manila keeps no daylight saving time). The
+result labels `window.timeZone` as `Asia/Manila`. It makes one call to
 `get_feedback_count_summary`, which returns fixed groups only:
 
 - category, source, and status counts for submissions created in the window;
-- a daily count for each UTC day, with zero-filled days.
+- a daily count for each Asia/Manila day, with zero-filled days.
 
 The database returns sparse groups. The feature module (`queries.ts`) fills in
 missing groups and days, so the summary always lists every category, source,
@@ -196,11 +204,15 @@ reviewer identity appear in the result.
   the three protected reads, review preconditions and transitions, null
   clearing, RPC error and malformed-response mapping, sanitized transport and
   client failures with log-canary checks, and schema bounds.
-- `tests/integration/feedback.db.test.ts` covers the summary RPC against
-  PostgreSQL. It checks the grants, denial for unprovisioned and revoked
-  operators, window rejection, and exact counts over a historical window with
-  multiple UTC days, an empty day, and exclusive end boundaries, plus a text
-  canary.
+- `tests/integration/feedback.db.test.ts` covers the summary RPC grants, the
+  denial of unprovisioned and revoked operators, and window shape.
+- `tests/integration/feedback-summary-manila.db.test.ts` runs the summary entry
+  against PostgreSQL around Manila midnight. It uses baseline deltas for
+  isolation, and it checks the window label, the excluded boundary instants,
+  the Nov 1 day count, zero-fill, and a text canary.
+- `tests/integration/feedback-review-flow.db.test.ts` runs the review entry
+  against PostgreSQL. An incomplete decision leaves the row, version, and
+  history unchanged, and an explicit null clear adds one version and one event.
 - `tests/integration/feedback-projection.db.test.ts` runs the persistence
   functions against PostgREST. It checks bounded keyset paging across a tied
   `created_at`, the preview projection keys, detail and history with truncation
