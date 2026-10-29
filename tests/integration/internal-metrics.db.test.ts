@@ -678,7 +678,7 @@ describe("internal validation metrics (PostgreSQL snapshot)", () => {
       const metrics = buildValidationMetrics(
         complete,
         window,
-        null as never,
+        null,
         asOfAfter,
       );
 
@@ -781,6 +781,31 @@ describe("internal validation metrics (PostgreSQL snapshot)", () => {
         independent: 2,
         total: 5,
       });
+
+      // EXPLAIN under the seeded pilot-shaped load. The outer Function Scan
+      // line shows one set-based call. It does not count the function's
+      // internal queries, so only the measured execution time is recorded.
+      const explainLines = output
+        .split("\n")
+        .filter((line) => /^(Function Scan|Execution Time)/.test(line));
+      expect(
+        explainLines.some((line) => line.startsWith("Function Scan")),
+      ).toBe(true);
+      const executionLine = explainLines.find((line) =>
+        line.startsWith("Execution Time"),
+      );
+      const executionMs = Number(
+        executionLine?.match(/Execution Time: ([0-9.]+) ms/)?.[1] ?? NaN,
+      );
+      expect(Number.isFinite(executionMs)).toBe(true);
+      expect(executionMs).toBeLessThan(5000);
+      console.info(
+        JSON.stringify({
+          check: "internal-metrics-explain",
+          syntheticRepairs: 400,
+          executionMs,
+        }),
+      );
 
       // The rolled-back fixtures left nothing persistent.
       const persisted = assertSupabaseSuccess(
