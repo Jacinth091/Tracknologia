@@ -1,4 +1,6 @@
 import { expect, test } from "@playwright/test";
+import { randomUUID } from "node:crypto";
+import { runLocalSql, sqlUuidLiteral } from "../helpers/local-postgres";
 import {
   cleanupActors,
   cleanupInternalOperator,
@@ -18,6 +20,33 @@ const providerWithoutMapping: SeedOptions[] = [
   { providerType: "SHOP", role: "STAFF" },
   { providerType: "INDEPENDENT" },
 ];
+
+// Temporary, actor-scoped audit failure: only this disposable operator's view
+// append raises, so the mapping and Auth session stay valid. The trigger is
+// removed in `finally` by the caller.
+function injectAuditFault(faultName: string, operatorUserId: string): string {
+  return `
+    CREATE FUNCTION public.${faultName}() RETURNS trigger
+    LANGUAGE plpgsql SET search_path = public, pg_temp AS $$
+    BEGIN
+      IF NEW.operator_user_id = ${sqlUuidLiteral(operatorUserId)}
+        AND NEW.operation = 'INTERNAL_ACCESS_VIEW' THEN
+        RAISE EXCEPTION 'injected internal audit failure for E2E';
+      END IF;
+      RETURN NEW;
+    END;
+    $$;
+    CREATE TRIGGER ${faultName} BEFORE INSERT ON public.internal_access_audit
+      FOR EACH ROW EXECUTE FUNCTION public.${faultName}();
+  `;
+}
+
+function removeAuditFault(faultName: string): string {
+  return `
+    DROP TRIGGER IF EXISTS ${faultName} ON public.internal_access_audit;
+    DROP FUNCTION IF EXISTS public.${faultName}();
+  `;
+}
 
 test.describe("E2E-08 Internal operator access", () => {
   test("only an enabled auth-only operator can reach the private internal area", async ({
@@ -50,6 +79,19 @@ test.describe("E2E-08 Internal operator access", () => {
         .click();
       await expect(operatorPage).toHaveURL(/\/internal$/, { timeout: 20_000 });
 
+      const viewEvents = async () => {
+        const { data, error } = await admin
+          .from("internal_access_audit")
+          .select("event_id, operator_user_id, actor_user_id, operation, reason")
+          .eq("operator_user_id", operator.userId)
+          .eq("operation", "INTERNAL_ACCESS_VIEW");
+        if (error) {
+          throw new Error(`[E2E] audit read failed: ${error.message}`);
+        }
+        return data ?? [];
+      };
+      const viewEventsBeforeVisit = await viewEvents();
+
       const internalResponse = await operatorPage.goto("/internal");
       expect(internalResponse?.status()).toBe(200);
       await expect(
@@ -57,6 +99,25 @@ test.describe("E2E-08 Internal operator access", () => {
           .getByRole("heading", { name: "Internal operations" })
           .first(),
       ).toBeVisible();
+
+      // The explicit visit must persist at least one new view event for this
+      // operator. Framework navigation may duplicate work, so the count is a
+      // lower bound rather than exactly one.
+      const knownEventIds = new Set(
+        viewEventsBeforeVisit.map((event) => event.event_id),
+      );
+      const newViewEvents = (await viewEvents()).filter(
+        (event) => !knownEventIds.has(event.event_id),
+      );
+      expect(newViewEvents.length).toBeGreaterThanOrEqual(1);
+      for (const event of newViewEvents) {
+        expect(event).toMatchObject({
+          operator_user_id: operator.userId,
+          actor_user_id: operator.userId,
+          operation: "INTERNAL_ACCESS_VIEW",
+          reason: null,
+        });
+      }
       await expect(operatorPage.locator('meta[name="robots"]')).toHaveAttribute(
         "content",
         /noindex/,
@@ -80,6 +141,45 @@ test.describe("E2E-08 Internal operator access", () => {
 
       expect(cacheControl).not.toContain("public");
       expect(allowsPrivateCaching || isDevRevalidationPair).toBe(true);
+
+      // 2b. A real audit INSERT failure for only this operator must withhold
+      //     protected content. The fault is removed in `finally`, and access
+      //     must recover before the same-cookie revocation check below.
+      const faultName = `e2e_audit_fault_${randomUUID().replaceAll("-", "").slice(0, 16)}`;
+      const viewEventsBeforeFault = await viewEvents();
+      try {
+        await runLocalSql(
+          supabaseUrl,
+          injectAuditFault(faultName, operator.userId),
+        );
+        await operatorPage.goto("/internal");
+        await expect(
+          operatorPage.getByRole("heading", {
+            name: "Internal access unavailable",
+          }),
+        ).toBeVisible();
+        await expect(
+          operatorPage.getByRole("heading", { name: "Internal operations" }),
+        ).toHaveCount(0);
+
+        const knownFaultIds = new Set(
+          viewEventsBeforeFault.map((event) => event.event_id),
+        );
+        const persistedDuringFault = (await viewEvents()).filter(
+          (event) => !knownFaultIds.has(event.event_id),
+        );
+        expect(persistedDuringFault).toHaveLength(0);
+      } finally {
+        await runLocalSql(supabaseUrl, removeAuditFault(faultName));
+      }
+
+      const recovered = await operatorPage.goto("/internal");
+      expect(recovered?.status()).toBe(200);
+      await expect(
+        operatorPage
+          .getByRole("heading", { name: "Internal operations" })
+          .first(),
+      ).toBeVisible();
 
       // 3. Revocation applies to the same session on the next request.
       await revokeInternalOperator(admin, operator.userId);
