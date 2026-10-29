@@ -18,15 +18,15 @@
 #     and verifies no shared migration changed.
 #  3. Boots a scratch Supabase lab on offset ports so the running dev stack
 #     is never disturbed.
-#  4. Applies the BASE migration history only (release-like previous state).
-#  5. Copies the pending migration(s) in and runs `db push --local`, i.e. the
-#     apply-pending-only upgrade.
-#  6. Runs the full database integration suite against the upgraded lab.
-#     With no integrations-relevant changes the suite passes as-is. On local
-#     dev stacks the environment-specific "anon can SELECT raw providers"
-#     failure (local images auto-grant anon defaults) is only tolerated when
-#     REHEARSAL_ALLOW_ANON_QUIRK=1 is set; otherwise it is treated like any
-#     other failure (fail-closed). CI stacks do not exhibit the quirk.
+#  4. Copies only BASE migrations into the lab (exact-line exclusion of the
+#     pending list), resets the lab, and proves the recorded migration history
+#     equals the base set with no pending version present.
+#  5. Copies the pending migration(s) in and runs `db push --local`, then
+#     proves the recorded history now equals base + pending.
+#  6. Runs the full database integration suite against the upgraded lab and
+#     prints a bounded success summary, including the upgrade-only cases. The
+#     "anon cannot SELECT raw providers" quirk is tolerated only when
+#     REHEARSAL_ALLOW_ANON_QUIRK=1 is set; otherwise it fails like any failure.
 #  7. If no migration is pending relative to the base ref, the rehearsal is
 #     INAPPLICABLE and exits 0; shared migration edits/deletions are still
 #     fatal (forward-only is immutable) so the check cannot be silently
@@ -49,6 +49,29 @@ cd "$repo_root"
 
 log() { printf '[rehearse] %s\n' "$*"; }
 die() { printf '[rehearse] ERROR: %s\n' "$*" >&2; exit 1; }
+
+# Exact-line membership in a newline-separated list (one path or version per
+# line). Substring or prefix matches must not count as members.
+in_list() { grep -Fxq -- "$1" <<< "$2"; }
+
+# Asserts the membership helper itself before any lab is created, so a broken
+# helper cannot silently let a pending migration into the base set.
+membership_self_check() {
+  local sample=$'supabase/migrations/a.sql\nsupabase/migrations/b.sql'
+  if ! in_list "supabase/migrations/a.sql" "$sample"; then
+    die "self-check: first list line was not matched"
+  fi
+  if ! in_list "supabase/migrations/b.sql" "$sample"; then
+    die "self-check: last list line was not matched"
+  fi
+  if in_list "supabase/migrations/a" "$sample"; then
+    die "self-check: a prefix matched as a list member"
+  fi
+  if in_list "supabase/migrations/c.sql" "$sample"; then
+    die "self-check: an absent path matched"
+  fi
+}
+membership_self_check
 
 supabase_bin="supabase"
 if ! command -v supabase >/dev/null 2>&1; then
@@ -135,9 +158,21 @@ if [ -z "$pending" ]; then
   exit 0
 fi
 
+# Migration version is the timestamp prefix of the file name.
+migration_version() { basename "$1" | cut -d_ -f1; }
+
+pending_versions=""
+while IFS= read -r pending_file; do
+  [ -n "$pending_file" ] || continue
+  pending_versions="${pending_versions}$(migration_version "$pending_file")"$'\n'
+done <<< "$pending"
+pending_versions="${pending_versions%$'\n'}"
+
 log "shared migrations unchanged relative to base (forward-only verified)"
 log "pending migrations to apply on upgrade:"
-printf '  %s\n' $pending
+while IFS= read -r pending_file; do
+  [ -n "$pending_file" ] && printf '  %s\n' "$pending_file"
+done <<< "$pending"
 
 lab_base_dir="${REHEARSAL_TMPDIR:-${TMPDIR:-/tmp}}"
 mkdir -p "$lab_base_dir"
@@ -159,24 +194,83 @@ log "remapping lab ports by +$REHEARSAL_PORT_OFFSET (dev stack untouched)"
 export REHEARSAL_PORT_OFFSET
 perl -pi -e 'if (/^(\s*(?:port|shadow_port))\s*=\s*(\d+)\s*$/) { my $n = $2 + $ENV{"REHEARSAL_PORT_OFFSET"}; $_ = "$1 = $n\n"; }' "$lab_root/supabase/config.toml"
 
+# Base set only: every repository migration that is not a pending (added) file.
 for m in supabase/migrations/*.sql; do
-  case " $pending " in
-    *" $m "*) ;;
-    *) cp "$m" "$lab_root/supabase/migrations/" ;;
-  esac
+  if in_list "$m" "$pending"; then
+    continue
+  fi
+  cp "$m" "$lab_root/supabase/migrations/"
 done
+
+# Fail closed: no pending file may exist in the base set before the reset.
+while IFS= read -r pending_file; do
+  [ -n "$pending_file" ] || continue
+  if [ -e "$lab_root/supabase/migrations/$(basename "$pending_file")" ]; then
+    die "pending migration $pending_file leaked into the base set"
+  fi
+done <<< "$pending"
 
 log "starting lab stack"
 cli start >/dev/null
 
+lab_project_id="$(sed -n 's/^project_id = "\([^"]*\)".*/\1/p' "$lab_root/supabase/config.toml" | head -n 1)"
+[ -n "$lab_project_id" ] || die "could not read the lab project id"
+lab_db_container="supabase_db_${lab_project_id}"
+if ! in_list "$lab_db_container" "$(docker ps --format '{{.Names}}')"; then
+  die "lab database container $lab_db_container is not running"
+fi
+
+# Recorded migration versions in the lab database (service-owned history).
+applied_versions() {
+  docker exec "$lab_db_container" psql -X -U postgres -d postgres -tA \
+    -c "SELECT version FROM supabase_migrations.schema_migrations ORDER BY version;" \
+    | sed '/^$/d' | sort
+}
+
+# Migration versions present in the lab's migration directory.
+lab_versions() {
+  for f in "$lab_root"/supabase/migrations/*.sql; do
+    migration_version "$f"
+  done | sort
+}
+
 log "applying BASE migration history only (release-like previous state, seeded with old-state fixture)"
 cli db reset >/dev/null
 
+# Proof before the upgrade: the recorded history is exactly the base set, and
+# no pending version has been applied by the base reset.
+base_versions="$(lab_versions)"
+applied_before="$(applied_versions)"
+if [ "$applied_before" != "$base_versions" ]; then
+  die "BASE reset recorded a migration history that differs from the base set"
+fi
+while IFS= read -r pending_version; do
+  [ -n "$pending_version" ] || continue
+  if in_list "$pending_version" "$applied_before"; then
+    die "pending migration $pending_version was already applied by the BASE reset"
+  fi
+done <<< "$pending_versions"
+log "pre-upgrade proof: $(printf '%s\n' "$applied_before" | grep -c .) base versions recorded, no pending version present"
+
 log "copying pending migration(s) and applying ONLY pending (upgrade path)"
-for m in $pending; do
-  cp "$m" "$lab_root/supabase/migrations/"
-done
+while IFS= read -r pending_file; do
+  [ -n "$pending_file" ] && cp "$pending_file" "$lab_root/supabase/migrations/"
+done <<< "$pending"
 ( cd "$lab_root" && printf 'y\n' | $supabase_bin --yes db push --local ) >/dev/null
+
+# Proof after the upgrade: the recorded history is exactly base + pending.
+expected_versions="$(lab_versions)"
+applied_after="$(applied_versions)"
+if [ "$applied_after" != "$expected_versions" ]; then
+  die "post-upgrade recorded history does not match base + pending"
+fi
+while IFS= read -r pending_version; do
+  [ -n "$pending_version" ] || continue
+  if ! in_list "$pending_version" "$applied_after"; then
+    die "pending migration $pending_version is not recorded after the upgrade"
+  fi
+done <<< "$pending_versions"
+log "post-upgrade proof: pending versions recorded after db push, history equals base + pending"
 
 # db push does not restart the API/PostgREST, so its cached schema (loaded at
 # start time) would miss the newly applied functions. Real upgrades refresh the
@@ -204,12 +298,31 @@ log "lab API URL: $SUPABASE_TEST_URL"
 results="$lab_root/db-suite.log"
 log "running the database integration suite against the upgraded lab"
 set +e
-pnpm exec vitest run tests/integration >"$results" 2>&1
+pnpm exec vitest run --reporter=verbose tests/integration >"$results" 2>&1
 rc=$?
 set -e
 
+# Bounded per-case counts from the verbose reporter. Only names and verdicts
+# are read; nothing from the fixture or SQL payload is printed.
+count_lines() { grep -Ec "$1" "$results" || true; }
+feedback_passed="$(count_lines '(✓|√) tests/integration/feedback\.db\.test\.ts > ')"
+feedback_failed="$(count_lines '(×|✗|X) tests/integration/feedback\.db\.test\.ts > ')"
+feedback_skipped="$(count_lines '(↓|-) tests/integration/feedback\.db\.test\.ts > ')"
+upgrade_passed="$(count_lines '(✓|√) tests/integration/feedback\.db\.test\.ts > pending-only upgrade preserves old-state data')"
+
 if [ "$rc" -eq 0 ]; then
-  log "database integration suite PASSED against the upgraded lab"
+  # Fail closed: a successful run must include the Feedback cases, have no
+  # Feedback failures, and actually execute both upgrade-only cases.
+  if [ "$feedback_passed" -lt 1 ] || [ "$feedback_failed" -ne 0 ]; then
+    rc=1
+    log "Feedback suite evidence is missing or incomplete"
+  elif [ "$upgrade_passed" -lt 2 ]; then
+    rc=1
+    log "pending-only upgrade cases did not run (expected 2 passing, found $upgrade_passed)"
+  fi
+  if [ "$rc" -eq 0 ]; then
+    log "database integration suite PASSED against the upgraded lab"
+  fi
 elif [ "${REHEARSAL_ALLOW_ANON_QUIRK:-0}" = "1" ]; then
   known_anon_failure=0
   if grep -q "Tests  1 failed | " "$results" \
@@ -232,9 +345,14 @@ fi
 
 printf '============ rehearsal summary ============\n'
 printf 'base baseline   : %s (%s)\n' "$base_ref" "$base_sha"
-printf 'pending set     : %s\n' "$(printf '%s ' $pending)"
+printf 'pending set     : %s\n' "$(basename -a $(printf '%s\n' "$pending") | tr '\n' ' ')"
+printf 'pending versions: %s\n' "$(printf '%s\n' "$pending_versions" | tr '\n' ' ')"
+printf 'pre-upgrade     : history == base set, no pending version recorded\n'
+printf 'post-upgrade    : history == base + pending, pending versions recorded\n'
 printf 'shared changes  : none (forward-only verified)\n'
 printf 'lab api url     : %s\n' "${SUPABASE_TEST_URL:-}"
+printf 'feedback cases  : %s passed, %s failed, %s skipped\n' "$feedback_passed" "$feedback_failed" "$feedback_skipped"
+printf 'upgrade cases   : %s passed (old-state fixture verified)\n' "$upgrade_passed"
 printf 'suite result    : %s\n' "$([ "$rc" -eq 0 ] && echo PASS || echo FAIL)"
 printf '===========================================\n'
 
