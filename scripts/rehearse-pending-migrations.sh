@@ -85,8 +85,8 @@ upgrade_passed_pattern='(✓|√) tests/integration/feedback\.db\.test\.ts > pen
 # (the shape Vitest prints), so selector drift fails before any lab is created.
 selector_self_check() {
   local colored plain stripped
-  colored=$'\e[32m✓\e[39m tests/integration/feedback.db.test.ts\e[2m > \e[22mFeedback private persistence > pending-only upgrade preserves old-state data'
-  plain='✓ tests/integration/feedback.db.test.ts > Feedback private persistence > pending-only upgrade preserves old-state data'
+  colored=$'\e[32m✓\e[39m tests/integration/feedback.db.test.ts\e[2m > \e[22mpending-only upgrade preserves old-state data\e[2m > \e[22mkeeps the seeded Provider, Request and Repair exactly unchanged'
+  plain='✓ tests/integration/feedback.db.test.ts > pending-only upgrade preserves old-state data > keeps the seeded Provider, Request and Repair exactly unchanged'
   for line in "$colored" "$plain"; do
     stripped="$(printf '%s\n' "$line" | sed -E 's/\x1b\[[0-9;]*[A-Za-z]//g')"
     if ! grep -Eq "$feedback_passed_pattern" <<< "$stripped"; then
