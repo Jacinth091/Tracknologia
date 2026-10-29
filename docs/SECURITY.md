@@ -148,6 +148,16 @@ roles, not `user_metadata`, and not inferred from owning or joining a Provider:
   adapters; review stays on the internal operator adapter. Reviewers and submissions referenced by
   history are `ON DELETE RESTRICT`, so deleting an Auth identity cannot erase
   review history.
+- Feedback privacy (PR #105 review): redaction and purge are owner-run SQL only,
+  never a browser, Provider, or service-role path. Each runs in one transaction
+  that ends with `rollback;` by default. The privacy audit
+  (`feedback_privacy_audit`) is append-only, with no client privilege and
+  `service_role` `SELECT` only. A redaction bumps `row_version` and fills the
+  review stamp without overwriting it, so a triage form loaded before the
+  redaction is rejected with `FEEDBACK_VERSION_CONFLICT` and cannot restore
+  erased notes or link. Routine access views stay `INTERNAL_ACCESS_VIEW` events
+  with a null reason. Policy approval for redaction and purge is issue #87 and
+  is not implied by this implementation.
 - Feedback abuse budget: the durable limiter gains a `feedback_submit`
   operation (default 5 requests per 600 seconds), with its own
   `PUBLIC_ABUSE_FEEDBACK_*` overrides. Its counter is independent of the

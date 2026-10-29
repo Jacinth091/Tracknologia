@@ -33,6 +33,9 @@ internal_access_audit
 Private Feedback (issue #89):
 feedback_submissions
 feedback_review_events
+
+Owner-only Feedback privacy audit (PR #105 review):
+feedback_privacy_audit
 ```
 
 Authentication identities live in Supabase-managed `auth.users`.
@@ -341,10 +344,29 @@ Append-only per-feedback review history (issue #89). It is separate from
 - `reason` (nullable, trimmed, 3–500 characters; required for reopening from
   `RESOLVED` or `DISMISSED`)
 - `occurred_at` (server default); index `(feedback_id, occurred_at, event_id)`
-- Never copies `title`, `message`, or `internal_notes` text.
+- Never copies `title`, `message`, or `internal_notes` text. The owner-run
+  redaction runbook sets prohibited free-text `reason` values to null; it adds
+  no event and bumps only `feedback_submissions.row_version`.
 - Referenced feedback and reviewer identities cannot be deleted while history
-  exists, so the audit trail is not removed by accident. Retention and erasure
-  remain unresolved launch gates (issue #87).
+  exists, so the audit trail is not removed by accident. The owner-run purge
+  runbook is the only path that deletes this history, and it records itself in
+  `feedback_privacy_audit`. Retention and erasure remain unresolved launch gates
+  (issue #87).
+
+### 15a. `feedback_privacy_audit`
+
+Append-only audit of owner-run Feedback redaction and purge (PR #105 review).
+It is separate from `internal_access_audit`, which stays access-only.
+
+- `event_id` (uuid, PK), `operation` (fixed: `FEEDBACK_REDACTED`,
+  `FEEDBACK_PURGED`), `target_feedback_id` (uuid, **no** foreign key, so it
+  survives a purge), `actor_user_id` (FK to `auth.users`, `ON DELETE SET NULL`),
+  `approval_ref` (3–80 characters of letters, digits and `#._/:-`), `created_at`
+- RLS enabled with no policies. `service_role` has `SELECT` only; `PUBLIC`,
+  `anon`, and `authenticated` have no privilege.
+- Written only inside the owner-run runbook transaction in `docs/OPERATIONS.md`,
+  in the same transaction as the redaction or purge. Never holds participant text.
+- Retention is part of the open issue #87 policy decision and is not defined.
 
 `get_feedback_count_summary(p_operator_user_id, p_window_start, p_window_end)`
 (issue #90) is a service-role-only, set-based aggregate. It returns `(dimension,
