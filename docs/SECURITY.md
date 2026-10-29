@@ -144,14 +144,22 @@ roles, not `user_metadata`, and not inferred from owning or joining a Provider:
   the function. The SQL function does not read any session itself; it trusts
   only the service-role caller. It rechecks the enabled mapping under
   `FOR SHARE` before locking the feedback row, and commits the row update and
-  its history event together. `submit_feedback` is reserved for the public
-  Feedback adapter; review stays on the internal operator adapter. Reviewers and submissions referenced by
+  its history event together. `submit_feedback` is reserved for the public and Provider Feedback
+  adapters; review stays on the internal operator adapter. Reviewers and submissions referenced by
   history are `ON DELETE RESTRICT`, so deleting an Auth identity cannot erase
   review history.
 - Feedback abuse budget: the durable limiter gains a `feedback_submit`
   operation (default 5 requests per 600 seconds), with its own
   `PUBLIC_ABUSE_FEEDBACK_*` overrides. Its counter is independent of the
   tracking and Repair Request counters.
+- Feedback summary (issue #90): `get_feedback_count_summary(...)` is service-role
+  only and rechecks the enabled operator mapping under `FOR SHARE`. It returns
+  fixed count groups for a bounded UTC window and never message, notes, nonce,
+  identity, or row identifiers. Every internal Feedback read passes the operator
+  guard and the required access audit before its privileged query.
+- The Feedback `feedback_submit` budget covers both public and Provider
+  submissions. Provider membership is resolved before the budget, and the budget
+  runs before any input is parsed.
 
 ## Public Provider and invitation projections
 
