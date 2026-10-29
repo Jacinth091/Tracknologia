@@ -276,6 +276,9 @@ internal access events.
 - `reason` (bounded 3–200 characters when present; null for application access
   events)
 - `created_at` (timestamptz, server default)
+- Auth deletion nulls only the direct user references; `operation`, `reason`,
+  and `created_at` remain and may stay linkable through external approval
+  records. This is not full anonymization.
 - stores no Provider, Repair, Repair Request, Customer, email, path, or payload
   data
 - `service_role` can read but cannot insert, update, or delete rows directly;

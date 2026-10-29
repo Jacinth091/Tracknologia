@@ -59,7 +59,7 @@ ALTER TABLE public.internal_access_audit ENABLE ROW LEVEL SECURITY;
 -- absence of policies. Supabase's default table privileges also cover
 -- service_role, so service_role must be revoked explicitly before receiving
 -- SELECT only. The table owner (the SECURITY DEFINER functions below) performs
--- every write, including the FK ON DELETE SET NULL anonymization.
+-- every write, including the FK ON DELETE SET NULL nulling of direct user references.
 REVOKE ALL ON TABLE public.internal_operators
   FROM PUBLIC, anon, authenticated, service_role;
 REVOKE ALL ON TABLE public.internal_access_audit
