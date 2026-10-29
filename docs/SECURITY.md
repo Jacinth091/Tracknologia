@@ -155,7 +155,7 @@ roles, not `user_metadata`, and not inferred from owning or joining a Provider:
   `service_role` `SELECT` only. A redaction bumps `row_version` and fills the
   review stamp without overwriting it, so a triage form loaded before the
   redaction is rejected with `FEEDBACK_VERSION_CONFLICT` and cannot restore
-  erased notes or link. Routine access views stay `INTERNAL_ACCESS_VIEW` events
+  erased notes; the linked issue URL is retained. Routine access views stay `INTERNAL_ACCESS_VIEW` events
   with a null reason. Policy approval for redaction and purge is issue #87 and
   is not implied by this implementation.
 - Feedback abuse budget: the durable limiter gains a `feedback_submit`

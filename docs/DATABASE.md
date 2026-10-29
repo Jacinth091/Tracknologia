@@ -353,6 +353,12 @@ Append-only per-feedback review history (issue #89). It is separate from
   `feedback_privacy_audit`. Retention and erasure remain unresolved launch gates
   (issue #87).
 
+`get_feedback_count_summary(p_operator_user_id, p_window_start, p_window_end)`
+(issue #90) is a service-role-only, set-based aggregate. It returns `(dimension,
+bucket, row_count)` rows for categories, sources, current statuses, and Asia/Manila days
+in a window of at most 31 days, with no row content or identifiers. It adds no
+table and no column.
+
 ### 15a. `feedback_privacy_audit`
 
 Append-only audit of owner-run Feedback redaction and purge (PR #105 review).
@@ -367,12 +373,6 @@ It is separate from `internal_access_audit`, which stays access-only.
 - Written only inside the owner-run runbook transaction in `docs/OPERATIONS.md`,
   in the same transaction as the redaction or purge. Never holds participant text.
 - Retention is part of the open issue #87 policy decision and is not defined.
-
-`get_feedback_count_summary(p_operator_user_id, p_window_start, p_window_end)`
-(issue #90) is a service-role-only, set-based aggregate. It returns `(dimension,
-bucket, row_count)` rows for categories, sources, current statuses, and Asia/Manila days
-in a window of at most 31 days, with no row content or identifiers. It adds no
-table and no column.
 
 ### Public Tracking projection
 
