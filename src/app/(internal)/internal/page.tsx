@@ -1,9 +1,12 @@
 import { notFound, redirect } from "next/navigation";
+import Link from "next/link";
 import {
   recordSensitiveInternalAccess,
   requireInternalOperator,
 } from "@/features/internal-operations";
 import { InternalServiceUnavailable } from "./_components/internal-service-unavailable";
+import { buttonVariants } from "@/components/ui/button";
+import { cn } from "@/lib/utils";
 
 export default async function InternalPage() {
   // The layout guard is not sufficient by itself: every sensitive internal
@@ -35,10 +38,20 @@ export default async function InternalPage() {
         Internal operations
       </h1>
       <p className="max-w-prose text-sm text-muted-foreground">
-        This private area is limited to enabled internal operators. Sensitive
-        internal review surfaces are not enabled yet, and operator access is
-        recorded in the append-only internal access audit.
+        This private area is limited to enabled internal operators, and operator
+        access is recorded in the append-only internal access audit.
       </p>
+      <div>
+        <Link
+          href="/internal/feedback"
+          className={cn(
+            buttonVariants({ variant: "outline", size: "sm" }),
+            "inline-flex",
+          )}
+        >
+          Feedback Inbox
+        </Link>
+      </div>
     </section>
   );
 }

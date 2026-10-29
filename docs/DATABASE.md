@@ -33,6 +33,9 @@ internal_access_audit
 Private Feedback (issue #89):
 feedback_submissions
 feedback_review_events
+
+Owner-only Feedback privacy audit (PR #105 review):
+feedback_privacy_audit
 ```
 
 Authentication identities live in Supabase-managed `auth.users`.
@@ -321,10 +324,19 @@ trusts only the service-role caller.
   lengths count PostgreSQL characters, not bytes. Control characters
   U+0001–U+0008, U+000E–U+001F and U+007F are rejected inside `title` and
   `message`; TAB, LF, VT, FF and CR are permitted as content, and only the
-  ASCII edge set is trimmed. Original `title` and `message` are never changed
-  after insert.
+  ASCII edge set is trimmed. Original `title` and `message` are not changed
+  after insert under normal submission and triage. The one exception is an
+  owner-approved privacy redaction run from the trusted SQL runbook in
+  `docs/OPERATIONS.md`, which replaces them with `[redacted]` (issue #87 policy
+  gate).
 - The review-stamp CHECK ties `row_version = 1` to no review and any later
   version to a recorded `reviewed_at`/`reviewed_by`.
+- Schema semantics for a privacy touch on a never-reviewed row: the owner
+  redaction raises `row_version` to `2` and fills `reviewed_at`/`reviewed_by`
+  only where they are null, to satisfy the existing CHECK. Those stamps are
+  administrative metadata. They do not mean triage occurred. The row keeps
+  `status` `NEW`, `priority` `NORMAL`, and an empty review history. Existing
+  stamps are kept when present. Triage is shown by review events and status.
 - Indexes: `(created_at DESC, id DESC)` and `(status, created_at DESC, id DESC)`.
 - No participant identity, Provider ID, IP, browser metadata, Repair IDs,
   tracking codes, or device fields are stored.
@@ -341,16 +353,35 @@ Append-only per-feedback review history (issue #89). It is separate from
 - `reason` (nullable, trimmed, 3–500 characters; required for reopening from
   `RESOLVED` or `DISMISSED`)
 - `occurred_at` (server default); index `(feedback_id, occurred_at, event_id)`
-- Never copies `title`, `message`, or `internal_notes` text.
+- Never copies `title`, `message`, or `internal_notes` text. The owner-run
+  redaction runbook sets prohibited free-text `reason` values to null; it adds
+  no event and bumps only `feedback_submissions.row_version`.
 - Referenced feedback and reviewer identities cannot be deleted while history
-  exists, so the audit trail is not removed by accident. Retention and erasure
-  remain unresolved launch gates (issue #87).
+  exists, so the audit trail is not removed by accident. The owner-run purge
+  runbook is the only path that deletes this history, and it records itself in
+  `feedback_privacy_audit`. Retention and erasure remain unresolved launch gates
+  (issue #87).
 
 `get_feedback_count_summary(p_operator_user_id, p_window_start, p_window_end)`
 (issue #90) is a service-role-only, set-based aggregate. It returns `(dimension,
 bucket, row_count)` rows for categories, sources, current statuses, and Asia/Manila days
 in a window of at most 31 days, with no row content or identifiers. It adds no
 table and no column.
+
+### 15a. `feedback_privacy_audit`
+
+Append-only audit of owner-run Feedback redaction and purge (PR #105 review).
+It is separate from `internal_access_audit`, which stays access-only.
+
+- `event_id` (uuid, PK), `operation` (fixed: `FEEDBACK_REDACTED`,
+  `FEEDBACK_PURGED`), `target_feedback_id` (uuid, **no** foreign key, so it
+  survives a purge), `actor_user_id` (FK to `auth.users`, `ON DELETE SET NULL`),
+  `approval_ref` (3–80 characters of letters, digits and `#._/:-`), `created_at`
+- RLS enabled with no policies. `service_role` has `SELECT` only; `PUBLIC`,
+  `anon`, and `authenticated` have no privilege.
+- Written only inside the owner-run runbook transaction in `docs/OPERATIONS.md`,
+  in the same transaction as the redaction or purge. Never holds participant text.
+- Retention is part of the open issue #87 policy decision and is not defined.
 
 ### Public Tracking projection
 
