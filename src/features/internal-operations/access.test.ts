@@ -77,6 +77,19 @@ describe("requireInternalOperator", () => {
     },
   );
 
+  it("ignores forged internal-operator metadata", async () => {
+    mocks.requireUser.mockResolvedValue({
+      ...authenticatedUser("forged-user"),
+      userMetadata: { internal_operator: true },
+    });
+    mocks.findInternalOperator.mockResolvedValue({ status: "MISSING" });
+
+    await expect(requireInternalOperator()).resolves.toEqual({
+      status: "FORBIDDEN",
+    });
+    expect(mocks.findInternalOperator).toHaveBeenCalledWith("forged-user");
+  });
+
   it("denies a disabled mapping", async () => {
     mocks.requireUser.mockResolvedValue(authenticatedUser("disabled-operator"));
     mocks.findInternalOperator.mockResolvedValue({ status: "DISABLED" });
