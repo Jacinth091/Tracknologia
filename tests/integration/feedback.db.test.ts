@@ -1305,3 +1305,149 @@ describe.runIf(process.env.REHEARSAL_UPGRADE_FIXTURE === "1")(
     );
   },
 );
+
+// Issue #90: the count-only summary RPC. Fixtures land inside the current UTC
+// day, so the window is [today, tomorrow) and the expectations stay exact.
+const SUMMARY_SIGNATURE =
+  "public.get_feedback_count_summary(uuid,timestamptz,timestamptz)";
+const SUMMARY_CANARY = "feedback-summary-canary-text-7c1e";
+
+function summaryWindow() {
+  const start = new Date();
+  start.setUTCHours(0, 0, 0, 0);
+  const end = new Date(start.getTime() + 86_400_000);
+  return {
+    p_window_start: start.toISOString(),
+    p_window_end: end.toISOString(),
+  };
+}
+
+async function readSummary(operatorUserId: string, window = summaryWindow()) {
+  return admin.rpc("get_feedback_count_summary", {
+    p_operator_user_id: operatorUserId,
+    ...window,
+  });
+}
+
+describe("Feedback count summary (PostgreSQL)", () => {
+  it(
+    "grants the summary RPC to service_role only",
+    async () => {
+      expect(await functionGrantBits(SUMMARY_SIGNATURE)).toBe("001");
+    },
+    DB_CASE_TIMEOUT_MS,
+  );
+
+  it(
+    "denies unprovisioned and revoked operators before any aggregate",
+    async () => {
+      const outsider = await createTestUser(
+        admin,
+        uniqueEmail("feedback-summary-outsider"),
+      );
+      const denied = await readSummary(outsider.user.id);
+      expect(denied.error?.message).toContain(
+        "Internal operator access required",
+      );
+      expect(denied.data).toBeNull();
+
+      const operatorId = await provisionOperator("feedback-summary-revoked");
+      assertSupabaseSuccess(
+        await admin.rpc("change_internal_operator_access", {
+          p_operator_user_id: operatorId,
+          p_actor_user_id: operatorId,
+          p_enabled: false,
+          p_reason: REVIEW_REASON,
+        }),
+        "revoke summary operator",
+      );
+      const revoked = await readSummary(operatorId);
+      expect(revoked.error?.message).toContain(
+        "Internal operator access required",
+      );
+    },
+    DB_CASE_TIMEOUT_MS,
+  );
+
+  it(
+    "rejects windows that are empty, inverted, or longer than 31 days",
+    async () => {
+      const operatorId = await provisionOperator("feedback-summary-window");
+      const start = "2026-10-01T00:00:00.000Z";
+      for (const end of [
+        "2026-10-01T00:00:00.000Z",
+        "2026-09-30T00:00:00.000Z",
+        "2026-11-02T00:00:00.000Z",
+      ]) {
+        const result = await readSummary(operatorId, {
+          p_window_start: start,
+          p_window_end: end,
+        });
+        expect(result.error?.message).toContain(
+          "FEEDBACK_SUMMARY_WINDOW_INVALID",
+        );
+      }
+    },
+    DB_CASE_TIMEOUT_MS,
+  );
+
+  it(
+    "returns exact fixed counts for mixed fixtures without row text",
+    async () => {
+      const operatorId = await provisionOperator("feedback-summary-counts");
+      const first = await createFeedback({
+        p_category: "BUG",
+        p_source: "PUBLIC_TRACKING",
+        p_message: `${SUMMARY_CANARY} tracking`,
+      });
+      await createFeedback({
+        p_category: "BUG",
+        p_source: "PUBLIC_FEEDBACK",
+        p_message: `${SUMMARY_CANARY} public`,
+      });
+      await createFeedback({
+        p_category: "FEATURE_REQUEST",
+        p_source: "PROVIDER_WORKSPACE",
+        p_participant_class: "SHOP_OWNER",
+        p_message: `${SUMMARY_CANARY} provider`,
+      });
+      assertSupabaseSuccess(
+        await admin.rpc("record_feedback_review", {
+          p_feedback_id: first.id,
+          p_operator_user_id: operatorId,
+          p_expected_row_version: 1,
+          p_target_status: "REVIEWING",
+          p_target_priority: "NORMAL",
+          p_internal_notes: null,
+          p_linked_issue_url: null,
+          p_reason: null,
+        }),
+        "review summary fixture",
+      );
+
+      const result = await readSummary(operatorId);
+      const rows = assertSupabaseSuccess(result, "read feedback summary")
+        .data as Array<{
+        dimension: string;
+        bucket: string;
+        row_count: number;
+      }> | null;
+      const count = (dimension: string, bucket: string) =>
+        rows?.find(
+          (row) => row.dimension === dimension && row.bucket === bucket,
+        )?.row_count ?? 0;
+      const today = new Date().toISOString().slice(0, 10);
+
+      expect(count("CATEGORY", "BUG")).toBe(2);
+      expect(count("CATEGORY", "FEATURE_REQUEST")).toBe(1);
+      expect(count("SOURCE", "PUBLIC_TRACKING")).toBe(1);
+      expect(count("SOURCE", "PUBLIC_FEEDBACK")).toBe(1);
+      expect(count("SOURCE", "PROVIDER_WORKSPACE")).toBe(1);
+      expect(count("STATUS", "NEW")).toBe(2);
+      expect(count("STATUS", "REVIEWING")).toBe(1);
+      expect(count("DAY", today)).toBe(3);
+      expect(JSON.stringify(rows)).not.toContain(SUMMARY_CANARY);
+    },
+    DB_CASE_TIMEOUT_MS,
+  );
+});
