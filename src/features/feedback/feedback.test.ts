@@ -713,7 +713,7 @@ describe("Feedback schemas", () => {
     expect(cursor("2026-10-30T09:00:00Z|not-a-uuid")).toBe(false);
   });
 
-  it("limits summary windows to 1 to 31 UTC days", () => {
+  it("limits summary windows to 1 to 31 Manila days", () => {
     expect(
       feedbackSummaryWindowSchema.safeParse({
         startDate: "2026-10-01",

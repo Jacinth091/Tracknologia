@@ -211,7 +211,7 @@ export const feedbackSummaryWindowSchema = z
       (Date.parse(window.endDateExclusive) - Date.parse(window.startDate)) /
       86_400_000;
     return days >= 1 && days <= 31;
-  }, "Summary window must cover 1 to 31 UTC days");
+  }, "Summary window must cover 1 to 31 Asia/Manila days");
 
 export type FeedbackSummaryWindow = z.output<
   typeof feedbackSummaryWindowSchema
