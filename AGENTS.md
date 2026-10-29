@@ -44,7 +44,7 @@ Tracknologia uses a single-context domain docs layout rooted at `CONTEXT.md` and
 
 ## Branches & commits
 
-- Promotion path enforced by `.github/workflows/branch-policy.yml`: only `staging` merges into `master`; only `feature/NN/*`, `fix/*`, `hotfix/*`, `chore/*`, or `dependabot/*` merge into `staging`; any branch may PR into a protected `feature/**` integration branch. Active development lands on `staging`.
+- Promotion path enforced by `.github/workflows/branch-policy.yml`: only `staging` merges into `master`; only `feature/NN/*`, `fix/*`, `hotfix/*`, `chore/*`, `dependabot/*`, or `release/*` merge into `staging`; `release/*` accepts `feature/NN/*`, `fix/*`, `hotfix/*`, `chore/*` and `dependabot/*` sources; any branch may PR into a protected `feature/**` integration branch. Active development lands on `staging`; v0.2.0 work lands on `release/0.2.0`.
 - Commit messages follow `tag[author_name]: description` (e.g., `feat[jnnzz]: add pilot analytics`) — see the `git-commit-rules` skill.
 
 ---
