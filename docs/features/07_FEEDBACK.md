@@ -206,10 +206,14 @@ reviewer identity appear in the result.
   client failures with log-canary checks, and schema bounds.
 - `tests/integration/feedback.db.test.ts` covers the summary RPC grants, the
   denial of unprovisioned and revoked operators, and window shape.
-- `tests/integration/feedback-summary-manila.db.test.ts` runs the summary entry
-  against PostgreSQL around Manila midnight. It uses baseline deltas for
-  isolation, and it checks the window label, the excluded boundary instants,
-  the Nov 1 day count, zero-fill, and a text canary.
+- `tests/integration/feedback-summary-manila.db.test.ts` is a direct SQL proof of
+  the summary function's Manila-aligned bounds. The unit test above covers the
+  Manila-to-UTC conversion and the response label. This file uses one psql session
+  inside a `REPEATABLE READ` transaction. It takes baselines, creates and pins
+  only its own fixtures through the existing RPCs, reads again in the same
+  snapshot, and rolls back. Concurrent committed writes cannot change its deltas.
+  It checks the start and exclusive-end instants, the Nov 1 PHT day bucket, and
+  zero-fill. It does not exercise the feature entry or PostgREST.
 - `tests/integration/feedback-review-flow.db.test.ts` runs the review entry
   against PostgreSQL. An incomplete decision leaves the row, version, and
   history unchanged, and an explicit null clear adds one version and one event.

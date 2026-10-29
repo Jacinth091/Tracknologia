@@ -135,7 +135,7 @@ tests/integration/
   internal-operations-overlap.db.test.ts — Overlapping audit/revoke and grant sessions
   feedback.db.test.ts          — Private Feedback grants, constraints, nonce retry, reviews, feedback budget, old-state upgrade check, count-summary grants, denials, windows, and exact counts
   feedback-projection.db.test.ts — Feedback persistence through PostgREST: keyset paging, detail/history bounds, null clearing
-  feedback-summary-manila.db.test.ts — Feedback summary Manila periods: UTC boundaries, zero-fill, baseline deltas
+  feedback-summary-manila.db.test.ts — Manila-aligned summary bounds and day buckets, one REPEATABLE READ snapshot, rolled back
   feedback-review-flow.db.test.ts — Feedback review keeps stored notes and link; explicit null clears
   load-stress.db.test.ts       — Burst invariants (Plan 10)
   helpers/
