@@ -12,9 +12,9 @@ const DAY_MS = 86_400_000;
 const manilaDateSchema = z.iso.date();
 
 export const metricsWindowSchema = z.discriminatedUnion("mode", [
-  z.object({ mode: z.literal("today") }),
-  z.object({ mode: z.literal("7d") }),
-  z.object({ mode: z.literal("30d") }),
+  z.strictObject({ mode: z.literal("today") }),
+  z.strictObject({ mode: z.literal("7d") }),
+  z.strictObject({ mode: z.literal("30d") }),
   z.strictObject({
     mode: z.literal("custom"),
     startDate: manilaDateSchema,
@@ -86,10 +86,13 @@ export function resolveMetricsWindow(
 
   const { startDate, endDateExclusive } = input;
   const days = (Date.parse(endDateExclusive) - Date.parse(startDate)) / DAY_MS;
-  if (days < 1 || days > MANILA_DAYS_MAX) {
+  if (!Number.isInteger(days) || days < 1 || days > MANILA_DAYS_MAX) {
     throw new Error(
       `Custom metrics periods must cover 1 to ${MANILA_DAYS_MAX} Asia/Manila days`,
     );
+  }
+  if (startDate >= tomorrow || endDateExclusive > tomorrow) {
+    throw new Error("Metrics periods cannot include future Manila days");
   }
   return { startDate, endDateExclusive };
 }

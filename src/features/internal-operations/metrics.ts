@@ -1,6 +1,7 @@
 import "server-only";
 
 import {
+  FeedbackError,
   getFeedbackAggregateSummary,
   type FeedbackCountSummary,
 } from "@/features/feedback";
@@ -60,6 +61,24 @@ const REPAIR_STATUSES = [
 
 export type RepairStatusNow = Record<(typeof REPAIR_STATUSES)[number], number>;
 
+export type MetricsCoverage = {
+  domain: {
+    source: "AUTHORITATIVE_DOMAIN_TABLES";
+    coverage: "RETAINED_ROWS_ONLY";
+    snapshot: "CURRENT_STATE";
+    observedEndUtc: string;
+  };
+  feedback: {
+    source: "FEEDBACK_MODULE";
+    coverage: "RETAINED_ROWS_ONLY";
+    status: "AVAILABLE" | "UNAVAILABLE";
+    asOfStart: string | null;
+    asOfEnd: string | null;
+    batches: number;
+  };
+  retentionPolicy: "UNAPPROVED";
+};
+
 export type ValidationMetrics = {
   asOf: string;
   window: ValidationMetricsWindow;
@@ -100,16 +119,88 @@ export type ValidationMetrics = {
     allTimeRepairs: number;
     adoptionPercent: number | null;
   };
-  feedback: FeedbackCountSummary;
+  feedback: FeedbackCountSummary | null;
+  coverage: MetricsCoverage;
 };
 
-// BIGINT and NUMERIC columns arrive as strings through PostgREST.
-export const metricsRowSchema = z.object({
-  dimension: z.string(),
-  bucket: z.string(),
-  row_count: z.coerce.number().int().nonnegative(),
-  interval_seconds: z.coerce.number().nonnegative().nullable(),
-});
+const METRIC_BUCKETS: Record<string, readonly string[]> = {
+  PROVIDER_ONBOARDED_IN_PERIOD: ["SHOP", "INDEPENDENT", "TOTAL"],
+  PROVIDER_ONBOARDED_ALL_TIME: ["SHOP", "INDEPENDENT", "TOTAL"],
+  ACTIVE_PROVIDER_IN_PERIOD: ["TOTAL", "REPEAT"],
+  ACTIVE_DAY: [],
+  STAFF_MEMBERSHIP_ACTIVE: ["TOTAL"],
+  SHOP_WITH_STAFF: ["TOTAL"],
+  REPAIR_STATUS_NOW: REPAIR_STATUSES,
+  REPAIR_CREATED_IN_PERIOD: ["TOTAL", "CUSTOMER_REQUEST", "PROVIDER_CREATED"],
+  REPAIR_COMPLETED_IN_PERIOD: ["TOTAL"],
+  READY_REACHED_IN_PERIOD: ["TOTAL"],
+  STATUS_MAINTAINED_IN_PERIOD: ["TOTAL"],
+  REQUEST_RECEIVED_IN_PERIOD: ["TOTAL"],
+  REQUEST_DECIDED_IN_PERIOD: ["TOTAL", "ACCEPTED", "DECLINED"],
+  REQUEST_PENDING_NOW: ["TOTAL"],
+  REQUEST_COHORT_IN_PERIOD: ["RECEIVED", "ACCEPTED"],
+  REQUEST_DECISION_SECONDS: ["MEAN"],
+  TRACKING_VIEWS_IN_PERIOD: ["TOTAL", "REPAIRS"],
+  TRACKING_ALL_TIME: ["TOTAL", "REPAIRS"],
+  REPAIR_ALL_TIME: ["TOTAL"],
+};
+
+const REQUIRED_GROUPS = [
+  "PROVIDER_ONBOARDED_ALL_TIME/TOTAL",
+  "ACTIVE_PROVIDER_IN_PERIOD/TOTAL",
+  "ACTIVE_PROVIDER_IN_PERIOD/REPEAT",
+  "STAFF_MEMBERSHIP_ACTIVE/TOTAL",
+  "SHOP_WITH_STAFF/TOTAL",
+  "REPAIR_CREATED_IN_PERIOD/TOTAL",
+  "REPAIR_COMPLETED_IN_PERIOD/TOTAL",
+  "READY_REACHED_IN_PERIOD/TOTAL",
+  "STATUS_MAINTAINED_IN_PERIOD/TOTAL",
+  "REQUEST_RECEIVED_IN_PERIOD/TOTAL",
+  "REQUEST_DECIDED_IN_PERIOD/TOTAL",
+  "REQUEST_DECIDED_IN_PERIOD/ACCEPTED",
+  "REQUEST_DECIDED_IN_PERIOD/DECLINED",
+  "REQUEST_PENDING_NOW/TOTAL",
+  "REQUEST_COHORT_IN_PERIOD/RECEIVED",
+  "REQUEST_COHORT_IN_PERIOD/ACCEPTED",
+  "REQUEST_DECISION_SECONDS/MEAN",
+  "TRACKING_VIEWS_IN_PERIOD/TOTAL",
+  "TRACKING_VIEWS_IN_PERIOD/REPAIRS",
+  "TRACKING_ALL_TIME/TOTAL",
+  "TRACKING_ALL_TIME/REPAIRS",
+  "REPAIR_ALL_TIME/TOTAL",
+];
+
+// PostgREST may encode BIGINT/NUMERIC as strings, but null/booleans are not counts.
+const numeric = z
+  .union([z.number(), z.string().regex(/^\d+(?:\.\d+)?$/)])
+  .transform(Number);
+export const metricsRowSchema = z
+  .strictObject({
+    dimension: z.string(),
+    bucket: z.string(),
+    row_count: numeric.pipe(
+      z.number().int().nonnegative().max(Number.MAX_SAFE_INTEGER),
+    ),
+    interval_seconds: numeric.pipe(z.number().nonnegative()).nullable(),
+    as_of: z.iso.datetime({ offset: true }),
+  })
+  .superRefine((row, ctx) => {
+    const allowed = METRIC_BUCKETS[row.dimension];
+    if (
+      !allowed ||
+      (row.dimension === "ACTIVE_DAY"
+        ? !z.iso.date().safeParse(row.bucket).success
+        : !allowed.includes(row.bucket))
+    ) {
+      ctx.addIssue({ code: "custom", message: "Unknown metrics group" });
+    }
+    if (
+      row.dimension !== "REQUEST_DECISION_SECONDS" &&
+      row.interval_seconds !== null
+    ) {
+      ctx.addIssue({ code: "custom", message: "Unexpected interval value" });
+    }
+  });
 
 export type MetricsRow = z.output<typeof metricsRowSchema>;
 
@@ -135,7 +226,7 @@ function roundPercent(numerator: number, denominator: number): number | null {
 export function buildValidationMetrics(
   rows: MetricsRow[],
   window: ValidationMetricsWindow,
-  feedback: FeedbackCountSummary,
+  feedback: FeedbackCountSummary | null,
   asOf: string,
 ): ValidationMetrics {
   const onboarding = (
@@ -166,10 +257,12 @@ export function buildValidationMetrics(
     }
   }
 
-  const daily = rows
-    .filter((row) => row.dimension === "ACTIVE_DAY")
-    .map((row) => ({ date: row.bucket, distinctProviders: row.row_count }))
-    .sort((a, b) => a.date.localeCompare(b.date));
+  const daily = Array.from({ length: window.days }, (_, day) => {
+    const date = new Date(Date.parse(window.startDate) + day * DAY_MS)
+      .toISOString()
+      .slice(0, 10);
+    return { date, distinctProviders: countAt(rows, "ACTIVE_DAY", date) };
+  });
 
   const periodViews = countAt(rows, "TRACKING_VIEWS_IN_PERIOD", "TOTAL");
   const allTimeViews = countAt(rows, "TRACKING_ALL_TIME", "TOTAL");
@@ -241,6 +334,25 @@ export function buildValidationMetrics(
       adoptionPercent: roundPercent(allTimeRepairsViewed, allTimeRepairs),
     },
     feedback,
+    coverage: {
+      domain: {
+        source: "AUTHORITATIVE_DOMAIN_TABLES",
+        coverage: "RETAINED_ROWS_ONLY",
+        snapshot: "CURRENT_STATE",
+        observedEndUtc: new Date(
+          Math.min(Date.parse(window.endUtc), Date.parse(asOf)),
+        ).toISOString(),
+      },
+      feedback: {
+        source: "FEEDBACK_MODULE",
+        coverage: "RETAINED_ROWS_ONLY",
+        status: feedback ? "AVAILABLE" : "UNAVAILABLE",
+        asOfStart: feedback?.asOf ?? null,
+        asOfEnd: feedback?.asOf ?? null,
+        batches: feedback ? 1 : 0,
+      },
+      retentionPolicy: "UNAPPROVED",
+    },
   };
 }
 
@@ -251,102 +363,204 @@ export function buildValidationMetrics(
 export async function getValidationMetrics(
   window: unknown,
 ): Promise<ValidationMetrics> {
-  const access = await requireInternalOperator();
-  if (access.status === "UNAVAILABLE") {
-    throw new MetricsError(
-      "Validation metrics are unavailable. Please try again.",
-      "UNAVAILABLE",
-    );
-  }
-  if (access.status !== "ALLOWED") {
-    throw new MetricsError("Internal access is not available", "FORBIDDEN");
-  }
-
-  const parsed = metricsWindowSchema.safeParse(window);
-  if (!parsed.success) {
-    throw new MetricsError("Metrics period is invalid", "INVALID_INPUT");
-  }
-
-  let resolved;
   try {
-    resolved = resolveMetricsWindow(parsed.data);
-  } catch (err) {
-    throw new MetricsError(
-      err instanceof Error ? err.message : "Metrics period is invalid",
-      "INVALID_INPUT",
+    const access = await requireInternalOperator();
+    if (access.status === "UNAVAILABLE") {
+      throw new MetricsError(
+        "Validation metrics are unavailable. Please try again.",
+        "UNAVAILABLE",
+      );
+    }
+    if (access.status !== "ALLOWED") {
+      throw new MetricsError("Internal access is not available", "FORBIDDEN");
+    }
+    const parsed = metricsWindowSchema.safeParse(window);
+    if (!parsed.success) {
+      throw new MetricsError("Metrics period is invalid", "INVALID_INPUT");
+    }
+    let resolved;
+    try {
+      resolved = resolveMetricsWindow(parsed.data);
+    } catch (error) {
+      throw new MetricsError(
+        error instanceof Error ? error.message : "Metrics period is invalid",
+        "INVALID_INPUT",
+      );
+    }
+    if (!(await recordSensitiveInternalAccess("INTERNAL_ACCESS_VIEW"))) {
+      throw new MetricsError(
+        "Validation metrics are unavailable. Please try again.",
+        "UNAVAILABLE",
+      );
+    }
+    const period: ValidationMetricsWindow = {
+      mode: parsed.data.mode,
+      ...resolved,
+      days:
+        (Date.parse(resolved.endDateExclusive) -
+          Date.parse(resolved.startDate)) /
+        DAY_MS,
+      timeZone: "Asia/Manila",
+      startUtc: manilaMidnightUtc(resolved.startDate),
+      endUtc: manilaMidnightUtc(resolved.endDateExclusive),
+    };
+    const rows = await readMetricRows(access.userId, period);
+    const feedbackRead = await readFeedbackBatches(period);
+    const metrics = buildValidationMetrics(
+      rows,
+      period,
+      feedbackRead.summary,
+      rows[0].as_of,
     );
-  }
-
-  const audited = await recordSensitiveInternalAccess("INTERNAL_ACCESS_VIEW");
-  if (!audited) {
+    metrics.coverage.feedback = feedbackRead.coverage;
+    return metrics;
+  } catch (error) {
+    if (error instanceof MetricsError) throw error;
+    console.error("[METRICS_FAILURE] validation metrics operation unavailable");
     throw new MetricsError(
       "Validation metrics are unavailable. Please try again.",
       "UNAVAILABLE",
     );
   }
+}
 
-  const startDate = resolved.startDate;
-  const endDateExclusive = resolved.endDateExclusive;
-  const feedback = await getFeedbackAggregateSummary({
-    startDate,
-    endDateExclusive,
-  });
+function sumCounts<Key extends string>(
+  left: Record<Key, number>,
+  right: Record<Key, number>,
+): Record<Key, number> {
+  const result = { ...left };
+  for (const key in right) result[key] += right[key];
+  return result;
+}
 
-  const rows = await readMetricRows(access.userId, {
-    start: manilaMidnightUtc(startDate),
-    endExclusive: manilaMidnightUtc(endDateExclusive),
-  });
-
-  return buildValidationMetrics(
-    rows,
-    {
-      mode: parsed.data.mode,
-      startDate,
-      endDateExclusive,
-      days: Math.round(
-        (Date.parse(endDateExclusive) - Date.parse(startDate)) / DAY_MS,
-      ),
-      timeZone: "Asia/Manila",
-      startUtc: manilaMidnightUtc(startDate),
-      endUtc: manilaMidnightUtc(endDateExclusive),
-    },
-    feedback,
-    new Date().toISOString(),
-  );
+// Feedback retains its existing 31-day query bound. Disjoint batches cover the
+// report period; their separately generated current-status reads are labelled.
+async function readFeedbackBatches(window: ValidationMetricsWindow): Promise<{
+  summary: FeedbackCountSummary | null;
+  coverage: MetricsCoverage["feedback"];
+}> {
+  const coverage: MetricsCoverage["feedback"] = {
+    source: "FEEDBACK_MODULE",
+    coverage: "RETAINED_ROWS_ONLY",
+    status: "UNAVAILABLE",
+    asOfStart: null,
+    asOfEnd: null,
+    batches: 0,
+  };
+  try {
+    let summary: FeedbackCountSummary | null = null;
+    for (
+      let start = Date.parse(window.startDate);
+      start < Date.parse(window.endDateExclusive);
+      start += 31 * DAY_MS
+    ) {
+      const end = Math.min(
+        start + 31 * DAY_MS,
+        Date.parse(window.endDateExclusive),
+      );
+      const batch = await getFeedbackAggregateSummary({
+        startDate: new Date(start).toISOString().slice(0, 10),
+        endDateExclusive: new Date(end).toISOString().slice(0, 10),
+      });
+      if (summary === null) {
+        summary = {
+          ...batch,
+          byCategory: { ...batch.byCategory },
+          bySource: { ...batch.bySource },
+          byStatus: { ...batch.byStatus },
+          daily: [...batch.daily],
+          window: {
+            timeZone: "Asia/Manila",
+            startDate: window.startDate,
+            endDateExclusive: window.endDateExclusive,
+            days: window.days,
+          },
+        };
+        coverage.asOfStart = batch.asOf;
+      } else {
+        summary.total += batch.total;
+        summary.byCategory = sumCounts(summary.byCategory, batch.byCategory);
+        summary.bySource = sumCounts(summary.bySource, batch.bySource);
+        summary.byStatus = sumCounts(summary.byStatus, batch.byStatus);
+        summary.daily.push(...batch.daily);
+        summary.asOf = batch.asOf;
+      }
+      coverage.asOfEnd = batch.asOf;
+      coverage.batches++;
+    }
+    coverage.status = "AVAILABLE";
+    return { summary, coverage };
+  } catch (error) {
+    if (error instanceof FeedbackError && error.code === "FORBIDDEN") {
+      throw new MetricsError("Internal access is not available", "FORBIDDEN");
+    }
+    // Never return a partial-period count as a complete summary.
+    console.error("[METRICS_FAILURE] feedback summary unavailable");
+    return {
+      summary: null,
+      coverage: {
+        ...coverage,
+        status: "UNAVAILABLE",
+        asOfStart: null,
+        asOfEnd: null,
+        batches: 0,
+      },
+    };
+  }
 }
 
 async function readMetricRows(
   operatorUserId: string,
-  window: { start: string; endExclusive: string },
+  window: ValidationMetricsWindow,
 ): Promise<MetricsRow[]> {
   const client = await createInternalOpsClient();
   const { data, error } = await client.rpc("get_internal_validation_metrics", {
     p_operator_user_id: operatorUserId,
-    p_window_start: window.start,
-    p_window_end: window.endExclusive,
+    p_window_start: window.startUtc,
+    p_window_end: window.endUtc,
   });
-
   if (error) {
     console.error("[METRICS_FAILURE] validation metrics RPC failed", {
-      code: error.code,
-      message: error.message,
-      timestamp: new Date().toISOString(),
+      code:
+        typeof error.code === "string" && /^[A-Z0-9]{5,8}$/.test(error.code)
+          ? error.code
+          : "unknown",
     });
     throw new MetricsError(
       "Validation metrics are unavailable. Please try again.",
       "UNAVAILABLE",
     );
   }
-
-  const projected = metricsRowSchema.array().safeParse(data ?? []);
-  if (!projected.success) {
-    console.error("[METRICS_FAILURE] validation metrics rows are malformed", {
-      timestamp: new Date().toISOString(),
-    });
+  const parsed = metricsRowSchema.array().safeParse(data);
+  if (!parsed.success || parsed.data.length === 0) {
     throw new MetricsError(
       "Validation metrics are unavailable. Please try again.",
       "UNAVAILABLE",
     );
   }
-  return projected.data;
+  const rows = parsed.data;
+  const seen = new Set<string>();
+  for (const row of rows) {
+    const key = row.dimension + "/" + row.bucket;
+    if (
+      seen.has(key) ||
+      row.as_of !== rows[0].as_of ||
+      (row.dimension === "ACTIVE_DAY" &&
+        (row.bucket < window.startDate ||
+          row.bucket >= window.endDateExclusive))
+    ) {
+      throw new MetricsError(
+        "Validation metrics are unavailable. Please try again.",
+        "UNAVAILABLE",
+      );
+    }
+    seen.add(key);
+  }
+  if (!REQUIRED_GROUPS.every((key) => seen.has(key))) {
+    throw new MetricsError(
+      "Validation metrics are unavailable. Please try again.",
+      "UNAVAILABLE",
+    );
+  }
+  return rows;
 }
