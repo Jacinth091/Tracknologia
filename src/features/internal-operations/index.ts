@@ -5,6 +5,14 @@ export {
 } from "./access";
 
 export {
+  getValidationMetrics,
+  MetricsError,
+  type ValidationMetrics,
+  type ValidationMetricsWindow,
+  type RepairStatusNow,
+} from "./metrics";
+
+export {
   INTERNAL_OPERATION_CATEGORIES,
   type InternalAccess,
   type InternalOperationCategory,

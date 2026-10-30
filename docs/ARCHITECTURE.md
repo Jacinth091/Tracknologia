@@ -119,6 +119,14 @@ platform, or external analytics dependency is part of the MVP architecture.
 
 ## Private internal operations
 
+`getValidationMetrics` is the server-only O2 report Interface. It owns period
+validation, ratios, fixed projection and honest coverage metadata; a narrow
+set-based PostgreSQL RPC performs the aggregate read. It composes Feedback
+through that Module's summary Interface in batches within the existing 31-day
+query bound. Feedback depends only on the independent Operations access entry,
+so reporting does not create a barrel cycle. The pure projection helper stays
+internal to the Module. No raw-domain browser or public metrics route is added.
+
 `src/features/internal-operations` is a separate Module for the private
 internal-operator privilege layer. It is intentionally independent of Provider
 membership: an operator may have no Provider, and owning a Provider grants no

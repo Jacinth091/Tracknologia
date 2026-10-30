@@ -383,7 +383,40 @@ It is separate from `internal_access_audit`, which stays access-only.
   in the same transaction as the redaction or purge. Never holds participant text.
 - Retention is part of the open issue #87 policy decision and is not defined.
 
-### Public Tracking projection
+### 16. `get_internal_validation_metrics`
+
+`get_internal_validation_metrics(p_operator_user_id, p_window_start, p_window_end)`
+(issue #93) is a service-role-only, set-based aggregate over the authoritative
+domain tables for internal operator dashboards. It returns fixed
+`(dimension, bucket, row_count, interval_seconds, as_of)` groups only, where
+`interval_seconds` is the mean request decision lag (seconds) for the decision
+measures. No table and no column is added. It adds no provider series and no row
+identifiers, and identifiers may only enter `COUNT` or `COUNT(DISTINCT ...)`
+groupings inside the function.
+
+- Window: inclusive start, exclusive end, at most 90 Asia/Manila days; finite
+  bounds must align with Manila midnight. Future starts and ends beyond the
+  next Manila midnight are rejected. The application derives the UTC bounds.
+- Every row shares one database-generated `as_of`, captured after the operator
+  mapping lock. Period event observations stop at `min(window_end, as_of)`;
+  snapshots are current retained state, not reconstructed historical state.
+- Measures return `(dimension, bucket, row_count)`: onboarding by type and
+  all-time, active/repeat Provider activity, `ACTIVE_DAY` series buckets, staff
+  snapshot, current Repair statuses, Repair created/completed/READY/maintenance,
+  request received/decided/pending/cohort measures, mean decision seconds, and
+  Tracking observations/adoption.
+- Request cohort measures use `repair_requests.submitted_at` inside the window;
+  decision measures use `accepted_at`/`declined_at` inside the window, so the
+  cohort never shifts when a later decision lands.
+- Operator mapping is rechecked under `FOR SHARE` so a concurrent revocation
+  serializes against this read; the function fails closed on a missing or
+  disabled mapping.
+- It adds no table, no column, and no table policy. The Feedback trend is not
+  duplicated here; it is read through the Feedback summary interface
+  (`get_feedback_count_summary`) in disjoint windows of at most 31 days. The
+  application records their separate freshness, not a common atomic snapshot.
+
+### 17. Public Tracking projection
 
 `lookup_public_repair(text)` is a read-only `SECURITY DEFINER` function rather
 than a table or unrestricted view. It normalizes a bounded Tracking Code and
