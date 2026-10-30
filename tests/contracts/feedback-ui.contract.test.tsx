@@ -71,10 +71,7 @@ function rejectedWith(overrides: Partial<Omit<Rejected, "status">>): Rejected {
 function renderForm(state: FeedbackFormState | null, pending = false) {
   actionState.mockReturnValue([state, vi.fn(), pending]);
   return renderToStaticMarkup(
-    <FeedbackForm
-      action={vi.fn<FormAction>()}
-      initialNonce={INITIAL_NONCE}
-    />,
+    <FeedbackForm action={vi.fn<FormAction>()} initialNonce={INITIAL_NONCE} />,
   );
 }
 
@@ -242,9 +239,9 @@ describe("feedback form submission wrapper", () => {
   }
 
   it("returns an unconfirmed rejection that keeps the nonce sent when the action throws", async () => {
-    const action = vi.fn<FormAction>().mockRejectedValue(
-      new Error("connection reset"),
-    );
+    const action = vi
+      .fn<FormAction>()
+      .mockRejectedValue(new Error("connection reset"));
     const wrapper = wrapperFor(action);
 
     const state = await wrapper(
