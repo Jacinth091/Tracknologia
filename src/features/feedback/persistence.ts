@@ -3,6 +3,7 @@ import "server-only";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { z } from "zod";
 
+import { looksLikeContactDetails } from "./contact-details";
 import { feedbackUnavailable } from "./errors";
 import type { FeedbackListOptions } from "./schemas";
 import {
@@ -19,9 +20,14 @@ import {
 
 const FEEDBACK_PAGE_SIZE = 50;
 const FEEDBACK_HISTORY_LIMIT = 100;
+// Operator review is due once a submission is this old (#87 decision 7).
+const FEEDBACK_REVIEW_AGE_DAYS = 90;
+const DAY_MS = 86_400_000;
 
+// message is selected only to compute mayContainContactDetails. toPreview
+// copies fields one by one, so it never reaches the returned preview.
 const PREVIEW_COLUMNS =
-  "id, category, source, participant_class, title, status, priority, row_version, created_at, reviewed_at";
+  "id, category, source, participant_class, title, message, status, priority, row_version, created_at, reviewed_at";
 const DETAIL_COLUMNS =
   "id, category, source, participant_class, title, message, created_at, status, priority, internal_notes, linked_issue_url, row_version, reviewed_at";
 const HISTORY_COLUMNS =
@@ -43,6 +49,10 @@ const previewRowSchema = z.object({
   row_version: positiveVersion,
   created_at: timestamp,
   reviewed_at: timestamp.nullable(),
+});
+
+const previewQueryRowSchema = previewRowSchema.extend({
+  message: z.string(),
 });
 
 const detailRowSchema = previewRowSchema.extend({
@@ -74,7 +84,7 @@ const summaryRowSchema = z.object({
 });
 
 export type FeedbackSummaryRow = z.output<typeof summaryRowSchema>;
-export type FeedbackPreviewRow = z.output<typeof previewRowSchema>;
+export type FeedbackPreviewRow = z.output<typeof previewQueryRowSchema>;
 
 export interface FeedbackSubmissionRecord {
   nonce: string;
@@ -144,6 +154,12 @@ export async function listFeedbackPreviews(
   if (options.source) {
     query = query.eq("source", options.source);
   }
+  if (options.dueForReview) {
+    const reviewCutoff = new Date(
+      Date.now() - FEEDBACK_REVIEW_AGE_DAYS * DAY_MS,
+    ).toISOString();
+    query = query.lt("created_at", reviewCutoff);
+  }
   if (options.cursor) {
     const [cursorTime, cursorId] = options.cursor.split("|");
     query = query.or(
@@ -156,7 +172,7 @@ export async function listFeedbackPreviews(
     throw feedbackUnavailable("list feedback", error);
   }
 
-  const parsed = z.array(previewRowSchema).safeParse(data);
+  const parsed = z.array(previewQueryRowSchema).safeParse(data);
   if (!parsed.success) {
     throw malformed("list feedback");
   }
@@ -372,5 +388,8 @@ function toPreview(row: FeedbackPreviewRow) {
     rowVersion: row.row_version,
     createdAt: row.created_at,
     reviewedAt: row.reviewed_at,
+    mayContainContactDetails: looksLikeContactDetails(
+      `${row.title ?? ""} ${row.message}`,
+    ),
   };
 }
