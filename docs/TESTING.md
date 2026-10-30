@@ -38,6 +38,14 @@ pending, alert and receipt states, the plain `/feedback` links from Tracking and
 the Request receipt, the Provider nav Feedback item, and the public and Provider
 page nonce and context wiring.
 
+`src/app/(internal)/internal/activity/page.test.tsx` renders the operator
+validation metrics page with `getValidationMetrics` and the access guard mocked
+at the feature seam. It checks that values render, that `null` ratios and
+unavailable Feedback show as N/A and Unavailable rather than 0, that each
+`MetricsError` code and the unauthenticated redirect map to their outcome, that
+URL params map to the window input with a 7-day default, and that no raw
+identifiers appear in the HTML. It needs no database.
+
 Avoid testing implementation details or Tailwind class strings unless they are functionally significant.
 
 ### End-to-end tests — Playwright
