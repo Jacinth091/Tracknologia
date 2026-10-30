@@ -25,4 +25,13 @@ describe("looksLikeContactDetails", () => {
   ])("does not flag device or number text in %j", (text) => {
     expect(looksLikeContactDetails(text)).toBe(false);
   });
+
+  it("returns false for a huge unbroken token with no @", () => {
+    expect(looksLikeContactDetails("a".repeat(100_000))).toBe(false);
+  });
+
+  it("checks only the first 4000 characters", () => {
+    const text = `${"a".repeat(4000)} jane.doe@example.com`;
+    expect(looksLikeContactDetails(text)).toBe(false);
+  });
 });
