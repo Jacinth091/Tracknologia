@@ -2,6 +2,7 @@
 process.env.TZ = "UTC";
 
 import { describe, expect, it, vi } from "vitest";
+import type { ReactNode } from "react";
 import { renderToStaticMarkup } from "react-dom/server";
 
 // Mocked: the feature read (the data seam), framework navigation, and the icon
@@ -27,7 +28,7 @@ vi.mock("next/navigation", () => ({
 }));
 
 vi.mock("next/link", () => ({
-  default: ({ href, children }: { href: string; children: unknown }) => (
+  default: ({ href, children }: { href: string; children: ReactNode }) => (
     <a href={href}>{children}</a>
   ),
 }));
