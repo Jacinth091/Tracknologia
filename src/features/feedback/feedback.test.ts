@@ -733,15 +733,7 @@ describe("Feedback schemas", () => {
 // functions see the same shape PostgREST returns.
 function queryResult(result: { data: unknown; error: unknown }) {
   const chain: Record<string, unknown> = {};
-  for (const method of [
-    "select",
-    "order",
-    "limit",
-    "eq",
-    "or",
-    "lt",
-    "is",
-  ]) {
+  for (const method of ["select", "order", "limit", "eq", "or", "lt", "is"]) {
     chain[method] = vi.fn(() => chain);
   }
   chain.maybeSingle = vi.fn(() => Promise.resolve(result));
