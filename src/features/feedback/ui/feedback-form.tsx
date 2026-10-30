@@ -12,6 +12,7 @@ import { Label } from "@/components/ui/label";
 import { LoadingSpinner } from "@/components/ui/loading-spinner";
 import { Textarea } from "@/components/ui/textarea";
 
+import { looksLikeContactDetails } from "../contact-details";
 import {
   FEEDBACK_CATEGORIES,
   type FeedbackCategory,
@@ -154,6 +155,13 @@ function FeedbackFields({
   const [category, setCategory] = useState(values?.category ?? "");
   const prompt = isCategory(category) ? CATEGORY_COPY[category].prompt : null;
   const hasFieldErrors = Object.keys(fieldErrors).length > 0;
+  const [typed, setTyped] = useState({
+    title: values?.title ?? "",
+    message: values?.message ?? "",
+  });
+  const contactWarning = looksLikeContactDetails(
+    `${typed.title}\n${typed.message}`,
+  );
 
   return (
     <form action={formAction} className="space-y-6" aria-busy={pending}>
@@ -207,6 +215,9 @@ function FeedbackFields({
           id="feedback-title"
           name="title"
           defaultValue={values?.title}
+          onChange={(event) =>
+            setTyped((current) => ({ ...current, title: event.target.value }))
+          }
           autoComplete="off"
           aria-invalid={Boolean(fieldErrors.title)}
           aria-describedby={
@@ -222,6 +233,13 @@ function FeedbackFields({
 
       <div className="space-y-2">
         <Label htmlFor="feedback-message">Message</Label>
+        <p
+          id="feedback-message-reminder"
+          className="text-sm text-muted-foreground"
+        >
+          Please don&apos;t include names, phone numbers, addresses or other
+          personal details.
+        </p>
         {prompt && (
           <p
             id="feedback-message-prompt"
@@ -235,17 +253,33 @@ function FeedbackFields({
           name="message"
           rows={6}
           defaultValue={values?.message}
+          onChange={(event) =>
+            setTyped((current) => ({
+              ...current,
+              message: event.target.value,
+            }))
+          }
           required
           aria-invalid={Boolean(fieldErrors.message)}
           aria-describedby={
             [
+              "feedback-message-reminder",
               prompt ? "feedback-message-prompt" : null,
+              contactWarning ? "feedback-contact-warning" : null,
               fieldErrors.message ? "feedback-message-error" : null,
             ]
               .filter(Boolean)
-              .join(" ") || undefined
+              .join(" ")
           }
         />
+        <p
+          id="feedback-contact-warning"
+          aria-live="polite"
+          className="text-sm text-destructive"
+        >
+          {contactWarning &&
+            "This looks like a phone number or email address. Please remove it before sending."}
+        </p>
         {fieldErrors.message && (
           <p id="feedback-message-error" className="text-xs text-destructive">
             {fieldErrors.message}
