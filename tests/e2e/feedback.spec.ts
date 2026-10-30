@@ -225,7 +225,9 @@ test.describe("E2E-10 Participant feedback forms", () => {
         page.getByText(TITLE_TOO_LONG_COPY, { exact: true }),
       ).toBeVisible();
       await expect(page.getByLabel("Title (optional)")).toBeFocused();
-      await expect(page.getByLabel("Title (optional)")).toHaveValue(longerTitle);
+      await expect(page.getByLabel("Title (optional)")).toHaveValue(
+        longerTitle,
+      );
       await expect(page.getByLabel("Message", { exact: true })).toHaveValue(
         message,
       );
