@@ -41,7 +41,7 @@ export default async function InternalPage() {
         This private area is limited to enabled internal operators, and operator
         access is recorded in the append-only internal access audit.
       </p>
-      <div>
+      <div className="flex flex-wrap gap-2">
         <Link
           href="/internal/feedback"
           className={cn(
@@ -50,6 +50,15 @@ export default async function InternalPage() {
           )}
         >
           Feedback Inbox
+        </Link>
+        <Link
+          href="/internal/activity"
+          className={cn(
+            buttonVariants({ variant: "outline", size: "sm" }),
+            "inline-flex",
+          )}
+        >
+          Validation metrics
         </Link>
       </div>
     </section>
