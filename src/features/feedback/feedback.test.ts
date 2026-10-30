@@ -733,7 +733,15 @@ describe("Feedback schemas", () => {
 // functions see the same shape PostgREST returns.
 function queryResult(result: { data: unknown; error: unknown }) {
   const chain: Record<string, unknown> = {};
-  for (const method of ["select", "order", "limit", "eq", "or", "lt"]) {
+  for (const method of [
+    "select",
+    "order",
+    "limit",
+    "eq",
+    "or",
+    "lt",
+    "is",
+  ]) {
     chain[method] = vi.fn(() => chain);
   }
   chain.maybeSingle = vi.fn(() => Promise.resolve(result));
@@ -931,7 +939,7 @@ describe("Inbox review aids", () => {
     expect(JSON.stringify(page)).not.toContain(CANARY);
   });
 
-  it("keeps only submissions older than 90 days when due for review", async () => {
+  it("keeps only unreviewed submissions older than 90 days when due", async () => {
     vi.useFakeTimers();
     vi.setSystemTime(new Date("2026-10-30T12:00:00Z"));
     try {
@@ -943,6 +951,7 @@ describe("Inbox review aids", () => {
         Date.UTC(2026, 9, 30, 12) - 90 * 86_400_000,
       ).toISOString();
       expect(chain.lt).toHaveBeenCalledWith("created_at", cutoff);
+      expect(chain.is).toHaveBeenCalledWith("privacy_reviewed_at", null);
     } finally {
       vi.useRealTimers();
     }
