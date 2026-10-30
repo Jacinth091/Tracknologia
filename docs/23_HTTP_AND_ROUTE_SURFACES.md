@@ -49,7 +49,8 @@ generates the submission nonce, so each visit gets its own. It renders the
 shared `FeedbackForm` with the route-local `submitPublicFeedbackAction`. The
 action reads only the form fields through `submitFeedbackForm` and always
 records the `PUBLIC_FEEDBACK` source. The browser supplies no identity, source,
-or participant class. Copy is the #87 draft proposal and is not yet approved.
+or participant class. The copy and the inline privacy notice were owner-approved
+on 2026-10-30 (#87).
 
 ## Authentication routes
 
