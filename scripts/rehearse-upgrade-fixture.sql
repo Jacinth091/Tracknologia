@@ -107,3 +107,98 @@ VALUES
     now() + interval '1 day',
     2
   );
+
+-- Historic redaction for the privacy-review backfill (migration
+-- 20261102000000_add_feedback_privacy_review_mark.sql). Seeded only while that
+-- migration is pending: the privacy audit table exists and the
+-- privacy_reviewed_at column does not. Otherwise the base has no Feedback
+-- tables, or the column is already there, and nothing is seeded.
+--
+-- The redacted row mirrors the values the owner redaction runbook writes. Its
+-- two FEEDBACK_REDACTED audit rows are inserted latest first, so the upgrade
+-- must choose the earliest one. The control row has no audit row and must stay
+-- null after the backfill.
+DO $$
+BEGIN
+  IF to_regclass('public.feedback_privacy_audit') IS NOT NULL
+     AND NOT EXISTS (
+       SELECT 1
+       FROM information_schema.columns
+       WHERE table_schema = 'public'
+         AND table_name = 'feedback_submissions'
+         AND column_name = 'privacy_reviewed_at'
+     ) THEN
+    INSERT INTO public.feedback_submissions (
+      id,
+      submission_nonce,
+      category,
+      source,
+      participant_class,
+      title,
+      message,
+      status,
+      priority,
+      internal_notes,
+      created_at,
+      reviewed_at,
+      reviewed_by,
+      row_version
+    )
+    VALUES
+      (
+        '00000000-0000-4000-8000-00000000a001',
+        '00000000-0000-4000-8000-00000000b001',
+        'BUG',
+        'PUBLIC_TRACKING',
+        'PUBLIC_SELF_REPORTED_CUSTOMER',
+        '[redacted]',
+        '[redacted]',
+        'NEW',
+        'NORMAL',
+        NULL,
+        '2026-06-01T08:00:00Z',
+        '2026-06-10T09:00:00Z',
+        '00000000-0000-4000-8000-00000000c001',
+        2
+      ),
+      (
+        '00000000-0000-4000-8000-00000000a002',
+        '00000000-0000-4000-8000-00000000b002',
+        'USABILITY',
+        'PUBLIC_TRACKING',
+        'PUBLIC_SELF_REPORTED_CUSTOMER',
+        'Rehearsal control',
+        'Rehearsal control message',
+        'NEW',
+        'NORMAL',
+        NULL,
+        '2026-06-02T08:00:00Z',
+        NULL,
+        NULL,
+        1
+      );
+
+    INSERT INTO public.feedback_privacy_audit (
+      operation,
+      target_feedback_id,
+      actor_user_id,
+      approval_ref,
+      created_at
+    )
+    VALUES
+      (
+        'FEEDBACK_REDACTED',
+        '00000000-0000-4000-8000-00000000a001',
+        '00000000-0000-4000-8000-00000000c001',
+        'ISSUE-92-REHEARSAL',
+        '2026-06-12T09:00:00Z'
+      ),
+      (
+        'FEEDBACK_REDACTED',
+        '00000000-0000-4000-8000-00000000a001',
+        '00000000-0000-4000-8000-00000000c001',
+        'ISSUE-92-REHEARSAL',
+        '2026-06-10T09:00:00Z'
+      );
+  END IF;
+END $$;

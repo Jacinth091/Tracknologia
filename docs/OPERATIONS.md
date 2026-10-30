@@ -265,7 +265,8 @@ so that any triage form loaded before the redaction is rejected as a version
 conflict and cannot restore the erased text. The review stamp is filled only
 where it is null, so existing triage attribution is never overwritten. The
 version change itself is recorded as a `FEEDBACK_REDACTED` event in the privacy
-audit.
+audit. The redaction also sets `privacy_reviewed_at` to now(), so the submission
+leaves the 90-day due queue.
 
 On a row that was never reviewed (`row_version` 1), the redaction is the first
 touch. It fills `reviewed_at` and `reviewed_by` with the actor and time to
@@ -306,7 +307,8 @@ begin
       internal_notes = null,
       row_version = row_version + 1,
       reviewed_at = coalesce(reviewed_at, now()),
-      reviewed_by = coalesce(reviewed_by, v_actor_user_id)
+      reviewed_by = coalesce(reviewed_by, v_actor_user_id),
+      privacy_reviewed_at = now()
   where id = v_feedback_id;
   get diagnostics v_rows = row_count;
   if v_rows <> 1 then
@@ -375,10 +377,79 @@ end $$;
 rollback;
 ```
 
+Mark privacy review done (kept) is for a submission whose text needs no change:
+it is useful, carries no personal details, and should be kept. The block changes
+no text, status, priority or history. It sets `privacy_reviewed_at` to now() and
+writes a `FEEDBACK_PRIVACY_REVIEWED` audit row, so the submission leaves the
+90-day due queue:
+
+```sql
+-- runbook: feedback-privacy-review-kept
+-- Owner-approved privacy review that keeps one Feedback submission unchanged.
+-- Sets privacy_reviewed_at so the item leaves the 90-day due queue. Changes no
+-- text, status, priority or history. Rehearsal default ends with rollback;.
+-- Change the final statement to commit; only after review and the #87 approval.
+begin;
+do $$
+declare
+  v_feedback_id uuid := '<feedback-submission-uuid>'::uuid;
+  v_actor_user_id uuid := '<actor-auth-user-uuid>'::uuid;
+  v_approval_ref text := '<approval-ref>';
+  v_rows integer;
+begin
+  if v_approval_ref !~ '^[A-Za-z0-9#._/:-]{3,80}$' then
+    raise exception 'Approval reference is missing or out of bounds';
+  end if;
+
+  perform 1
+  from public.feedback_submissions
+  where id = v_feedback_id
+  for update;
+  if not found then
+    raise exception 'Target feedback submission not found';
+  end if;
+
+  update public.feedback_submissions
+  set privacy_reviewed_at = now()
+  where id = v_feedback_id;
+  get diagnostics v_rows = row_count;
+  if v_rows <> 1 then
+    raise exception 'Privacy review mark must affect exactly one submission, affected %', v_rows;
+  end if;
+
+  insert into public.feedback_privacy_audit
+    (operation, target_feedback_id, actor_user_id, approval_ref)
+  values
+    ('FEEDBACK_PRIVACY_REVIEWED', v_feedback_id, v_actor_user_id, v_approval_ref);
+end $$;
+rollback;
+```
+
 Routine triage is unaffected: `INTERNAL_ACCESS_VIEW` stays an access-only event
 with a null reason, and neither block writes to `internal_access_audit`. There
 is no public or Provider path to feedback lookups, and no automated GitHub
 posting; the linked-issue field in triage is a written reference only.
+
+### 90-day feedback review
+
+Participant feedback older than 90 days, with no privacy review recorded, is due
+(issue #87, decision 7; issue #108). Work through the due items as follows:
+
+1. In the internal Feedback Inbox, tick "Due for review (90+ days)" and apply
+   the filters. The list then shows only submissions created more than 90 days
+   ago that have no privacy review recorded.
+2. Open each item and read the original text. The "May contain personal
+   details" badge is a hint, so check the text yourself as well.
+   - If it has personal details, run the feedback redaction block above for that
+     submission, under its owner-approved ticket and the #87 approval.
+   - If it has no value to keep, run the feedback purge block above for that
+     submission, under the same approval.
+   - If it is useful and has no personal details, run the "Mark privacy review
+     done (kept)" block above for that submission, under the same approval.
+3. Each item leaves the queue once it is redacted, purged or marked. Redacting
+   also clears the badge, because the text changes. Changing only the status or
+   priority does not remove an item. Privacy review must be recorded with one of
+   the blocks above.
 
 ### What is out of scope
 

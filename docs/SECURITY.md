@@ -153,7 +153,9 @@ roles, not `user_metadata`, and not inferred from owning or joining a Provider:
   never a browser, Provider, or service-role path. Each runs in one transaction
   that ends with `rollback;` by default. The privacy audit
   (`feedback_privacy_audit`) is append-only, with no client privilege and
-  `service_role` `SELECT` only. A redaction bumps `row_version` and fills the
+  `service_role` `SELECT` only. The audit operations are `FEEDBACK_REDACTED`,
+  `FEEDBACK_PURGED` and `FEEDBACK_PRIVACY_REVIEWED` (the kept mark, which changes
+  no text). A redaction bumps `row_version` and fills the
   review stamp without overwriting it, so a triage form loaded before the
   redaction is rejected with `FEEDBACK_VERSION_CONFLICT` and cannot restore
   erased notes; the linked issue URL is retained. Routine access views stay `INTERNAL_ACCESS_VIEW` events
