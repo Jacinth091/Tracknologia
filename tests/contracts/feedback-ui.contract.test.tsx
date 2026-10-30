@@ -101,11 +101,17 @@ describe("feedback form", () => {
     }
     expect(hiddenNonce(html)).toBe(INITIAL_NONCE);
     expect(html).toContain("How we handle your feedback");
+    expect(html).toContain(
+      "<strong>Who can read it:</strong> only the Tracknologia team.",
+    );
+    expect(html).toContain("within 90 days we review feedback");
+    expect(html).toContain('id="feedback-message-reminder"');
+    expect(html).not.toContain("This looks like a phone number");
     for (const prompt of [
-      "What were you trying to do? / What happened? / What did you expect?",
-      "What were you trying to do, and what made it harder than expected?",
-      "What would you like to be able to do, and why?",
-      "What would you like us to know?",
+      "Something not working? Tell us what you were doing and what went wrong.",
+      "Was something confusing or hard to use?",
+      "What would make Tracknologia more useful for you?",
+      "Anything else you&#x27;d like to tell us?",
     ]) {
       expect(html).not.toContain(prompt);
     }
@@ -119,14 +125,17 @@ describe("feedback form", () => {
           title: "Tracking page",
           message: "Status stuck",
         },
-        fieldErrors: { message: "Enter a message before submitting." },
+        fieldErrors: { message: "Please write a message first." },
       }),
     );
 
     expect(radioFor(html, "BUG")).toContain('checked=""');
     expect(html).toContain(
-      "What were you trying to do? / What happened? / What did you expect?",
+      "Something not working? Tell us what you were doing and what went wrong.",
     );
+    const errorTag =
+      html.match(/<p\b[^>]*id="feedback-message-error"[^>]*>/)?.[0] ?? "";
+    expect(errorTag).toContain('role="alert"');
     const textarea = html.match(/<textarea\b[^>]*>/)?.[0] ?? "";
     expect(textarea).toContain('aria-invalid="true"');
     const describedBy =
@@ -139,17 +148,14 @@ describe("feedback form", () => {
   });
 
   it.each([
-    [
-      "USABILITY",
-      "What were you trying to do, and what made it harder than expected?",
-    ],
-    ["FEATURE_REQUEST", "What would you like to be able to do, and why?"],
-    ["GENERAL", "What would you like us to know?"],
+    ["USABILITY", "Was something confusing or hard to use?"],
+    ["FEATURE_REQUEST", "What would make Tracknologia more useful for you?"],
+    ["GENERAL", "Anything else you&#x27;d like to tell us?"],
   ])("shows the %s prompt after a rejected attempt", (category, prompt) => {
     const html = renderForm(
       rejectedWith({
         values: { category, title: "", message: "" },
-        fieldErrors: { message: "Enter a message before submitting." },
+        fieldErrors: { message: "Please write a message first." },
       }),
     );
 
@@ -158,11 +164,12 @@ describe("feedback form", () => {
   });
 
   it("announces a rejected attempt without field errors as an alert", () => {
-    const message = "Too many submissions. Wait a few minutes and try again.";
+    const message =
+      "You've sent a lot in a short time. Please wait a few minutes and try again.";
     const html = renderForm(rejectedWith({ reason: "RATE_LIMITED", message }));
 
     expect(html).toMatch(/<div[^>]*role="alert"[^>]*>/);
-    expect(html).toContain(message);
+    expect(html).toContain(message.replace(/'/g, "&#x27;"));
   });
 
   it("disables submission and shows progress while pending", () => {
@@ -178,10 +185,106 @@ describe("feedback form", () => {
 
     expect(html).toContain('role="status"');
     expect(html).toContain(
-      "Thanks — your feedback was received. We can&#x27;t reply to every submission.",
+      "Thanks! We got your feedback. We read everything, but we can&#x27;t reply to each message.",
     );
     expect(html).toContain(">Send more feedback</button>");
     expect(html).not.toContain("<form");
+  });
+
+  it("warns about contact details without hiding the text", () => {
+    const html = renderForm(
+      rejectedWith({
+        values: { category: "BUG", title: "", message: "Call 0917 123 4567" },
+        fieldErrors: {},
+      }),
+    );
+
+    expect(html).toContain(
+      "This looks like a phone number or email address. Please remove it before sending.",
+    );
+    const textarea = html.match(/<textarea\b[^>]*>/)?.[0] ?? "";
+    expect(textarea).toContain("feedback-contact-warning");
+    expect(textarea).toContain("feedback-message-reminder");
+    expect(html).toMatch(/<textarea[^>]*>Call 0917 123 4567<\/textarea>/);
+  });
+});
+
+describe("feedback form submission wrapper", () => {
+  const savedText = {
+    category: "BUG",
+    title: "Tracking page",
+    message: "Status stuck",
+  };
+  const previous = rejectedWith({ values: savedText });
+
+  function formFor(fields: Record<string, string>) {
+    const formData = new FormData();
+    for (const [name, value] of Object.entries(fields)) {
+      formData.set(name, value);
+    }
+    return formData;
+  }
+
+  // The wrapper is the first argument of the mocked useActionState.
+  function wrapperFor(action: ReturnType<typeof vi.fn>) {
+    renderToStaticMarkup(
+      <FeedbackForm action={action} initialNonce={INITIAL_NONCE} />,
+    );
+    return actionState.mock.calls.at(-1)?.[0] as (
+      previous: FeedbackFormState | null,
+      formData: FormData,
+    ) => Promise<FeedbackFormState>;
+  }
+
+  it("returns an unconfirmed rejection that keeps the nonce sent when the action throws", async () => {
+    const action = vi.fn().mockRejectedValue(new Error("connection reset"));
+    const wrapper = wrapperFor(action);
+
+    const state = await wrapper(
+      null,
+      formFor({ ...savedText, submissionNonce: NONCE }),
+    );
+
+    expect(state).toEqual({
+      status: "rejected",
+      reason: "UNAVAILABLE",
+      message:
+        "We're not sure it went through. It's safe to send again; we won't get it twice.",
+      fieldErrors: {},
+      values: savedText,
+      nonce: NONCE,
+    });
+  });
+
+  it("keeps the nonce when an identical resend follows a rejection", async () => {
+    const action = vi
+      .fn()
+      .mockResolvedValue({ status: "accepted", nextNonce: NEXT_NONCE });
+    const wrapper = wrapperFor(action);
+
+    await wrapper(previous, formFor({ ...savedText, submissionNonce: NONCE }));
+
+    expect(action.mock.calls[0][1].get("submissionNonce")).toBe(NONCE);
+  });
+
+  it("replaces the nonce when the text changed after a rejection", async () => {
+    const action = vi
+      .fn()
+      .mockResolvedValue({ status: "accepted", nextNonce: NEXT_NONCE });
+    const wrapper = wrapperFor(action);
+
+    await wrapper(
+      previous,
+      formFor({
+        ...savedText,
+        message: "Status changed",
+        submissionNonce: NONCE,
+      }),
+    );
+
+    const sent = action.mock.calls[0][1].get("submissionNonce");
+    expect(sent).toMatch(UUID_PATTERN);
+    expect(sent).not.toBe(NONCE);
   });
 });
 
