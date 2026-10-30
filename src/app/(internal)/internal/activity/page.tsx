@@ -27,7 +27,6 @@ const PERIOD_OPTIONS = [
 ] as const;
 
 type Period = (typeof PERIOD_OPTIONS)[number]["value"];
-type Counts = ValidationMetrics["providers"]["allTime"];
 
 function firstSearchParam(value?: string | string[]) {
   return Array.isArray(value) ? value[0] : value;
