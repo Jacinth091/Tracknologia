@@ -227,6 +227,15 @@ that normalized email — including invitations held by other Shops while the
 recipient was still eligible — is superseded. Cross-Shop invitations remain
 independent only while the recipient has no membership.
 
+## Public health check
+
+`GET /api/health` is a deliberate public exception for the uptime monitor. It
+answers `{"status":"healthy"}` (200) or `{"status":"unavailable"}` (503) with
+`Cache-Control: no-store`. It has no cookies, auth, redirects or other fields.
+The probe is a read-only, head-only, single-row query with no table content,
+bounded by a 3-second timeout. Its failure logs carry only a fixed message and
+a SQLSTATE-shaped code.
+
 ## Server Actions and Route Handlers
 
 Treat every mutation interface as externally callable.

@@ -389,6 +389,21 @@ internal provisioning UI or Server Action
 publishable-key access to the audit or admin functions
 ```
 
+## Uptime monitoring
+
+Uptime is watched by UptimeRobot (Free) with one HTTP(S) monitor on
+`<app-url>/api/health`, a 5-minute interval, and an alert contact owned by the
+operator.
+
+- `200` with `{"status":"healthy"}` means the app reached its database.
+- `503` with `{"status":"unavailable"}` means it did not. Check the production
+  logs for `[HEALTH_FAILURE]` and the database status before acting.
+- There is no detail by design. The body and headers reveal nothing about the
+  cause, version or hostname.
+
+Record each incident as a GitHub issue with the #87 fields: start, end, impact,
+category, status, resolution and release ref. Never include participant data.
+
 ## Exit criteria
 
 ```text
