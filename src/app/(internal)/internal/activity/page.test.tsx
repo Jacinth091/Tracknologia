@@ -226,7 +226,10 @@ describe("Validation metrics page", () => {
       new MetricsError("Metrics period is invalid", "INVALID_INPUT"),
     );
 
-    const html = await renderActivity({ period: "custom", start: "2026-01-01" });
+    const html = await renderActivity({
+      period: "custom",
+      start: "2026-01-01",
+    });
 
     expect(html).toContain("up to 90 days");
     expect(html).toContain('name="period"');

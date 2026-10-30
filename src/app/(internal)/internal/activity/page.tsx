@@ -262,7 +262,10 @@ export default async function ActivityPage({
                 title="By category"
                 counts={metrics.feedback.byCategory}
               />
-              <CountGroup title="By status" counts={metrics.feedback.byStatus} />
+              <CountGroup
+                title="By status"
+                counts={metrics.feedback.byStatus}
+              />
             </>
           ) : (
             <p className="text-sm text-muted-foreground">
