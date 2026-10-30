@@ -132,46 +132,45 @@ deployments also follow, reject both at startup.
 Vercel bakes `NEXT_PUBLIC_*` values into the build, so redeploy after you change
 them.
 
-### Preview: the #109 acceptance check
-
-Run the acceptance check on a Preview deployment backed by a separate, free
-**test** Supabase project, so pilot data stays clean. Running it against
-Production instead needs the owner's explicit approval.
-
-1. Link the repo to the test project and apply every migration:
-
-   ```bash
-   npx supabase link --project-ref <test-ref>
-   npx supabase db push
-   ```
-
-2. Set the variables above with the **Preview** scope, using the test project's values. Set `NEXT_PUBLIC_APP_URL` to the branch's stable Preview URL, `https://<project>-git-<branch>-<scope>.vercel.app`.
-3. In the test project's Supabase Authentication → URL Configuration, set the Site URL to that Preview URL, and add `<preview-url>/auth/callback` to the redirect URLs.
-4. Vercel Deployment Protection may require you to be signed in to Vercel to open the Preview URL.
-
-Each Vercel deployment page shows the Git commit it was built from. Use the
-deployment at the PR's exact head SHA, and confirm that SHA before you test.
-
-Smoke and anti-spoof checklist, run on the Preview:
-
-- A Tracking lookup with a real tracking code shows the Repair.
-- A Repair Request submitted from a Provider's public page succeeds.
-- Feedback submission succeeds.
-- **Throttle:** from one device, the 21st feedback submission within 10 minutes is throttled (default `PUBLIC_ABUSE_FEEDBACK_MAX=20`).
-- **Spoof:** repeat the throttle check with a browser header extension, such as ModHeader, adding forged `x-vercel-forwarded-for`, `x-forwarded-for`, `x-real-ip` and `x-tracknologia-client-ip` values. It must still throttle at the 21st submission.
-- **Isolation:** from a second device on a different network, such as a phone on mobile data, a submission still succeeds while the first device is throttled.
-
-Record pass or fail, the deployed SHA and the date only. Do not record IP
-addresses, tracking codes or personal data.
-
-### Production: the pilot
+### Production: the pilot setup
 
 Set the same variables with the **Production** scope. Point them at the pilot
 Supabase project, and set `NEXT_PUBLIC_APP_URL` to the production URL. In the
 pilot project's Supabase Authentication → URL Configuration, set the Site URL
 to the production URL, and add `<app-url>/auth/callback` to the redirect URLs.
 
-Never put real participant data in a Preview deployment.
+### Production: pre-launch acceptance check
+
+Run this check on the production deployment **before the pilot opens**, against
+the pilot Supabase project. That project holds no participant data before
+launch. The owner approved running the check here (#109, 2026-10-30).
+
+1. Open the Vercel deployment page and confirm it shows the exact merged commit you expect. Record that SHA.
+2. Put the marker `SMOKE-TEST` in every test title or message you submit. Create the test Provider account through the normal registration UI, with `SMOKE-TEST` in its name.
+3. Run the checklist on the production URL:
+   - A Tracking lookup with the tracking code of a `SMOKE-TEST` Repair shows the Repair.
+   - A Repair Request submitted from the test Provider's public page succeeds.
+   - Feedback submission succeeds.
+   - **Throttle:** from one device, the 21st feedback submission within 10 minutes is throttled (default `PUBLIC_ABUSE_FEEDBACK_MAX=20`).
+   - **Spoof:** repeat the throttle check with a browser header extension, such as ModHeader, adding forged `x-vercel-forwarded-for`, `x-forwarded-for`, `x-real-ip` and `x-tracknologia-client-ip` values. It must still throttle at the 21st submission.
+   - **Isolation:** from a second device on a different network, such as a phone on mobile data, a submission still succeeds while the first device is throttled.
+4. Record pass or fail, the deployed SHA and the date only. Do not record IP
+   addresses, tracking codes or personal data.
+
+### Test data cleanup
+
+Delete all `SMOKE-TEST` data before you invite anyone. Use this order, because
+feedback has no link to a Provider and cannot be removed by deleting one:
+
+1. **Feedback:** the owner runs the feedback-purge runbook in `docs/OPERATIONS.md` ("Feedback redaction and deletion") for each `SMOKE-TEST` submission. It is owner-only, irreversible and needs an approval reference.
+2. **Test Provider:** in the Supabase dashboard, delete the `SMOKE-TEST` Provider. This cascades to its Repairs, Repair Requests, status events, updates and tracking observations.
+3. **Test user:** in Supabase Authentication, delete the `SMOKE-TEST` user.
+
+### Preview deployments (optional)
+
+Preview deployments are not needed for the pre-launch check. If you use one,
+give it its own Preview-scoped variables, following the list above. A Preview
+must never hold real participant data.
 
 ## Start the application
 
