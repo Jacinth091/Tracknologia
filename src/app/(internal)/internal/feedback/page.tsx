@@ -11,6 +11,7 @@ import {
   EmptyMedia,
   EmptyTitle,
 } from "@/components/ui/empty";
+import { Badge } from "@/components/ui/badge";
 import { buttonVariants } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Label } from "@/components/ui/label";
@@ -56,7 +57,12 @@ function nonEmptyParam(value?: string) {
 }
 
 function inboxHref(
-  filters: { status?: string; category?: string; source?: string },
+  filters: {
+    status?: string;
+    category?: string;
+    source?: string;
+    due?: string;
+  },
   cursor?: string,
 ) {
   const params = new URLSearchParams();
@@ -93,19 +99,23 @@ export default async function FeedbackInboxPage({
     category?: string | string[];
     source?: string | string[];
     cursor?: string | string[];
+    due?: string | string[];
   }>;
 }) {
   const params = await searchParams;
+  const dueForReview = nonEmptyParam(firstSearchParam(params.due)) === "1";
   const raw = {
     status: nonEmptyParam(firstSearchParam(params.status)),
     category: nonEmptyParam(firstSearchParam(params.category)),
     source: nonEmptyParam(firstSearchParam(params.source)),
     cursor: nonEmptyParam(firstSearchParam(params.cursor)),
+    dueForReview: dueForReview || undefined,
   };
   const current = {
     status: raw.status,
     category: raw.category,
     source: raw.source,
+    due: dueForReview ? "1" : undefined,
   };
 
   let page;
@@ -192,6 +202,17 @@ export default async function FeedbackInboxPage({
             ))}
           </select>
         </div>
+        <div className="flex items-center gap-2 sm:col-span-3">
+          <input
+            id="filter-due"
+            type="checkbox"
+            name="due"
+            value="1"
+            defaultChecked={current.due === "1"}
+            className="size-4 accent-primary"
+          />
+          <Label htmlFor="filter-due">Due for review (90+ days)</Label>
+        </div>
         <div className="sm:col-span-3">
           <button
             type="submit"
@@ -235,6 +256,11 @@ export default async function FeedbackInboxPage({
                     </p>
                   </div>
                   <div className="flex shrink-0 items-center gap-2">
+                    {item.mayContainContactDetails && (
+                      <Badge variant="outline">
+                        May contain personal details
+                      </Badge>
+                    )}
                     {item.priority !== "NORMAL" && (
                       <span
                         className={cn(
