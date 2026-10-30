@@ -84,13 +84,27 @@ jobs:
           path: test-results/unit.json
           retention-days: 7
 
-      - name: Build application
+      # The scan shares this step's env so it always searches for the exact
+      # placeholder values the build received.
+      - name: Build application and scan browser bundle for server secrets
         env:
           NEXT_PUBLIC_APP_URL: https://ci-build.invalid
           SUPABASE_SERVICE_ROLE_KEY: ci-build-only-service-role-placeholder
           RESEND_API_KEY: re_ci_build_only_placeholder
           RESEND_FROM_EMAIL: Tracknologia <noreply@ci-build.invalid>
-        run: pnpm build
+        run: |
+          pnpm build
+          if [ -z "$(ls -A .next/static 2>/dev/null)" ]; then
+            echo "::error::.next/static is missing or empty; cannot scan the browser bundle"
+            exit 1
+          fi
+          for name in SUPABASE_SERVICE_ROLE_KEY RESEND_API_KEY PUBLIC_ABUSE_HMAC_SECRET PUBLIC_ABUSE_TRUSTED_PROXY_SECRET; do
+            [ -n "${!name}" ] || { echo "::error::$name is empty; nothing to scan for"; exit 1; }
+            if grep -rlF -- "${!name}" .next/static; then
+              echo "::error::$name value found in the browser bundle (files above)"
+              exit 1
+            fi
+          done
 
   db-integration:
     name: Database integration

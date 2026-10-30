@@ -27,6 +27,7 @@ Key invariants:
 - **Fail-Fast**: Production configurations missing required secrets (`NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY`, `SUPABASE_SERVICE_ROLE_KEY`, `RESEND_API_KEY`, `PUBLIC_ABUSE_HMAC_SECRET`, `PUBLIC_ABUSE_TRUSTED_PROXY_SECRET`) or with invalid app origins fail immediately at boot.
 - **Forbidden Ingress Bypasses**: `PUBLIC_ABUSE_SHARED_DEV_BUCKET=true` and `NEXT_PUBLIC_REQUIRE_EMAIL_CONFIRMATION=false` are explicitly rejected in production to prevent silent security degradation.
 - **Secret Privacy**: Configuration validation errors and email client error logs MUST NEVER leak API keys, HMAC secrets, bearer tokens, or email message bodies. Dev email logging executes ONLY when `RESEND_API_KEY` is omitted in local/development mode, printing only safe non-sensitive metadata (recipient address, sender address, subject line).
+- **Browser Bundle Scan**: Server secrets are read only in the `server-only` config seam and are never `NEXT_PUBLIC_*`. The CI `Verify` build then searches `.next/static` for the build's placeholder values of `SUPABASE_SERVICE_ROLE_KEY`, `RESEND_API_KEY`, `PUBLIC_ABUSE_HMAC_SECRET` and `PUBLIC_ABUSE_TRUSTED_PROXY_SECRET`, and fails if any appears or the directory is empty.
 
 ## Authentication
 
