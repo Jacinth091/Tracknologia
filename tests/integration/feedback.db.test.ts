@@ -1327,6 +1327,7 @@ describe.runIf(process.env.REHEARSAL_UPGRADE_FIXTURE === "1")(
         // The fixture seeds Feedback only while the mark migration is pending.
         if (redacted === null) {
           ctx.skip();
+          return;
         }
 
         const audits = assertSupabaseSuccess(
