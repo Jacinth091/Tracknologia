@@ -20,7 +20,8 @@ import {
 
 const FEEDBACK_PAGE_SIZE = 50;
 const FEEDBACK_HISTORY_LIMIT = 100;
-// Operator review is due once a submission is this old (#87 decision 7).
+// Privacy review is due once a submission is this old and still unreviewed
+// (#87 decision 7, #108).
 const FEEDBACK_REVIEW_AGE_DAYS = 90;
 const DAY_MS = 86_400_000;
 
@@ -158,7 +159,9 @@ export async function listFeedbackPreviews(
     const reviewCutoff = new Date(
       Date.now() - FEEDBACK_REVIEW_AGE_DAYS * DAY_MS,
     ).toISOString();
-    query = query.lt("created_at", reviewCutoff);
+    query = query
+      .lt("created_at", reviewCutoff)
+      .is("privacy_reviewed_at", null);
   }
   if (options.cursor) {
     const [cursorTime, cursorId] = options.cursor.split("|");
