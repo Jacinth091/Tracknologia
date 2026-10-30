@@ -19,7 +19,7 @@ const rateLimitOverridesSchema = z.object({
   PUBLIC_ABUSE_REPAIR_REQUEST_WINDOW_SECONDS: positiveInteger
     .max(86_400)
     .default(600),
-  PUBLIC_ABUSE_FEEDBACK_MAX: positiveInteger.max(10_000).default(5),
+  PUBLIC_ABUSE_FEEDBACK_MAX: positiveInteger.max(10_000).default(20),
   PUBLIC_ABUSE_FEEDBACK_WINDOW_SECONDS: positiveInteger
     .max(86_400)
     .default(600),

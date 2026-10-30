@@ -51,7 +51,7 @@ describe("durable public-operation abuse control", () => {
     expect(getRateLimitConfig().operations).toEqual({
       tracking_lookup: { max: 30, windowSeconds: 60 },
       repair_request_submit: { max: 5, windowSeconds: 600 },
-      feedback_submit: { max: 5, windowSeconds: 600 },
+      feedback_submit: { max: 20, windowSeconds: 600 },
     });
   });
 
