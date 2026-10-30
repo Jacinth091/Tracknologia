@@ -113,21 +113,18 @@ describe("submitFeedbackForm", () => {
       "Your title is too long. Keep it to 120 characters or fewer.",
     ],
     [{ category: "" }, "category", "Choose a feedback category"],
-  ])(
-    "maps invalid %j to the %s field copy",
-    async (overrides, field, copy) => {
-      const state = await submitFeedbackForm(
-        formDataWith(validFields(overrides)),
-        rejecting("INVALID_INPUT"),
-      );
+  ])("maps invalid %j to the %s field copy", async (overrides, field, copy) => {
+    const state = await submitFeedbackForm(
+      formDataWith(validFields(overrides)),
+      rejecting("INVALID_INPUT"),
+    );
 
-      expect(state).toMatchObject({
-        status: "rejected",
-        reason: "INVALID_INPUT",
-        fieldErrors: { [field]: copy },
-      });
-    },
-  );
+    expect(state).toMatchObject({
+      status: "rejected",
+      reason: "INVALID_INPUT",
+      fieldErrors: { [field]: copy },
+    });
+  });
 
   it("replaces a malformed nonce with a fresh UUID on rejection", async () => {
     const formData = formDataWith(
@@ -179,10 +176,7 @@ describe("submitFeedbackForm", () => {
       .mockImplementation(() => {});
     const submit = vi.fn().mockRejectedValue(new Error(PRIVATE_TEXT));
 
-    const state = await submitFeedbackForm(
-      formDataWith(validFields()),
-      submit,
-    );
+    const state = await submitFeedbackForm(formDataWith(validFields()), submit);
 
     expect(state).toMatchObject({
       status: "rejected",

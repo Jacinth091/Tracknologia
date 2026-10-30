@@ -268,9 +268,7 @@ describe("feedback pages", () => {
   });
 
   it("gives each public visit its own nonce", async () => {
-    const first = hiddenNonce(
-      renderToStaticMarkup(await PublicFeedbackPage()),
-    );
+    const first = hiddenNonce(renderToStaticMarkup(await PublicFeedbackPage()));
     const second = hiddenNonce(
       renderToStaticMarkup(await PublicFeedbackPage()),
     );
