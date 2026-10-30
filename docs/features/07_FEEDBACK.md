@@ -155,6 +155,20 @@ blocks. History returns the newest 100 events by `row_version`, presented oldest
 and reports truncation when older events exist.
 Lists use keyset pagination on `(created_at, id)`, with a page size of 50.
 
+Each preview carries `mayContainContactDetails`. The server computes it from the
+title and message with the same `looksLikeContactDetails` hint the participant
+form uses. Persistence reads the message only for that check, and the preview
+never returns it. The flag is a hint for operators, not a guarantee: it can miss
+details, so the operator still reads the original before deciding what to redact.
+
+The list also accepts `dueForReview`, exposed in the inbox as the `due=1` filter
+"Due for review (90+ days)". It keeps only submissions created more than 90 days
+ago, with the cutoff computed on the server at query time. The filter is
+age-based only (#87 decision 7). Redaction clears the badge because the text
+changes, and purge removes the row. An item reviewed but left unchanged stays in
+the list until it is purged. That limitation is deliberate and is described in
+`docs/OPERATIONS.md`.
+
 ## Review transitions
 
 `recordFeedbackReview` checks, in order: the operator guard, input shape, the

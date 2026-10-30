@@ -380,6 +380,28 @@ with a null reason, and neither block writes to `internal_access_audit`. There
 is no public or Provider path to feedback lookups, and no automated GitHub
 posting; the linked-issue field in triage is a written reference only.
 
+### 90-day feedback review
+
+Participant feedback older than 90 days is due for review (issue #87, decision
+7). Work through the due items as follows:
+
+1. In the internal Feedback Inbox, tick "Due for review (90+ days)" and apply
+   the filters. The list then shows only submissions created more than 90 days
+   ago.
+2. Open each item and read the original text. The "May contain personal
+   details" badge is a hint, so check the text yourself as well.
+   - If it has personal details, run the feedback redaction block above for that
+     submission, under its owner-approved ticket and the #87 approval.
+   - If it has no value to keep, run the feedback purge block above for that
+     submission, under the same approval.
+   - If it needs neither, leave it alone.
+3. Redacting clears the badge, because the text changes. A purged item leaves
+   the inbox.
+
+The due filter is age-based only. An item that was reviewed but left unchanged
+stays in the "Due for review" list. Its presence there does not mean a review
+was missed. Check its status history on the detail page instead.
+
 ### What is out of scope
 
 ```text
