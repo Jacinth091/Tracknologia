@@ -15,9 +15,11 @@ Requests, or Tracking. Participant forms (#91) are thin route adapters:
 `src/app/(public)/feedback/` for anonymous visitors and Customers, and
 `src/app/(provider)/dashboard/feedback/` for Provider members. They pass only
 browser input to `submitFeedbackForm`; the public page always records
-`PUBLIC_FEEDBACK`. Their copy and inline privacy notice are the #87 draft
-proposal and are **not approved**: the branch is a held draft PR and must not
-merge until #87 approves the copy and a working 90-day deletion process exists.
+`PUBLIC_FEEDBACK`. Their copy and inline privacy notice were owner-approved on
+2026-10-30 (#87). Feedback is kept, with a personal review within 90 days: the
+team removes or redacts personal details, or deletes feedback that is not
+useful, through the runbooks in `docs/OPERATIONS.md`. Inbox tooling for that
+review queue is a follow-up issue, not part of #91.
 The internal operator inbox (#92) is also a rendered surface:
 `src/app/(internal)/internal/feedback/` lists bounded previews, shows
 the bounded original text to enabled operators only, and adapts triage
@@ -89,7 +91,7 @@ SQLSTATE-shaped code, never SQL text, messages, input, or error payloads.
 
 Public and Provider submissions share one `feedback_submit` budget
 (`PUBLIC_ABUSE_FEEDBACK_MAX` / `PUBLIC_ABUSE_FEEDBACK_WINDOW_SECONDS`, default
-5 per 600 seconds), which is independent of the tracking and Repair Request
+20 per 600 seconds), which is independent of the tracking and Repair Request
 counters.
 
 The order is fixed:
@@ -102,9 +104,9 @@ The order is fixed:
 4. `submit_feedback` through the service-role public operation client.
 5. Accept the RPC result only when it is exactly `ACCEPTED`.
 
-Invalid input still consumes budget. Retries reuse the same
-`submissionNonce`, so the database makes a retry a no-op and returns the same
-receipt.
+Invalid input still consumes budget. An identical retry reuses the same
+`submissionNonce`, so the database makes it a no-op and returns the same
+receipt. An edited retry gets a new nonce (see Participant form).
 
 ## Validation bounds
 
@@ -196,6 +198,31 @@ status, and day in the window.
 never implies an all-time total. No row identifiers, text, nonce, or
 reviewer identity appear in the result.
 
+## Participant form
+
+The shared client form in `ui/feedback-form.tsx` adds three behaviours on top of
+the server contract:
+
+- **Personal-details reminder and warning.** The reminder always shows under the
+  Message label. `contact-details.ts` checks the title and message as the
+  participant types, for an email address, a Philippine mobile number, or a `+`
+  number of 9 or more digits. It shows a warning and never blocks a submission.
+  The check runs only in the browser, and no text leaves it for this purpose.
+- **Nonce rotation.** A rejected attempt keeps its nonce, so an identical resend
+  is a no-op in the database. A changed category, title, or message gets a fresh
+  nonce, so an edited retry is stored as a new submission (C-01).
+- **Lost responses.** The form submits through a client wrapper. If the action
+  throws, the wrapper returns an unconfirmed state with the "not sure" copy, and
+  it keeps the nonce that was sent, so an identical retry is safe.
+
+Tradeoff (C-03, accepted): the wrapper means that before the page hydrates, or
+without JavaScript, the form does not submit through the server action, and the
+lost-response handling is unavailable.
+
+Placement (C-04): `ui/` is deliberate. Two route groups (public and Provider)
+import the form, and the feature barrel is server-only. It is not a pattern for
+other features to copy.
+
 ## Module ownership
 
 - `persistence.ts` owns database access only. Every RPC and select response is
@@ -209,13 +236,14 @@ reviewer identity appear in the result.
 
 ## Explicit non-goals
 
-- No notifications, replies, or support engagement. The participant surfaces
-  stay gated by the held-copy status in the Description.
+- No notifications, replies, or support engagement. Inbox tooling for the 90-day
+  personal-review queue is a follow-up issue.
 - No Feedback reference on Repair, Repair Request, or Tracking records.
 - No public lookup, receipt identifier, or status endpoint.
 - No new tables beyond #89 and the owner-only `feedback_privacy_audit` (one
   aggregate RPC only).
-- Retention and erasure remain launch gates (issue #87). Redaction and purge are
+- Retention follows the #87 review model: a 90-day personal review, then
+  redaction or deletion. Redaction and purge are
   owner-run SQL in `docs/OPERATIONS.md` ("Feedback redaction and deletion"),
   each a separate rollback-first transaction. They are not a product or
   Provider feature, and no participant surface is enabled by them.
@@ -237,12 +265,17 @@ reviewer identity appear in the result.
 - `tests/contracts/feedback-ui.contract.test.tsx` renders the shared form
   (category radios and prompts, field-error wiring, pending, alert, accepted
   receipt), the plain `/feedback` links from Tracking and the Request receipt,
-  the Provider nav Feedback item by role, and the two pages' nonce and
-  Provider-context wiring.
+  the Provider nav Feedback item by role, the two pages' nonce and
+  Provider-context wiring, the personal-details warning, and the wrapper's
+  unconfirmed path and nonce rotation, captured through the mocked
+  `useActionState`.
+- `src/features/feedback/contact-details.test.ts` covers the phone and email
+  positives and the device, year, quantity and IMEI negatives.
 - `tests/e2e/feedback.spec.ts` (E2E-10) drives the real forms: an anonymous
-  visitor reaches `/feedback` from `/track` and stores four categories with the
-  public source and class; a 121-character title is refused in place; the
-  sixth submission in a window is throttled; each Provider role stores its
+  visitor reaches `/feedback` from `/track`, sees the warning appear and clear,
+  and stores four categories with the public source and class; a 121-character
+  title is refused in place; the twenty-first submission in a window is
+  throttled after 20 accepted; each Provider role stores its
   trusted class and `PROVIDER_WORKSPACE`; and the form fits a 375px viewport.
   Every scenario resets the shared `feedback_submit` limiter row before and
   after, scopes its reads to a per-run title marker, and deletes its rows

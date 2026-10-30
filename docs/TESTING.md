@@ -84,9 +84,10 @@ Mandatory release scenarios (one spec file each under `tests/e2e/`):
 Participant feedback has its own spec, `tests/e2e/feedback.spec.ts` (E2E-10),
 outside the numbered release list. It drives the real public and Provider forms
 and asserts stored rows through the service client. The `feedback_submit` limiter
-is one shared dev bucket (5 per 600 seconds across public and Provider
+is one shared dev bucket (20 per 600 seconds across public and Provider
 submissions), so every scenario deletes that limiter row through trusted SQL
-before and after it runs. Each scenario also writes titles with a per-run marker,
+before and after it runs. The throttle scenario sends 20 accepted submissions,
+then a 21st that is refused. Each scenario also writes titles with a per-run marker,
 scopes its reads to that marker, and deletes its rows through `runLocalSql` before
 its actors are removed.
 
@@ -201,6 +202,10 @@ proves acceptance and nonce rotation, that only the four form fields reach
 submit, the field-error copy, malformed-nonce replacement, the fixed
 rate-limit, forbidden, and unavailable copy, and that unexpected errors never
 reveal their text. It needs no database.
+
+`src/features/feedback/contact-details.test.ts` checks the pure personal-details
+hint: emails, Philippine mobile numbers and `+` numbers are flagged, while device
+names, years, quantities and 15-digit IMEIs are not. It needs no database.
 
 `tests/integration/feedback.db.test.ts` uses the same live psql sessions for
 same-nonce submissions and same-version reviews, the review/revocation overlap,

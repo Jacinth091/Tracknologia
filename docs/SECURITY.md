@@ -159,7 +159,7 @@ roles, not `user_metadata`, and not inferred from owning or joining a Provider:
   with a null reason. Policy approval for redaction and purge is issue #87 and
   is not implied by this implementation.
 - Feedback abuse budget: the durable limiter gains a `feedback_submit`
-  operation (default 5 requests per 600 seconds), with its own
+  operation (default 20 requests per 600 seconds), with its own
   `PUBLIC_ABUSE_FEEDBACK_*` overrides. Its counter is independent of the
   tracking and Repair Request counters.
 - Feedback summary (issue #90): `get_feedback_count_summary(...)` is service-role
@@ -177,8 +177,8 @@ roles, not `user_metadata`, and not inferred from owning or joining a Provider:
   Provider page), so a forged value never reaches storage. Entry links from
   Tracking, the Request receipt, and the Provider nav carry no query string and
   no Tracking Code or Request Reference. The participant copy and privacy notice
-  are the #87 draft proposal, not approved, and the branch is held until #87
-  approval and a working deletion process.
+  were owner-approved on 2026-10-30 (#87). Feedback is kept with a personal
+  review within 90 days, through the runbooks in `docs/OPERATIONS.md`.
 - Operational validation metrics (issue #93) independently require the operator
   guard and a successful access audit. The aggregate RPC rechecks the enabled
   mapping under `FOR SHARE` and is executable only by `service_role`. It returns
