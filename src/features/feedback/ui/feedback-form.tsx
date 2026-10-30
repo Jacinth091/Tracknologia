@@ -281,16 +281,14 @@ function FeedbackFields({
           }
           required
           aria-invalid={Boolean(fieldErrors.message)}
-          aria-describedby={
-            [
-              "feedback-message-reminder",
-              prompt ? "feedback-message-prompt" : null,
-              contactWarning ? "feedback-contact-warning" : null,
-              fieldErrors.message ? "feedback-message-error" : null,
-            ]
-              .filter(Boolean)
-              .join(" ")
-          }
+          aria-describedby={[
+            "feedback-message-reminder",
+            prompt ? "feedback-message-prompt" : null,
+            contactWarning ? "feedback-contact-warning" : null,
+            fieldErrors.message ? "feedback-message-error" : null,
+          ]
+            .filter(Boolean)
+            .join(" ")}
         />
         <p
           id="feedback-contact-warning"
@@ -342,8 +340,8 @@ function FeedbackPrivacyNotice() {
       <div className="mt-3 space-y-3 leading-relaxed">
         <p>
           <strong>What we collect:</strong> the kind of feedback, your title and
-          message, which page you sent it from, whether you&apos;re a customer or
-          a Provider (and your Provider role), and when you sent it. We
+          message, which page you sent it from, whether you&apos;re a customer
+          or a Provider (and your Provider role), and when you sent it. We
           don&apos;t ask for your name, email, phone number or tracking codes.
           Please don&apos;t put them in your message.
         </p>
@@ -352,8 +350,8 @@ function FeedbackPrivacyNotice() {
           customers and Providers can&apos;t.
         </p>
         <p>
-          <strong>How long we keep it:</strong> within 90 days we review feedback
-          and remove any personal details we find, or delete it if it
+          <strong>How long we keep it:</strong> within 90 days we review
+          feedback and remove any personal details we find, or delete it if it
           isn&apos;t useful. After that we keep it to help improve Tracknologia.
           Removed details may stay in backups for a limited time. We use a
           temporary coded key, not your IP address, to stop spam. We can&apos;t
