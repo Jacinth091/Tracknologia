@@ -38,18 +38,20 @@ function hasForbiddenControl(value: string): boolean {
   });
 }
 
-function boundedText(min: number, max: number, label: string) {
+function boundedText(
+  min: number,
+  max: number,
+  label: string,
+  messages = {
+    tooShort: `${label} must be at least ${min} characters`,
+    tooLong: `${label} must be ${max} characters or fewer`,
+  },
+) {
   return z
     .string()
     .transform(asciiTrim)
-    .refine(
-      (value) => codePointLength(value) >= min,
-      `${label} must be at least ${min} characters`,
-    )
-    .refine(
-      (value) => codePointLength(value) <= max,
-      `${label} must be ${max} characters or fewer`,
-    )
+    .refine((value) => codePointLength(value) >= min, messages.tooShort)
+    .refine((value) => codePointLength(value) <= max, messages.tooLong)
     .refine(
       (value) => !hasForbiddenControl(value),
       `${label} contains unsupported characters`,
@@ -58,7 +60,12 @@ function boundedText(min: number, max: number, label: string) {
 
 // Stored text that can be cleared: blank becomes null, and a non-blank value
 // must satisfy the bounds the table enforces for the stored text.
-function clearableBoundedText(min: number, max: number, label: string) {
+function clearableBoundedText(
+  min: number,
+  max: number,
+  label: string,
+  rangeMessage = `${label} must be ${min} to ${max} characters`,
+) {
   return z
     .string()
     .transform((value) => asciiTrim(value))
@@ -66,7 +73,7 @@ function clearableBoundedText(min: number, max: number, label: string) {
       (value) =>
         value === "" ||
         (codePointLength(value) >= min && codePointLength(value) <= max),
-      `${label} must be ${min} to ${max} characters`,
+      rangeMessage,
     )
     .refine(
       (value) => !hasForbiddenControl(value),
@@ -76,12 +83,17 @@ function clearableBoundedText(min: number, max: number, label: string) {
 }
 
 // Optional fields: absent, null, or blank input becomes null.
-function optionalBoundedText(min: number, max: number, label: string) {
+function optionalBoundedText(
+  min: number,
+  max: number,
+  label: string,
+  rangeMessage?: string,
+) {
   return z
     .string()
     .nullish()
     .transform((value) => value ?? "")
-    .pipe(clearableBoundedText(min, max, label));
+    .pipe(clearableBoundedText(min, max, label, rangeMessage));
 }
 
 // Required key of a full-replacement review. It must be present and hold a
@@ -141,12 +153,21 @@ const submissionNonceSchema = z.uuid("Feedback could not be verified");
 
 // Browser-facing submission fields only. Source, participant class, status,
 // priority, reviewer, and provider/user identity are not accepted here.
+// Participant copy was owner-approved on 2026-10-30 (#87).
 export const submitFeedbackSchema = z.strictObject({
   category: z.enum(FEEDBACK_CATEGORIES, {
     error: "Choose a feedback category",
   }),
-  title: optionalBoundedText(1, 120, "Title"),
-  message: boundedText(1, 2000, "Feedback message"),
+  title: optionalBoundedText(
+    1,
+    120,
+    "Title",
+    "That title is a bit long. Please keep it under 120 characters.",
+  ),
+  message: boundedText(1, 2000, "Feedback message", {
+    tooShort: "Please write a message first.",
+    tooLong: "That's a bit long. Please keep it under 2,000 characters.",
+  }),
   submissionNonce: submissionNonceSchema,
 });
 

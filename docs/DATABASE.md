@@ -359,8 +359,10 @@ Append-only per-feedback review history (issue #89). It is separate from
 - Referenced feedback and reviewer identities cannot be deleted while history
   exists, so the audit trail is not removed by accident. The owner-run purge
   runbook is the only path that deletes this history, and it records itself in
-  `feedback_privacy_audit`. Retention and erasure remain unresolved launch gates
-  (issue #87).
+  `feedback_privacy_audit`. Feedback is kept. Within 90 days an operator reviews
+  it and redacts personal details or deletes it through the owner-run runbooks in
+  `docs/OPERATIONS.md`. Retention for the other data classes is still open in
+  issue #87.
 
 `get_feedback_count_summary(p_operator_user_id, p_window_start, p_window_end)`
 (issue #90) is a service-role-only, set-based aggregate. It returns `(dimension,

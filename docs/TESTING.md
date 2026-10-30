@@ -32,6 +32,12 @@ tracking outcomes and URL prefill, Request receipts, and native account radios.
 It supplies action results at the rendering seam; it does not exercise browser
 events, real Server Action transport, responsive layout, or computed styles.
 
+`tests/contracts/feedback-ui.contract.test.tsx` applies the same method to the
+participant feedback form: category radios and prompts, field-error wiring,
+pending, alert and receipt states, the plain `/feedback` links from Tracking and
+the Request receipt, the Provider nav Feedback item, and the public and Provider
+page nonce and context wiring.
+
 Avoid testing implementation details or Tailwind class strings unless they are functionally significant.
 
 ### End-to-end tests — Playwright
@@ -74,6 +80,16 @@ Mandatory release scenarios (one spec file each under `tests/e2e/`):
 6. `staff-lifecycle.spec.ts` — OWNER invites, Staff accepts, gets permitted
    access, owner-only controls are denied, OWNER removes Staff, access is
    denied.
+
+Participant feedback has its own spec, `tests/e2e/feedback.spec.ts` (E2E-10),
+outside the numbered release list. It drives the real public and Provider forms
+and asserts stored rows through the service client. The `feedback_submit` limiter
+is one shared dev bucket (20 per 600 seconds across public and Provider
+submissions), so every scenario deletes that limiter row through trusted SQL
+before and after it runs. The throttle scenario sends 20 accepted submissions,
+then a 21st that is refused. Each scenario also writes titles with a per-run marker,
+scopes its reads to that marker, and deletes its rows through `runLocalSql` before
+its actors are removed.
 
 Reliability rules:
 
@@ -183,6 +199,17 @@ on retained audit rows (not full anonymization).
 audit seams to prove limiter-first ordering, forged-field rejection, Provider class
 derivation, no-query denials, audit-failure withholding, review preconditions, and
 schema bounds. It needs no database.
+
+`src/features/feedback/form.test.ts` calls `submitFeedbackForm` directly with a
+real `FormData` and a fake submit function, with no mocks of the adapter. It
+proves acceptance and nonce rotation, that only the four form fields reach
+submit, the field-error copy, malformed-nonce replacement, the fixed
+rate-limit, forbidden, and unavailable copy, and that unexpected errors never
+reveal their text. It needs no database.
+
+`src/features/feedback/contact-details.test.ts` checks the pure personal-details
+hint: emails, Philippine mobile numbers and `+` numbers are flagged, while device
+names, years, quantities and 15-digit IMEIs are not. It needs no database.
 
 `tests/integration/feedback.db.test.ts` uses the same live psql sessions for
 same-nonce submissions and same-version reviews, the review/revocation overlap,

@@ -69,10 +69,10 @@ reduced-motion preference. Gauges use already-fetched status fields; they do not
 poll or imply live updates. Compact gauges appear in Provider lists; larger
 gauges appear in details, public tracking, and submitted Request receipts.
 
-The identity covers landing, auth, onboarding, public request/tracking, and the
-Provider workspace. The Provider workspace uses a compact 64px header: wordmark,
-inline desktop navigation (Dashboard, Requests, Repairs, Shop-only Team & Staff,
-Settings) with a yellow underline on the current section — including detail
+The identity covers landing, auth, onboarding, public request/tracking/feedback,
+and the Provider workspace. The Provider workspace uses a compact 64px header:
+wordmark, inline desktop navigation (Dashboard, Requests, Repairs, Shop-only
+Team & Staff, Feedback, Settings) with a yellow underline on the current section — including detail
 routes — the Provider name and role, and an avatar account menu containing
 Settings and Sign Out. On phones the links move into a Sheet opened from a menu
 button; both surfaces render the same role-gated link list and mark the active

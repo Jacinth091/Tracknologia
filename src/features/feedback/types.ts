@@ -133,6 +133,24 @@ export interface FeedbackCountSummary {
   daily: Array<{ date: string; count: number }>;
 }
 
+export type FeedbackFormField = "category" | "title" | "message";
+
+/**
+ * Participant form outcome. A rejected attempt echoes only the allow-listed
+ * fields and keeps its nonce so a retry stays idempotent; acceptance carries
+ * a fresh nonce for the next submission and nothing about the stored row.
+ */
+export type FeedbackFormState =
+  | { status: "accepted"; nextNonce: string }
+  | {
+      status: "rejected";
+      reason: "INVALID_INPUT" | "RATE_LIMITED" | "UNAVAILABLE" | "FORBIDDEN";
+      message: string;
+      fieldErrors: Partial<Record<FeedbackFormField, string>>;
+      values: Record<FeedbackFormField, string>;
+      nonce: string;
+    };
+
 export type FeedbackErrorCode =
   | "INVALID_INPUT"
   | "RATE_LIMITED"

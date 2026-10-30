@@ -131,6 +131,16 @@ export default async function TrackRepairPage({
             No account needed. Need help with your code or service arrangement?
             Contact your Repair Provider.
           </p>
+
+          <p className="px-2 text-center text-sm text-muted-foreground">
+            Something about Tracknologia itself?{" "}
+            <Link
+              href="/feedback"
+              className="font-medium text-foreground underline underline-offset-4"
+            >
+              Send feedback
+            </Link>
+          </p>
         </div>
       </main>
     </div>
