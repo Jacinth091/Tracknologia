@@ -91,7 +91,7 @@ describe("submitFeedbackForm", () => {
       status: "rejected",
       reason: "INVALID_INPUT",
       message: "Feedback error",
-      fieldErrors: { message: "Enter a message before submitting." },
+      fieldErrors: { message: "Please write a message first." },
       values: {
         category: "BUG",
         title: "Tracking page",
@@ -105,12 +105,12 @@ describe("submitFeedbackForm", () => {
     [
       { message: "a".repeat(2001) },
       "message",
-      "Your message is too long. Keep it to 2,000 characters or fewer.",
+      "That's a bit long. Please keep it under 2,000 characters.",
     ],
     [
       { title: "a".repeat(121) },
       "title",
-      "Your title is too long. Keep it to 120 characters or fewer.",
+      "That title is a bit long. Please keep it under 120 characters.",
     ],
     [{ category: "" }, "category", "Choose a feedback category"],
   ])("maps invalid %j to the %s field copy", async (overrides, field, copy) => {
@@ -144,9 +144,15 @@ describe("submitFeedbackForm", () => {
   });
 
   it.each([
-    ["RATE_LIMITED", "Too many submissions. Wait a few minutes and try again."],
+    [
+      "RATE_LIMITED",
+      "You've sent a lot in a short time. Please wait a few minutes and try again.",
+    ],
     ["FORBIDDEN", "Sign in to your Provider account to send feedback."],
-    ["UNAVAILABLE", "Feedback is temporarily unavailable. Try again later."],
+    [
+      "UNAVAILABLE",
+      "We can't take feedback right now. Please try again later.",
+    ],
   ] as const)(
     "gives %s the fixed copy and keeps the nonce and values",
     async (code, copy) => {
@@ -181,7 +187,7 @@ describe("submitFeedbackForm", () => {
     expect(state).toMatchObject({
       status: "rejected",
       reason: "UNAVAILABLE",
-      message: "Feedback is temporarily unavailable. Try again later.",
+      message: "We can't take feedback right now. Please try again later.",
       fieldErrors: {},
       nonce: NONCE,
     });
