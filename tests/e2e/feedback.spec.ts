@@ -211,6 +211,20 @@ test.describe("E2E-10 Participant feedback forms", () => {
         message,
       );
 
+      // An edited retry that is refused again keeps keyboard focus on the title.
+      const longerTitle = marker.padEnd(122, "y");
+      await page.getByLabel("Title (optional)").fill(longerTitle);
+      await page.getByLabel("Title (optional)").press("Enter");
+
+      await expect(
+        page.getByText(TITLE_TOO_LONG_COPY, { exact: true }),
+      ).toBeVisible();
+      await expect(page.getByLabel("Title (optional)")).toBeFocused();
+      await expect(page.getByLabel("Title (optional)")).toHaveValue(longerTitle);
+      await expect(page.getByLabel("Message", { exact: true })).toHaveValue(
+        message,
+      );
+
       expect(await storedRowsFor(admin, marker)).toHaveLength(0);
     } finally {
       await context.close();
