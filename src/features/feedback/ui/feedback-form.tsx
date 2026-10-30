@@ -65,6 +65,12 @@ function isCategory(value: string): value is FeedbackCategory {
   return (FEEDBACK_CATEGORIES as readonly string[]).includes(value);
 }
 
+function isEditedSince(previous: Rejected, formData: FormData): boolean {
+  return (["category", "title", "message"] as const).some(
+    (name) => formText(formData, name) !== previous.values[name],
+  );
+}
+
 /**
  * The one participant feedback form for public and Provider routes. The route
  * supplies its Server Action and a server-generated nonce; the nonce survives
@@ -81,11 +87,17 @@ export function FeedbackForm({
     FeedbackFormState | null,
     FormData
   >(async (previous, formData) => {
+    // A changed text is a new submission. Only an identical resend keeps the
+    // nonce, so an edited retry is never stored as the old text.
+    if (previous?.status === "rejected" && isEditedSince(previous, formData)) {
+      formData.set("submissionNonce", crypto.randomUUID());
+    }
+    const sentNonce = formText(formData, "submissionNonce");
     try {
       return await action(previous, formData);
     } catch {
       // The response was lost, possibly after the row committed. Keeping the
-      // nonce makes the retry a no-op if it did.
+      // sent nonce makes an identical retry a no-op if it did.
       return {
         status: "rejected",
         reason: "UNAVAILABLE",
@@ -96,7 +108,7 @@ export function FeedbackForm({
           title: formText(formData, "title"),
           message: formText(formData, "message"),
         },
-        nonce: formText(formData, "submissionNonce"),
+        nonce: sentNonce,
       };
     }
   }, null);
@@ -203,7 +215,11 @@ function FeedbackFields({
           ))}
         </div>
         {fieldErrors.category && (
-          <p id="feedback-category-error" className="text-xs text-destructive">
+          <p
+            id="feedback-category-error"
+            role="alert"
+            className="text-xs text-destructive"
+          >
             {fieldErrors.category}
           </p>
         )}
@@ -225,7 +241,11 @@ function FeedbackFields({
           }
         />
         {fieldErrors.title && (
-          <p id="feedback-title-error" className="text-xs text-destructive">
+          <p
+            id="feedback-title-error"
+            role="alert"
+            className="text-xs text-destructive"
+          >
             {fieldErrors.title}
           </p>
         )}
@@ -281,7 +301,11 @@ function FeedbackFields({
             "This looks like a phone number or email address. Please remove it before sending."}
         </p>
         {fieldErrors.message && (
-          <p id="feedback-message-error" className="text-xs text-destructive">
+          <p
+            id="feedback-message-error"
+            role="alert"
+            className="text-xs text-destructive"
+          >
             {fieldErrors.message}
           </p>
         )}
