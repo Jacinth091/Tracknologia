@@ -391,9 +391,17 @@ publishable-key access to the audit or admin functions
 
 ## Uptime monitoring
 
-Uptime is watched by UptimeRobot (Free) with one HTTP(S) monitor on
-`<app-url>/api/health`, a 5-minute interval, and an alert contact owned by the
-operator.
+Uptime monitoring is an operator setup checklist. It is **not active** until the
+production deployment exists and the first alert test is done.
+
+Setup, using UptimeRobot (Free):
+
+- [ ] Create one HTTP(S) monitor on `<app-url>/api/health`.
+- [ ] Set the interval to 5 minutes.
+- [ ] Add an alert contact owned by the operator.
+- [ ] Trigger a test alert and confirm it arrives.
+
+Once set up:
 
 - `200` with `{"status":"healthy"}` means the app reached its database.
 - `503` with `{"status":"unavailable"}` means it did not. Check the production

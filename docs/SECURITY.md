@@ -232,7 +232,9 @@ independent only while the recipient has no membership.
 `GET /api/health` is a deliberate public exception for the uptime monitor. It
 answers `{"status":"healthy"}` (200) or `{"status":"unavailable"}` (503) with
 `Cache-Control: no-store`. It has no cookies, auth, redirects or other fields.
-The probe is a read-only, head-only, single-row query with no table content,
+The probe is a deliberate, bounded exception to the service-role public-operation
+client (`createPublicOperationClient`) scope: a read-only, head-only, single-row
+query on `providers` with no table content, used only by `checkReadiness`,
 bounded by a 3-second timeout. Its failure logs carry only a fixed message and
 a SQLSTATE-shaped code.
 
