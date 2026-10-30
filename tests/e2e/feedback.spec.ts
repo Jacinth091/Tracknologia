@@ -68,7 +68,9 @@ async function fillAndSubmit(
   await chooseCategory(page, label);
   await page.getByLabel("Title (optional)").fill(title);
   await page.getByLabel("Message", { exact: true }).fill(message);
-  await page.getByRole("button", { name: "Send feedback", exact: true }).click();
+  await page
+    .getByRole("button", { name: "Send feedback", exact: true })
+    .click();
 }
 
 test.describe("E2E-10 Participant feedback forms", () => {
@@ -300,7 +302,9 @@ test.describe("E2E-10 Participant feedback forms", () => {
           });
           const teamLinks = nav.getByRole("link", { name: "Team & Staff" });
           await expect(teamLinks).toHaveCount(testCase.hasTeamLink ? 1 : 0);
-          await nav.getByRole("link", { name: "Feedback", exact: true }).click();
+          await nav
+            .getByRole("link", { name: "Feedback", exact: true })
+            .click();
           await expect(page).toHaveURL(/\/dashboard\/feedback$/);
 
           const title = `${marker}-${index}`;
