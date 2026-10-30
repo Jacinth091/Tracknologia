@@ -13,6 +13,7 @@ import {
   uniqueEmail,
 } from "./helpers/supabase-test-context";
 import { expectRpcPermissionDenied } from "./helpers/shared-test-utils";
+import { checkReadiness } from "@/features/internal-operations";
 
 requireDbConfig();
 
@@ -405,6 +406,10 @@ describe("Internal operator access and audit", () => {
         p_operation_category: "INTERNAL_ACCESS_VIEW",
       }),
     );
+  });
+
+  it("reports the database as healthy to the public readiness check", async () => {
+    await expect(checkReadiness()).resolves.toBe("healthy");
   });
 
   // Only disposable auth identities are created here (never Provider rows);
