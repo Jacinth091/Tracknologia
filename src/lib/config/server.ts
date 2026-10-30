@@ -22,6 +22,7 @@ export interface ServerConfig {
     hmacSecret: string;
     trustedProxySecret: string;
     sharedDevBucket: boolean;
+    clientIpSource: "trusted-proxy" | "vercel";
   };
   auth: {
     requireEmailConfirmation: boolean;
@@ -178,13 +179,33 @@ export function parseServerConfig(
     env.PUBLIC_ABUSE_SHARED_DEV_BUCKET?.trim().toLowerCase();
   const sharedDevBucket = sharedDevBucketRaw === "true";
 
+  const clientIpSourceRaw =
+    env.PUBLIC_ABUSE_CLIENT_IP_SOURCE?.trim().toLowerCase();
+  if (
+    clientIpSourceRaw &&
+    clientIpSourceRaw !== "trusted-proxy" &&
+    clientIpSourceRaw !== "vercel"
+  ) {
+    throw new Error(
+      'Configuration error: PUBLIC_ABUSE_CLIENT_IP_SOURCE must be "trusted-proxy" or "vercel".',
+    );
+  }
+  const clientIpSource =
+    clientIpSourceRaw === "vercel" ? "vercel" : "trusted-proxy";
+  if (clientIpSource === "vercel" && env.VERCEL?.trim() !== "1") {
+    throw new Error(
+      "Configuration error: PUBLIC_ABUSE_CLIENT_IP_SOURCE=vercel requires running on Vercel (VERCEL=1).",
+    );
+  }
+
   if (hmacSecret.length < 32) {
     throw new Error(
       "Configuration error: PUBLIC_ABUSE_HMAC_SECRET must be at least 32 characters long.",
     );
   }
   const requiresTrustedProxySecret =
-    runtime === "production" || !sharedDevBucket;
+    clientIpSource === "trusted-proxy" &&
+    (runtime === "production" || !sharedDevBucket);
   if (requiresTrustedProxySecret && trustedProxySecret.length < 32) {
     throw new Error(
       "Configuration error: PUBLIC_ABUSE_TRUSTED_PROXY_SECRET must be at least 32 characters long.",
@@ -237,6 +258,7 @@ export function parseServerConfig(
       hmacSecret,
       trustedProxySecret,
       sharedDevBucket,
+      clientIpSource,
     },
     auth: {
       requireEmailConfirmation,

@@ -24,11 +24,13 @@ const DB_CASE_TIMEOUT_MS = 90_000;
 const PAGE_CANARY = "projection-preview-canary-3d8a";
 const DETAIL_CANARY = "projection-message-canary-5b2e";
 const NOTES_CANARY = "projection-notes-canary-9a4f";
+const DUE_CANARY = "projection-due-canary-6e0b";
 const LINK = "https://github.com/Jacinth091/Tracknologia/issues/12";
 const PREVIEW_KEYS = [
   "category",
   "createdAt",
   "id",
+  "mayContainContactDetails",
   "participantClass",
   "priority",
   "reviewedAt",
@@ -212,6 +214,59 @@ describe("Feedback projections through PostgREST (persistence)", () => {
       expect(occurred).toEqual([...(occurred ?? [])].sort((a, b) => a - b));
       expect(JSON.stringify(history)).not.toContain(DETAIL_CANARY);
       expect(JSON.stringify(history)).not.toContain(NOTES_CANARY);
+    },
+    DB_CASE_TIMEOUT_MS,
+  );
+
+  it(
+    "lists only unreviewed submissions older than 90 days for the due filter",
+    async () => {
+      const unreviewed = await submitFixture(`${DUE_CANARY} unreviewed`);
+      const redacted = await submitFixture(`${DUE_CANARY} redacted`);
+      const kept = await submitFixture(`${DUE_CANARY} kept`);
+      const recent = await submitFixture(`${DUE_CANARY} recent`);
+      await runLocalSql(
+        testUrl,
+        `UPDATE public.feedback_submissions SET created_at = now() - interval '100 days' WHERE id IN (${[unreviewed, redacted, kept].map(sqlUuidLiteral).join(", ")});`,
+      );
+      // Redaction marks privacy review done and replaces the text; the kept
+      // mark changes only the review timestamp.
+      await runLocalSql(
+        testUrl,
+        `UPDATE public.feedback_submissions SET message = '[redacted]', privacy_reviewed_at = now() WHERE id = ${sqlUuidLiteral(redacted)};`,
+      );
+      await runLocalSql(
+        testUrl,
+        `UPDATE public.feedback_submissions SET privacy_reviewed_at = now() WHERE id = ${sqlUuidLiteral(kept)};`,
+      );
+
+      const due = await listFeedbackPreviews(admin, { dueForReview: true });
+      const dueIds = due.items.map((item) => item.id);
+
+      expect(dueIds).toContain(unreviewed);
+      expect(dueIds).not.toContain(redacted);
+      expect(dueIds).not.toContain(kept);
+      expect(dueIds).not.toContain(recent);
+
+      // The age and review predicates still hold alongside status and category.
+      const combined = await listFeedbackPreviews(admin, {
+        dueForReview: true,
+        status: "NEW",
+        category: "BUG",
+      });
+      const combinedIds = combined.items.map((item) => item.id);
+      expect(combinedIds).toContain(unreviewed);
+      expect(combinedIds).not.toContain(redacted);
+      expect(combinedIds).not.toContain(kept);
+      expect(combinedIds).not.toContain(recent);
+
+      const otherCategory = await listFeedbackPreviews(admin, {
+        dueForReview: true,
+        category: "GENERAL",
+      });
+      expect(otherCategory.items.map((item) => item.id)).not.toContain(
+        unreviewed,
+      );
     },
     DB_CASE_TIMEOUT_MS,
   );

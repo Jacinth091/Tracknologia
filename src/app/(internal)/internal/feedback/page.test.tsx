@@ -2,6 +2,7 @@
 process.env.TZ = "UTC";
 
 import { describe, expect, it, vi } from "vitest";
+import type { ReactNode } from "react";
 import { renderToStaticMarkup } from "react-dom/server";
 
 // Mocked: the feature read (the data seam), framework navigation, and the icon
@@ -27,7 +28,9 @@ vi.mock("next/navigation", () => ({
 }));
 
 vi.mock("next/link", () => ({
-  default: ({ children }: { children: unknown }) => children,
+  default: ({ href, children }: { href: string; children: ReactNode }) => (
+    <a href={href}>{children}</a>
+  ),
 }));
 
 vi.mock("@hugeicons/react", () => ({ HugeiconsIcon: () => null }));
@@ -70,5 +73,74 @@ describe("Feedback inbox page times", () => {
 
     expect(html).toMatch(/(1 Nov 2026|Nov 1, 2026),\s12:30\s?am/i);
     expect(html).not.toMatch(/Oct 31|31 Oct|4:30\s?pm/i);
+  });
+});
+
+function preview(overrides: Record<string, unknown> = {}) {
+  return {
+    id: FEEDBACK_ID,
+    category: "BUG",
+    source: "PUBLIC_TRACKING",
+    participantClass: "PUBLIC_SELF_REPORTED_CUSTOMER",
+    title: "Tracking error",
+    status: "NEW",
+    priority: "NORMAL",
+    rowVersion: 1,
+    createdAt: INSTANT,
+    reviewedAt: null,
+    mayContainContactDetails: false,
+    ...overrides,
+  };
+}
+
+const BADGE = "May contain personal details";
+
+describe("Feedback inbox review aids", () => {
+  it("shows the personal-details badge only on flagged previews", async () => {
+    feature.listInternalFeedback.mockResolvedValue({
+      items: [
+        preview({ mayContainContactDetails: true }),
+        preview({ id: "7a2d3e4f-5b6c-4d7e-8f80-9a0b1c2d3e4f" }),
+      ],
+      nextCursor: null,
+    });
+
+    const html = renderToStaticMarkup(
+      await FeedbackInboxPage({ searchParams: Promise.resolve({}) }),
+    );
+
+    expect(html.split(BADGE)).toHaveLength(2);
+  });
+
+  it("keeps the due filter checked and in the paging link", async () => {
+    feature.listInternalFeedback.mockResolvedValue({
+      items: [preview()],
+      nextCursor: `${INSTANT}|${FEEDBACK_ID}`,
+    });
+
+    const html = renderToStaticMarkup(
+      await FeedbackInboxPage({
+        searchParams: Promise.resolve({ due: "1" }),
+      }),
+    );
+
+    expect(feature.listInternalFeedback).toHaveBeenCalledWith(
+      expect.objectContaining({ dueForReview: true }),
+    );
+    expect(html).toMatch(/<input[^>]*name="due"[^>]*checked=""/);
+    expect(html).toMatch(/href="\/internal\/feedback\?due=1(&amp;|&)cursor=/);
+  });
+
+  it("does not request the due filter without due=1", async () => {
+    feature.listInternalFeedback.mockResolvedValue({
+      items: [],
+      nextCursor: null,
+    });
+
+    await FeedbackInboxPage({ searchParams: Promise.resolve({}) });
+
+    expect(feature.listInternalFeedback).toHaveBeenCalledWith(
+      expect.objectContaining({ dueForReview: undefined }),
+    );
   });
 });

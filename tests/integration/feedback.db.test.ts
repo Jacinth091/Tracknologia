@@ -23,6 +23,7 @@ import {
   waitUntilBlockedBy,
   type LocalSqlSession,
 } from "../helpers/local-postgres";
+import { listFeedbackPreviews } from "@/features/feedback/persistence";
 
 requireDbConfig();
 
@@ -57,6 +58,7 @@ const SUBMISSION_KEYS = [
   "message",
   "participant_class",
   "priority",
+  "privacy_reviewed_at",
   "reviewed_at",
   "reviewed_by",
   "row_version",
@@ -367,6 +369,7 @@ describe("Feedback private persistence (PostgreSQL)", () => {
             status: "NEW",
             priority: "NORMAL",
             row_version: 1,
+            privacy_reviewed_at: null,
             reviewed_at: null,
             reviewed_by: null,
           });
@@ -1152,6 +1155,12 @@ describe("Feedback private persistence (PostgreSQL)", () => {
   );
 });
 
+// Must match the Feedback backfill rows in scripts/rehearse-upgrade-fixture.sql.
+const REDACTION_BACKFILL = {
+  redactedId: "00000000-0000-4000-8000-00000000a001",
+  controlId: "00000000-0000-4000-8000-00000000a002",
+};
+
 // Runs only after scripts/rehearse-pending-migrations.sh seeded old-state data
 // on the base history and applied the pending migrations on top of it. Every
 // value below is compared exactly against the seeded fixture.
@@ -1300,6 +1309,55 @@ describe.runIf(process.env.REHEARSAL_UPGRADE_FIXTURE === "1")(
           ),
         ).toBe("001");
         expect(await functionGrantBits(LIMIT_SIGNATURE)).toBe("001");
+      },
+      DB_CASE_TIMEOUT_MS,
+    );
+
+    it(
+      "backfills privacy_reviewed_at from the earliest redaction and keeps the control unreviewed",
+      async (ctx) => {
+        const redacted = assertSupabaseSuccess(
+          await admin
+            .from("feedback_submissions")
+            .select("id, privacy_reviewed_at")
+            .eq("id", REDACTION_BACKFILL.redactedId)
+            .maybeSingle(),
+          "read seeded redacted feedback after upgrade",
+        ).data as { privacy_reviewed_at: string | null } | null;
+        // The fixture seeds Feedback only while the mark migration is pending.
+        if (redacted === null) {
+          ctx.skip();
+          return;
+        }
+
+        const audits = assertSupabaseSuccess(
+          await admin
+            .from("feedback_privacy_audit")
+            .select("created_at")
+            .eq("target_feedback_id", REDACTION_BACKFILL.redactedId),
+          "read seeded redaction audit rows",
+        ).data as { created_at: string }[];
+        expect(audits).toHaveLength(2);
+        const earliest = Math.min(
+          ...audits.map((audit) => Date.parse(audit.created_at)),
+        );
+        expect(Date.parse(redacted.privacy_reviewed_at ?? "")).toBe(earliest);
+
+        const control = assertSupabaseSuccess(
+          await admin
+            .from("feedback_submissions")
+            .select("privacy_reviewed_at")
+            .eq("id", REDACTION_BACKFILL.controlId)
+            .single(),
+          "read seeded control feedback after upgrade",
+        ).data;
+        expect(control).toEqual({ privacy_reviewed_at: null });
+
+        // The due queue shows the unreviewed old control and hides the redacted row.
+        const due = await listFeedbackPreviews(admin, { dueForReview: true });
+        const dueIds = due.items.map((item) => item.id);
+        expect(dueIds).not.toContain(REDACTION_BACKFILL.redactedId);
+        expect(dueIds).toContain(REDACTION_BACKFILL.controlId);
       },
       DB_CASE_TIMEOUT_MS,
     );

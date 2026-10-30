@@ -4,6 +4,8 @@ export {
   requireInternalOperator,
 } from "./access";
 
+export { checkReadiness } from "./readiness";
+
 export {
   getValidationMetrics,
   MetricsError,

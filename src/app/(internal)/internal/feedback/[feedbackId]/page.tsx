@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { notFound } from "next/navigation";
+import { Badge } from "@/components/ui/badge";
 import { buttonVariants } from "@/components/ui/button";
 import {
   Card,
@@ -10,6 +11,7 @@ import {
   CardTitle,
 } from "@/components/ui/card";
 import { FeedbackError, getInternalFeedback } from "@/features/feedback";
+import { looksLikeContactDetails } from "@/features/feedback/contact-details";
 import { cn } from "@/lib/utils";
 
 import { InternalServiceUnavailable } from "../../_components/internal-service-unavailable";
@@ -111,6 +113,17 @@ export default async function FeedbackDetailPage({
           </CardDescription>
         </CardHeader>
         <CardContent className="space-y-4">
+          {looksLikeContactDetails(
+            `${detail.original.title ?? ""} ${detail.original.message}`,
+          ) ? (
+            <div className="space-y-2">
+              <Badge variant="outline">May contain personal details</Badge>
+              <p className="text-sm text-muted-foreground">
+                Before closing, redact personal details with the feedback
+                redaction runbook in docs/OPERATIONS.md.
+              </p>
+            </div>
+          ) : null}
           <dl className="grid gap-4 sm:grid-cols-2">
             <div className="sm:col-span-2">
               <DetailValue label="Title" value={detail.original.title} />

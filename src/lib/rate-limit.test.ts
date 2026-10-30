@@ -206,3 +206,74 @@ describe("durable public-operation abuse control", () => {
     await expect(resolveClientIdentifier()).rejects.toThrow();
   });
 });
+
+describe("Vercel visitor IP source", () => {
+  function visitorHeaders(values: Record<string, string>) {
+    return { get: vi.fn((name: string) => values[name] ?? null) };
+  }
+
+  beforeEach(() => {
+    vi.stubEnv("VERCEL", "1");
+    vi.stubEnv("PUBLIC_ABUSE_CLIENT_IP_SOURCE", "vercel");
+  });
+
+  it("keys on the first x-vercel-forwarded-for entry without a proxy secret", async () => {
+    delete process.env.PUBLIC_ABUSE_TRUSTED_PROXY_SECRET;
+    mocks.headers.mockResolvedValue(
+      visitorHeaders({ "x-vercel-forwarded-for": "198.51.100.7, 10.0.0.1" }),
+    );
+
+    await expect(resolveClientIdentifier()).resolves.toBe("198.51.100.7");
+  });
+
+  it("accepts an IPv6 visitor", async () => {
+    mocks.headers.mockResolvedValue(
+      visitorHeaders({ "x-vercel-forwarded-for": "2001:db8::1, 10.0.0.1" }),
+    );
+
+    await expect(resolveClientIdentifier()).resolves.toBe("2001:db8::1");
+  });
+
+  it.each([[undefined], [""], ["not-an-ip"], [", 198.51.100.7"]])(
+    "fails closed when x-vercel-forwarded-for is %s",
+    async (value) => {
+      mocks.headers.mockResolvedValue(
+        visitorHeaders(
+          value === undefined ? {} : { "x-vercel-forwarded-for": value },
+        ),
+      );
+
+      await expect(resolveClientIdentifier()).rejects.toThrow(
+        "trusted ingress metadata is invalid",
+      );
+    },
+  );
+
+  it("ignores forged proof and forwarding headers, reading only x-vercel-forwarded-for", async () => {
+    const headerList = visitorHeaders({
+      "x-vercel-forwarded-for": "198.51.100.7",
+      "x-tracknologia-proxy-secret": PROXY_SECRET,
+      "x-tracknologia-client-ip": "192.0.2.1",
+      "x-forwarded-for": "192.0.2.2",
+      "x-real-ip": "192.0.2.3",
+    });
+    mocks.headers.mockResolvedValue(headerList);
+
+    await expect(resolveClientIdentifier()).resolves.toBe("198.51.100.7");
+    expect(headerList.get.mock.calls).toEqual([["x-vercel-forwarded-for"]]);
+  });
+
+  it("does not fall back to forged forwarding headers when Vercel's header is absent", async () => {
+    mocks.headers.mockResolvedValue(
+      visitorHeaders({
+        "x-tracknologia-client-ip": "192.0.2.1",
+        "x-forwarded-for": "192.0.2.2",
+        "x-real-ip": "192.0.2.3",
+      }),
+    );
+
+    await expect(resolveClientIdentifier()).rejects.toThrow(
+      "trusted ingress metadata is invalid",
+    );
+  });
+});

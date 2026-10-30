@@ -59,6 +59,9 @@ export interface FeedbackPreview {
   rowVersion: number;
   createdAt: string;
   reviewedAt: string | null;
+  // Computed server-side from title and message. The message itself never
+  // leaves the persistence layer.
+  mayContainContactDetails: boolean;
 }
 
 export interface FeedbackPreviewPage {

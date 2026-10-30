@@ -216,6 +216,7 @@ export const feedbackListOptionsSchema = z.strictObject({
   category: z.enum(FEEDBACK_CATEGORIES).optional(),
   source: z.enum(FEEDBACK_SOURCES).optional(),
   cursor: feedbackCursorSchema.optional(),
+  dueForReview: z.boolean().optional(),
 });
 
 export type FeedbackListOptions = z.output<typeof feedbackListOptionsSchema>;
