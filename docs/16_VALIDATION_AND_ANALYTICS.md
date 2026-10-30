@@ -82,6 +82,12 @@ an explicitly unavailable section (`feedback: null`), with available domain
 counts retained. Authorization failure denies the report, and a failed or
 incomplete domain query never becomes an apparently complete zero report.
 
+The metrics are viewed by enabled internal operators at `/internal/activity`
+(see `docs/23_HTTP_AND_ROUTE_SURFACES.md`). The page shows an empty denominator
+as `N/A`, never `0`, and shows an unavailable Feedback section as "Unavailable".
+Its header states the Manila period, the generation time, and the coverage
+labels the report returns. It shows no Provider, customer, or record identifiers.
+
 ## Provider metrics
 
 ### Provider creation and type split

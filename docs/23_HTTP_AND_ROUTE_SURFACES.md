@@ -116,6 +116,19 @@ renders the same `FeedbackForm` with the protected `submitProviderFeedbackAction
 That action derives the participant class and the `PROVIDER_WORKSPACE` source
 from the authenticated membership. The browser sends no Provider or user identity.
 
+## Internal operator routes
+
+### `/internal/activity`
+
+Operator-only validation metrics page, reached from the internal home page. It
+is a GET Server Component: the `period` (`today`, `7d`, `30d`, `custom`, default
+`7d`), `start` and `end` query parameters map to the window input, and
+`getValidationMetrics` validates it. The page re-runs the internal access guard
+before reading, and the read itself is guarded and audited. Unauthenticated
+visitors are redirected to login, forbidden operators get the private 404, and
+unavailable access or audit renders the safe unavailable state. The period
+picker is a plain form with no client JavaScript; refresh is a deliberate reload.
+
 ## Server Actions
 
 Good candidates:
