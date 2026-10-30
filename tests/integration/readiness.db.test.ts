@@ -28,18 +28,26 @@ requireDbConfig();
 const DB_CASE_TIMEOUT_MS = 10_000;
 
 describe("Public readiness probe against the real database", () => {
-  it("reports healthy when the real service-role client reaches the database", async () => {
-    shared.client = createAdminClient();
+  it(
+    "reports healthy when the real service-role client reaches the database",
+    async () => {
+      shared.client = createAdminClient();
 
-    await expect(checkReadiness()).resolves.toBe("healthy");
-  }, DB_CASE_TIMEOUT_MS);
+      await expect(checkReadiness()).resolves.toBe("healthy");
+    },
+    DB_CASE_TIMEOUT_MS,
+  );
 
-  it("reports unavailable when the client points at an unreachable URL", async () => {
-    // Port 9 on loopback is closed, so the round trip fails at transport level.
-    shared.client = createClient("http://127.0.0.1:9", testServiceKey, {
-      auth: { autoRefreshToken: false, persistSession: false },
-    });
+  it(
+    "reports unavailable when the client points at an unreachable URL",
+    async () => {
+      // Port 9 on loopback is closed, so the round trip fails at transport level.
+      shared.client = createClient("http://127.0.0.1:9", testServiceKey, {
+        auth: { autoRefreshToken: false, persistSession: false },
+      });
 
-    await expect(checkReadiness()).resolves.toBe("unavailable");
-  }, DB_CASE_TIMEOUT_MS);
+      await expect(checkReadiness()).resolves.toBe("unavailable");
+    },
+    DB_CASE_TIMEOUT_MS,
+  );
 });
