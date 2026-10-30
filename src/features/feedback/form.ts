@@ -14,11 +14,12 @@ const FORM_FIELDS: readonly FeedbackFormField[] = [
   "message",
 ];
 
-// #87 §3.6 proposal (owner approval pending). Validation copy lives in the
-// submission schema so the field errors and this mapping cannot drift.
+// Owner-approved on 2026-10-30 (#87). Validation copy lives in the submission
+// schema so the field errors and this mapping cannot drift.
 const REJECTION_COPY = {
-  RATE_LIMITED: "Too many submissions. Wait a few minutes and try again.",
-  UNAVAILABLE: "Feedback is temporarily unavailable. Try again later.",
+  RATE_LIMITED:
+    "You've sent a lot in a short time. Please wait a few minutes and try again.",
+  UNAVAILABLE: "We can't take feedback right now. Please try again later.",
   FORBIDDEN: "Sign in to your Provider account to send feedback.",
 } as const;
 

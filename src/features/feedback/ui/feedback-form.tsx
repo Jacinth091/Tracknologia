@@ -18,9 +18,9 @@ import {
   type FeedbackFormState,
 } from "../types";
 
-// Labels and the Bug prompt are the #81 contract; the other prompts and all
-// participant copy below are the #87 §3.1/§3.6 proposal (owner approval
-// pending). Prompts are guidance only; one message field holds the text.
+// Category labels and prompts, and all participant copy below, were
+// owner-approved on 2026-10-30 (#87). Prompts are guidance only; one message
+// field holds the text.
 const CATEGORY_COPY: Record<
   FeedbackCategory,
   { label: string; prompt: string }
@@ -28,27 +28,26 @@ const CATEGORY_COPY: Record<
   BUG: {
     label: "Bug Report",
     prompt:
-      "What were you trying to do? / What happened? / What did you expect?",
+      "Something not working? Tell us what you were doing and what went wrong.",
   },
   USABILITY: {
     label: "Usability",
-    prompt:
-      "What were you trying to do, and what made it harder than expected?",
+    prompt: "Was something confusing or hard to use?",
   },
   FEATURE_REQUEST: {
     label: "Feature Request",
-    prompt: "What would you like to be able to do, and why?",
+    prompt: "What would make Tracknologia more useful for you?",
   },
   GENERAL: {
     label: "General",
-    prompt: "What would you like us to know?",
+    prompt: "Anything else you'd like to tell us?",
   },
 };
 
 const SUCCESS_COPY =
-  "Thanks — your feedback was received. We can't reply to every submission.";
+  "Thanks! We got your feedback. We read everything, but we can't reply to each message.";
 const UNCONFIRMED_COPY =
-  "We couldn't confirm that your feedback reached us. Retrying is safe and reuses the same submission identifier.";
+  "We're not sure it went through. It's safe to send again; we won't get it twice.";
 
 type FeedbackFormAction = (
   state: FeedbackFormState | null,
@@ -274,8 +273,8 @@ function FeedbackFields({
   );
 }
 
-// #87 §4.0 PROPOSED notice. It must not be published before owner approval,
-// the 90-day deletion actually running, and confirmed backup retention.
+// Owner-approved on 2026-10-30 (#87 decision 8). Changing this text needs a new
+// owner decision.
 function FeedbackPrivacyNotice() {
   return (
     <details className="rounded-xl border border-border bg-muted/40 p-4 text-sm text-muted-foreground">
@@ -284,30 +283,23 @@ function FeedbackPrivacyNotice() {
       </summary>
       <div className="mt-3 space-y-3 leading-relaxed">
         <p>
-          When you send feedback, we collect the category, any title you add,
-          your message, the part of the service you sent it from, whether you
-          are an anonymous customer or an authenticated Provider (and, for
-          Providers, the existing Provider role derived from your session), and
-          the time of submission. Customers can submit without an account.
-          Providers use their existing account and Provider context. We do not
-          ask for your name, email address, phone number, Tracking Code, Request
-          Reference or photos. Please do not include personal details. Your
-          message is free text and may contain personal data even when you do
-          not intend it to.
+          <strong>What we collect:</strong> the kind of feedback, your title and
+          message, which page you sent it from, whether you&apos;re a customer or
+          a Provider (and your Provider role), and when you sent it. We
+          don&apos;t ask for your name, email, phone number or tracking codes.
+          Please don&apos;t put them in your message.
         </p>
         <p>
-          Only designated internal operators can read feedback. Providers and
-          the public cannot see it. We use a short-lived opaque key, not your
-          raw IP address, to prevent abuse. Reporting uses aggregate counts
-          only.
+          <strong>Who can read it:</strong> only the Tracknologia team. Other
+          customers and Providers can&apos;t.
         </p>
         <p>
-          We delete the entire feedback submission, including its text and
-          metadata, 90 days after submission. We keep a separate minimal review,
-          access and deletion audit for 180 days. Backup expiry depends on the
-          deployment provider and is not yet confirmed; we cannot promise
-          immediate erasure from backups. We do not promise a response or a
-          service level.
+          <strong>How long we keep it:</strong> within 90 days we review feedback
+          and remove any personal details we find, or delete it if it
+          isn&apos;t useful. After that we keep it to help improve Tracknologia.
+          Removed details may stay in backups for a limited time. We use a
+          temporary coded key, not your IP address, to stop spam. We can&apos;t
+          reply to every message.
         </p>
       </div>
     </details>

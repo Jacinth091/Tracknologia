@@ -153,7 +153,7 @@ const submissionNonceSchema = z.uuid("Feedback could not be verified");
 
 // Browser-facing submission fields only. Source, participant class, status,
 // priority, reviewer, and provider/user identity are not accepted here.
-// Participant copy is the #87 §3.6 proposal (owner approval pending).
+// Participant copy was owner-approved on 2026-10-30 (#87).
 export const submitFeedbackSchema = z.strictObject({
   category: z.enum(FEEDBACK_CATEGORIES, {
     error: "Choose a feedback category",
@@ -162,11 +162,11 @@ export const submitFeedbackSchema = z.strictObject({
     1,
     120,
     "Title",
-    "Your title is too long. Keep it to 120 characters or fewer.",
+    "That title is a bit long. Please keep it under 120 characters.",
   ),
   message: boundedText(1, 2000, "Feedback message", {
-    tooShort: "Enter a message before submitting.",
-    tooLong: "Your message is too long. Keep it to 2,000 characters or fewer.",
+    tooShort: "Please write a message first.",
+    tooLong: "That's a bit long. Please keep it under 2,000 characters.",
   }),
   submissionNonce: submissionNonceSchema,
 });
