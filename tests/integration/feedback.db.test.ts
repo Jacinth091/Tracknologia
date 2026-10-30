@@ -57,6 +57,7 @@ const SUBMISSION_KEYS = [
   "message",
   "participant_class",
   "priority",
+  "privacy_reviewed_at",
   "reviewed_at",
   "reviewed_by",
   "row_version",
@@ -367,6 +368,7 @@ describe("Feedback private persistence (PostgreSQL)", () => {
             status: "NEW",
             priority: "NORMAL",
             row_version: 1,
+            privacy_reviewed_at: null,
             reviewed_at: null,
             reviewed_by: null,
           });
