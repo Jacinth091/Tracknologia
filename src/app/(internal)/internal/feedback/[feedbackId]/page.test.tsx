@@ -95,3 +95,52 @@ describe("Feedback detail page times", () => {
     expect(html).not.toMatch(/Oct 31|31 Oct|4:30\s?pm/i);
   });
 });
+
+describe("Feedback detail page review aids", () => {
+  function detailWithOriginal(overrides: Record<string, unknown>) {
+    const detail = detailAt(INSTANT);
+    return { ...detail, original: { ...detail.original, ...overrides } };
+  }
+
+  it("shows the personal-details badge and runbook pointer when flagged", async () => {
+    feature.getInternalFeedback.mockResolvedValue(
+      detailWithOriginal({ message: "Reach me at a@example.com" }),
+    );
+
+    const html = renderToStaticMarkup(
+      await FeedbackDetailPage({
+        params: Promise.resolve({ feedbackId: FEEDBACK_ID }),
+      }),
+    );
+
+    expect(html).toContain("May contain personal details");
+    expect(html).toContain("docs/OPERATIONS.md");
+  });
+
+  it("flags a title that looks like contact details", async () => {
+    feature.getInternalFeedback.mockResolvedValue(
+      detailWithOriginal({ title: "Call 0917 123 4567" }),
+    );
+
+    const html = renderToStaticMarkup(
+      await FeedbackDetailPage({
+        params: Promise.resolve({ feedbackId: FEEDBACK_ID }),
+      }),
+    );
+
+    expect(html).toContain("May contain personal details");
+  });
+
+  it("omits the badge and runbook pointer when nothing looks like contact details", async () => {
+    feature.getInternalFeedback.mockResolvedValue(detailAt(INSTANT));
+
+    const html = renderToStaticMarkup(
+      await FeedbackDetailPage({
+        params: Promise.resolve({ feedbackId: FEEDBACK_ID }),
+      }),
+    );
+
+    expect(html).not.toContain("May contain personal details");
+    expect(html).not.toContain("docs/OPERATIONS.md");
+  });
+});

@@ -24,7 +24,7 @@ The application centralizes runtime environment parsing in `src/lib/config/serve
 Key invariants:
 
 - **Central Seam**: Server environment validation is decoupled from route invocation and executed on Node.js startup via `src/instrumentation.ts` when `APP_ENV=production` or `APP_ENV=staging`.
-- **Fail-Fast**: Production configurations missing required secrets (`NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY`, `SUPABASE_SERVICE_ROLE_KEY`, `RESEND_API_KEY`, `PUBLIC_ABUSE_HMAC_SECRET`, `PUBLIC_ABUSE_TRUSTED_PROXY_SECRET`) or with invalid app origins fail immediately at boot.
+- **Fail-Fast**: Production configurations missing required secrets (`NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY`, `SUPABASE_SERVICE_ROLE_KEY`, `RESEND_API_KEY`, `PUBLIC_ABUSE_HMAC_SECRET`, and `PUBLIC_ABUSE_TRUSTED_PROXY_SECRET` unless `PUBLIC_ABUSE_CLIENT_IP_SOURCE=vercel` on Vercel) or with invalid app origins fail immediately at boot.
 - **Forbidden Ingress Bypasses**: `PUBLIC_ABUSE_SHARED_DEV_BUCKET=true` and `NEXT_PUBLIC_REQUIRE_EMAIL_CONFIRMATION=false` are explicitly rejected in production to prevent silent security degradation.
 - **Secret Privacy**: Configuration validation errors and email client error logs MUST NEVER leak API keys, HMAC secrets, bearer tokens, or email message bodies. Dev email logging executes ONLY when `RESEND_API_KEY` is omitted in local/development mode, printing only safe non-sensitive metadata (recipient address, sender address, subject line).
 - **Browser Bundle Scan**: Server secrets are read only in the `server-only` config seam and are never `NEXT_PUBLIC_*`. The CI `Verify` build then searches `.next/static` for the build's placeholder values of `SUPABASE_SERVICE_ROLE_KEY`, `RESEND_API_KEY`, `PUBLIC_ABUSE_HMAC_SECRET` and `PUBLIC_ABUSE_TRUSTED_PROXY_SECRET`, and fails if any appears or the directory is empty.
@@ -153,7 +153,9 @@ roles, not `user_metadata`, and not inferred from owning or joining a Provider:
   never a browser, Provider, or service-role path. Each runs in one transaction
   that ends with `rollback;` by default. The privacy audit
   (`feedback_privacy_audit`) is append-only, with no client privilege and
-  `service_role` `SELECT` only. A redaction bumps `row_version` and fills the
+  `service_role` `SELECT` only. The audit operations are `FEEDBACK_REDACTED`,
+  `FEEDBACK_PURGED` and `FEEDBACK_PRIVACY_REVIEWED` (the kept mark, which changes
+  no text). A redaction bumps `row_version` and fills the
   review stamp without overwriting it, so a triage form loaded before the
   redaction is rejected with `FEEDBACK_VERSION_CONFLICT` and cannot restore
   erased notes; the linked issue URL is retained. Routine access views stay `INTERNAL_ACCESS_VIEW` events
@@ -376,6 +378,42 @@ abuse-control bucket by setting `PUBLIC_ABUSE_SHARED_DEV_BUCKET=true`; the
 opt-in is explicit and environment-based, so a staging or production deployment
 that forgets its ingress configuration fails closed instead of silently sharing
 one bucket. Arbitrary forwarded values cannot create additional buckets.
+
+### Vercel visitor IP source
+
+On Vercel, `PUBLIC_ABUSE_CLIENT_IP_SOURCE=vercel` replaces the trusted-ingress
+contract above. Vercel overwrites `X-Forwarded-For` and does not forward
+external visitor IPs, which is why that header is never read in this mode
+([Vercel request headers](https://vercel.com/docs/headers/request-headers)).
+The application instead trusts only `x-vercel-forwarded-for`. Vercel documents
+it as identical to `X-Forwarded-For`, but unlike that header it is not
+overwritten when a proxy sits in front of Vercel. The first entry must be a
+valid IP; otherwise the operation fails closed. The application ignores
+`x-tracknologia-proxy-secret`, `x-tracknologia-client-ip`, `x-forwarded-for`
+and `x-real-ip` in this mode, and `PUBLIC_ABUSE_TRUSTED_PROXY_SECRET` is not
+required. `PUBLIC_ABUSE_HMAC_SECRET` is still required, and the visitor IP is
+still stored only as the keyed HMAC actor key.
+
+The explicit setting keeps the trusted-ingress contract as the default. The
+`VERCEL=1` check is only a configuration sanity check. It makes the
+configuration throw at startup when the setting is copied to a host that does
+not set `VERCEL`. It is not proof of origin: anyone who controls a process's
+environment can set that variable, so it cannot establish where a request came
+from.
+
+Vercel mode is safe only when the application is actually served by Vercel's
+managed edge. There, Vercel overwrites `X-Forwarded-For` and does not forward
+external IPs, so `x-vercel-forwarded-for` carries the visitor IP. Never copy
+`PUBLIC_ABUSE_CLIENT_IP_SOURCE=vercel` together with `VERCEL=1` to a
+self-hosted or other host. A caller there could send arbitrary
+`x-vercel-forwarded-for` values, obtain a fresh abuse-control bucket on each
+request and bypass throttling. Other hosts must use the trusted-proxy mode,
+with its ingress proof.
+
+Residual risk: a proxy placed in front of Vercel would make every visitor that
+reaches the application through it appear with that proxy's IP, so they would
+share one bucket. This over-throttles rather than bypasses the limit, but the
+IP source must be revisited before such a proxy is introduced.
 
 The public Server Actions deliberately consume their budget before validating
 form input, so hostile traffic cannot obtain free schema validation probes from

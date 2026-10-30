@@ -1,4 +1,4 @@
-import { beforeEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 const mocks = vi.hoisted(() => ({
   after: vi.fn(),
@@ -155,6 +155,10 @@ beforeEach(() => {
   });
 });
 
+afterEach(() => {
+  vi.unstubAllEnvs();
+});
+
 describe("public actions under validated production ingress", () => {
   it("looks up Tracking through trusted ingress and durable abuse control", async () => {
     await expect(trackRepairAction(null, trackingFormData())).resolves.toEqual({
@@ -225,5 +229,27 @@ describe("public actions under validated production ingress", () => {
 
     expect(mocks.rpc).not.toHaveBeenCalled();
     expect(mocks.from).not.toHaveBeenCalled();
+  });
+
+  it("looks up Tracking through Vercel's visitor IP without a proxy secret", async () => {
+    vi.stubEnv("VERCEL", "1");
+    vi.stubEnv("PUBLIC_ABUSE_CLIENT_IP_SOURCE", "vercel");
+    delete process.env.PUBLIC_ABUSE_TRUSTED_PROXY_SECRET;
+    mocks.headerGet.mockImplementation((name: string) =>
+      name === "x-vercel-forwarded-for" ? `${CLIENT_IP}, 10.0.0.1` : null,
+    );
+
+    await expect(trackRepairAction(null, trackingFormData())).resolves.toEqual({
+      outcome: "found",
+      view: expect.objectContaining({
+        trackingCode: TRACKING_CODE,
+        providerDisplayName: "Downtown Repair",
+      }),
+    });
+
+    expectOpaqueRateLimitCall("tracking_lookup", {
+      max: 30,
+      windowSeconds: 60,
+    });
   });
 });

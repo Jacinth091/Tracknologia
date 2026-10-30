@@ -320,6 +320,13 @@ trusts only the service-role caller.
 - `created_at`, `reviewed_at`, `reviewed_by` (nullable FK to `auth.users`,
   `ON DELETE RESTRICT`), `row_version` (starts at `1`, increases on each
   review mutation)
+- `privacy_reviewed_at` (nullable `TIMESTAMPTZ`, migration
+  `20261102000000_add_feedback_privacy_review_mark.sql`): when an owner-run
+  privacy review completed, by the redaction block or the "Mark privacy review
+  done (kept)" block. Null means pending. It is set only by those runbooks, never
+  by triage or a client role, and it does not change `row_version`. The
+  due-for-review queue excludes non-null rows. A migration backfill sets it from
+  each existing submission's earliest `FEEDBACK_REDACTED` audit row.
 - Text is trimmed of ASCII edge whitespace only (space, tab, LF, CR, FF, VT);
   lengths count PostgreSQL characters, not bytes. Control characters
   U+0001–U+0008, U+000E–U+001F and U+007F are rejected inside `title` and
@@ -337,6 +344,7 @@ trusts only the service-role caller.
   administrative metadata. They do not mean triage occurred. The row keeps
   `status` `NEW`, `priority` `NORMAL`, and an empty review history. Existing
   stamps are kept when present. Triage is shown by review events and status.
+  The redaction also sets `privacy_reviewed_at`.
 - Indexes: `(created_at DESC, id DESC)` and `(status, created_at DESC, id DESC)`.
 - No participant identity, Provider ID, IP, browser metadata, Repair IDs,
   tracking codes, or device fields are stored.
@@ -376,13 +384,14 @@ Append-only audit of owner-run Feedback redaction and purge (PR #105 review).
 It is separate from `internal_access_audit`, which stays access-only.
 
 - `event_id` (uuid, PK), `operation` (fixed: `FEEDBACK_REDACTED`,
-  `FEEDBACK_PURGED`), `target_feedback_id` (uuid, **no** foreign key, so it
+  `FEEDBACK_PURGED`, `FEEDBACK_PRIVACY_REVIEWED`), `target_feedback_id` (uuid, **no** foreign key, so it
   survives a purge), `actor_user_id` (FK to `auth.users`, `ON DELETE SET NULL`),
   `approval_ref` (3–80 characters of letters, digits and `#._/:-`), `created_at`
 - RLS enabled with no policies. `service_role` has `SELECT` only; `PUBLIC`,
   `anon`, and `authenticated` have no privilege.
 - Written only inside the owner-run runbook transaction in `docs/OPERATIONS.md`,
-  in the same transaction as the redaction or purge. Never holds participant text.
+  in the same transaction as the redaction, purge or privacy-review mark. Never
+  holds participant text.
 - Retention is part of the open issue #87 policy decision and is not defined.
 
 ### 16. `get_internal_validation_metrics`

@@ -733,7 +733,7 @@ describe("Feedback schemas", () => {
 // functions see the same shape PostgREST returns.
 function queryResult(result: { data: unknown; error: unknown }) {
   const chain: Record<string, unknown> = {};
-  for (const method of ["select", "order", "limit", "eq", "or"]) {
+  for (const method of ["select", "order", "limit", "eq", "or", "lt", "is"]) {
     chain[method] = vi.fn(() => chain);
   }
   chain.maybeSingle = vi.fn(() => Promise.resolve(result));
@@ -876,6 +876,113 @@ describe("Persistence response boundaries", () => {
       expect(state.code).toBe("UNAVAILABLE");
     },
   );
+});
+
+describe("Inbox review aids", () => {
+  function previewRow(overrides: Record<string, unknown> = {}) {
+    return {
+      id: FEEDBACK_ID,
+      category: "BUG",
+      source: "PUBLIC_TRACKING",
+      participant_class: "PUBLIC_SELF_REPORTED_CUSTOMER",
+      title: null,
+      message: "The tracking page shows an error.",
+      status: "NEW",
+      priority: "NORMAL",
+      row_version: 1,
+      created_at: "2026-10-01T00:00:00+00:00",
+      reviewed_at: null,
+      ...overrides,
+    };
+  }
+
+  function previewClient(rows: unknown[]) {
+    const chain = queryResult({ data: rows, error: null });
+    const client = {
+      from: vi.fn(() => chain),
+    } as unknown as SupabaseClient;
+    return { client, chain };
+  }
+
+  it("flags previews whose title or message looks like contact details", async () => {
+    const { client } = previewClient([
+      previewRow({ message: "Call me on 0917 123 4567" }),
+      previewRow({ title: "Reach a@example.com", message: "Fine." }),
+      previewRow(),
+    ]);
+
+    const page = await listFeedbackPreviews(client, {});
+
+    expect(page.items.map((item) => item.mayContainContactDetails)).toEqual([
+      true,
+      true,
+      false,
+    ]);
+  });
+
+  it("never returns the message in a preview, even though it was selected", async () => {
+    const { client } = previewClient([
+      previewRow({ message: `${CANARY} a@example.com` }),
+    ]);
+
+    const page = await listFeedbackPreviews(client, {});
+
+    expect(Object.keys(page.items[0])).not.toContain("message");
+    expect(JSON.stringify(page)).not.toContain(CANARY);
+  });
+
+  it("keeps only unreviewed submissions older than 90 days when due", async () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date("2026-10-30T12:00:00Z"));
+    try {
+      const { client, chain } = previewClient([]);
+
+      await listFeedbackPreviews(client, { dueForReview: true });
+
+      const cutoff = new Date(
+        Date.UTC(2026, 9, 30, 12) - 90 * 86_400_000,
+      ).toISOString();
+      expect(chain.lt).toHaveBeenCalledWith("created_at", cutoff);
+      expect(chain.is).toHaveBeenCalledWith("privacy_reviewed_at", null);
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it("adds no age filter unless due for review is requested", async () => {
+    const { client, chain } = previewClient([]);
+
+    await listFeedbackPreviews(client, { status: "NEW" });
+
+    expect(chain.lt).not.toHaveBeenCalled();
+  });
+
+  it("combines the age filter with status, category, source and cursor", async () => {
+    const { client, chain } = previewClient([]);
+
+    await listFeedbackPreviews(client, {
+      status: "NEW",
+      category: "BUG",
+      source: "PUBLIC_TRACKING",
+      dueForReview: true,
+      cursor: `2026-10-01T00:00:00Z|${FEEDBACK_ID}`,
+    });
+
+    expect(chain.eq).toHaveBeenCalledWith("status", "NEW");
+    expect(chain.eq).toHaveBeenCalledWith("category", "BUG");
+    expect(chain.eq).toHaveBeenCalledWith("source", "PUBLIC_TRACKING");
+    expect(chain.lt).toHaveBeenCalledWith("created_at", expect.any(String));
+    expect(chain.or).toHaveBeenCalledWith(expect.stringContaining(FEEDBACK_ID));
+  });
+
+  it("rejects a due filter that is not a boolean", () => {
+    expect(
+      feedbackListOptionsSchema.safeParse({ dueForReview: "1" }).success,
+    ).toBe(false);
+    expect(
+      feedbackListOptionsSchema.safeParse({ dueForReview: true }).success,
+    ).toBe(true);
+  });
 });
 
 describe("Manila summary periods", () => {

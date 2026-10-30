@@ -43,6 +43,7 @@ interface FeedbackRow {
   row_version: number;
   reviewed_by: string | null;
   reviewed_at: string | null;
+  privacy_reviewed_at: string | null;
 }
 
 interface PrivacyAuditRow {
@@ -90,7 +91,8 @@ async function readRow(feedbackId: string): Promise<FeedbackRow | null> {
     testUrl,
     `SELECT coalesce(row_to_json(f)::text, '') FROM (
        SELECT id, title, message, internal_notes, linked_issue_url, status,
-              priority, row_version, reviewed_by, reviewed_at
+              priority, row_version, reviewed_by, reviewed_at,
+              privacy_reviewed_at
        FROM public.feedback_submissions
        WHERE id = ${sqlUuidLiteral(feedbackId)}
      ) f;`,
@@ -276,6 +278,7 @@ describe("Feedback redaction runbook (PostgreSQL)", () => {
       const feedbackId = await seedReviewedFeedback(operatorId);
       const before = await readRow(feedbackId);
       expect(before?.row_version).toBe(2);
+      expect(before?.privacy_reviewed_at).toBeNull();
 
       const block = fillRunbook(readRunbookBlock("feedback-redaction"), {
         feedbackId,
@@ -296,6 +299,7 @@ describe("Feedback redaction runbook (PostgreSQL)", () => {
         reviewed_by: operatorId,
       });
       expect(after?.reviewed_at).not.toBeNull();
+      expect(after?.privacy_reviewed_at).not.toBeNull();
       expect(JSON.stringify(after)).not.toContain(MESSAGE);
       expect(JSON.stringify(after)).not.toContain(NOTES);
 
@@ -398,6 +402,64 @@ describe("Feedback redaction runbook (PostgreSQL)", () => {
   );
 });
 
+describe("Feedback privacy review-kept runbook (PostgreSQL)", () => {
+  it(
+    "rehearsal default leaves the submission unmarked and unaudited",
+    async () => {
+      const operatorId = await provisionOperator(
+        "feedback-privacy-kept-rehearsal",
+      );
+      const feedbackId = await seedReviewedFeedback(operatorId);
+      const before = await readRow(feedbackId);
+      const kept = readRunbookBlock("feedback-privacy-review-kept");
+      const block = fillRunbook(kept, {
+        feedbackId,
+        actorId: operatorId,
+        approvalRef: APPROVAL,
+      });
+
+      await runLocalSql(testUrl, block);
+
+      expect(await readRow(feedbackId)).toEqual(before);
+      expect(await readPrivacyAudit(feedbackId)).toEqual([]);
+    },
+    DB_CASE_TIMEOUT_MS,
+  );
+
+  it(
+    "marks privacy review done without changing text, status or history",
+    async () => {
+      const operatorId = await provisionOperator("feedback-privacy-kept");
+      const feedbackId = await seedReviewedFeedback(operatorId);
+      const before = await readRow(feedbackId);
+      expect(before?.privacy_reviewed_at).toBeNull();
+
+      const kept = readRunbookBlock("feedback-privacy-review-kept");
+      const block = fillRunbook(kept, {
+        feedbackId,
+        actorId: operatorId,
+        approvalRef: APPROVAL,
+      });
+      await runLocalSql(testUrl, commitRunbook(block));
+
+      const after = await readRow(feedbackId);
+      expect(after?.privacy_reviewed_at).not.toBeNull();
+      expect({ ...after, privacy_reviewed_at: null }).toEqual(before);
+      expect(after?.message).toBe(MESSAGE);
+      expect(await readReviewReasons(feedbackId)).toEqual([REASON]);
+      expect(await readPrivacyAudit(feedbackId)).toEqual([
+        {
+          operation: "FEEDBACK_PRIVACY_REVIEWED",
+          target_feedback_id: feedbackId,
+          actor_user_id: operatorId,
+          approval_ref: APPROVAL,
+        },
+      ]);
+    },
+    DB_CASE_TIMEOUT_MS,
+  );
+});
+
 describe("Feedback purge runbook (PostgreSQL)", () => {
   it(
     "erases only the approved target and keeps its privacy audit",
@@ -462,12 +524,15 @@ describe("Feedback privacy runbook failure rollback (PostgreSQL)", () => {
       const before = await readRow(feedbackId);
       const redaction = readRunbookBlock("feedback-redaction");
       const purge = readRunbookBlock("feedback-purge");
+      const kept = readRunbookBlock("feedback-privacy-review-kept");
 
       const cases = [
         { block: redaction, feedbackId: randomUUID(), approvalRef: APPROVAL },
         { block: purge, feedbackId: randomUUID(), approvalRef: APPROVAL },
         { block: redaction, feedbackId: "not-a-uuid", approvalRef: APPROVAL },
         { block: purge, feedbackId: feedbackId, approvalRef: "bad ref" },
+        { block: kept, feedbackId: randomUUID(), approvalRef: APPROVAL },
+        { block: kept, feedbackId: feedbackId, approvalRef: "bad ref" },
       ];
       for (const testCase of cases) {
         const block = commitRunbook(
