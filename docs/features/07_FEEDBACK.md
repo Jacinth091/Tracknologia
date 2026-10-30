@@ -19,7 +19,8 @@ browser input to `submitFeedbackForm`; the public page always records
 2026-10-30 (#87). Feedback is kept, with a personal review within 90 days: the
 team removes or redacts personal details, or deletes feedback that is not
 useful, through the runbooks in `docs/OPERATIONS.md`. Inbox tooling for that
-review queue is a follow-up issue, not part of #91.
+review queue is the "Due for review" filter (#108); see the 90-day procedure in
+`docs/OPERATIONS.md`.
 The internal operator inbox (#92) is also a rendered surface:
 `src/app/(internal)/internal/feedback/` lists bounded previews, shows
 the bounded original text to enabled operators only, and adapts triage
@@ -163,11 +164,11 @@ details, so the operator still reads the original before deciding what to redact
 
 The list also accepts `dueForReview`, exposed in the inbox as the `due=1` filter
 "Due for review (90+ days)". It keeps only submissions created more than 90 days
-ago, with the cutoff computed on the server at query time. The filter is
-age-based only (#87 decision 7). Redaction clears the badge because the text
-changes, and purge removes the row. An item reviewed but left unchanged stays in
-the list until it is purged. That limitation is deliberate and is described in
-`docs/OPERATIONS.md`.
+ago, with the cutoff computed on the server at query time, and whose
+`privacy_reviewed_at` is null (#87 decision 7, #108). Privacy review is recorded
+by the owner-run redaction block, the purge block, or the "Mark privacy review
+done (kept)" block in `docs/OPERATIONS.md`. Each one leaves the queue, so a
+reviewed useful item does not reappear.
 
 ## Review transitions
 
