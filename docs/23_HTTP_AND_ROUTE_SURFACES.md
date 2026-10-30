@@ -52,6 +52,16 @@ records the `PUBLIC_FEEDBACK` source. The browser supplies no identity, source,
 or participant class. The copy and the inline privacy notice were owner-approved
 on 2026-10-30 (#87).
 
+## Operational routes
+
+### `/api/health`
+
+`GET` only, dynamic (`force-dynamic`, never prerendered or cached). It is a thin
+Route Handler over `checkReadiness()` in `internal-operations`. It returns
+`{"status":"healthy"}` with 200, or `{"status":"unavailable"}` with 503, both
+with `Cache-Control: no-store`. It reads no cookies or headers and returns no
+other fields. Documented in `docs/SECURITY.md` as the public health exception.
+
 ## Authentication routes
 
 - `/login`

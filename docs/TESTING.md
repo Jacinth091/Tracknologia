@@ -158,6 +158,7 @@ tests/integration/
   feedback-projection.db.test.ts — Feedback persistence through PostgREST: keyset paging, detail/history bounds, null clearing
   feedback-summary-manila.db.test.ts — Manila-aligned summary bounds and day buckets, one REPEATABLE READ snapshot, rolled back
   feedback-review-flow.db.test.ts — Feedback review keeps stored notes and link; explicit null clears
+  readiness.db.test.ts         — Public readiness probe healthy on the real database and unavailable on an unreachable URL
   load-stress.db.test.ts       — Burst invariants (Plan 10)
   helpers/
     supabase-test-context.ts   — client setup, user/fixture lifecycle

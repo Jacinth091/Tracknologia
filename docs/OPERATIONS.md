@@ -460,6 +460,29 @@ internal provisioning UI or Server Action
 publishable-key access to the audit or admin functions
 ```
 
+## Uptime monitoring
+
+Uptime monitoring is an operator setup checklist. It is **not active** until the
+production deployment exists and the first alert test is done.
+
+Setup, using UptimeRobot (Free):
+
+- [ ] Create one HTTP(S) monitor on `<app-url>/api/health`.
+- [ ] Set the interval to 5 minutes.
+- [ ] Add an alert contact owned by the operator.
+- [ ] Trigger a test alert and confirm it arrives.
+
+Once set up:
+
+- `200` with `{"status":"healthy"}` means the app reached its database.
+- `503` with `{"status":"unavailable"}` means it did not. Check the production
+  logs for `[HEALTH_FAILURE]` and the database status before acting.
+- There is no detail by design. The body and headers reveal nothing about the
+  cause, version or hostname.
+
+Record each incident as a GitHub issue with the #87 fields: start, end, impact,
+category, status, resolution and release ref. Never include participant data.
+
 ## Exit criteria
 
 ```text
