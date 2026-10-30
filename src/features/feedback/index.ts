@@ -10,6 +10,8 @@ export {
   recordFeedbackReview,
 } from "./commands";
 
+export { submitFeedbackForm } from "./form";
+
 export {
   getFeedbackAggregateSummary,
   getInternalFeedback,
@@ -21,6 +23,7 @@ export {
   type FeedbackCountSummary,
   type FeedbackDetail,
   type FeedbackErrorCode,
+  type FeedbackFormState,
   type FeedbackPreview,
   type FeedbackPreviewPage,
   type FeedbackReceipt,

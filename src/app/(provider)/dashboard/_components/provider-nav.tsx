@@ -42,6 +42,7 @@ export function ProviderNav({
     { href: "/dashboard/requests", label: "Requests" },
     { href: "/dashboard/repairs", label: "Repairs" },
     ...(isShop ? [{ href: "/dashboard/team", label: "Team & Staff" }] : []),
+    { href: "/dashboard/feedback", label: "Feedback" },
     { href: "/dashboard/settings", label: "Settings" },
   ].map((link) => ({
     ...link,
