@@ -75,7 +75,10 @@ describe("checkReadiness", () => {
 
   it("never echoes the error text in the result or the logs", async () => {
     seams.createPublicOperationClient.mockResolvedValue(
-      clientReturning({ code: "08006", message: CANARY }),
+      clientReturning({
+        data: null,
+        error: { code: "08006", message: CANARY },
+      }),
     );
 
     const result = await checkReadiness();
