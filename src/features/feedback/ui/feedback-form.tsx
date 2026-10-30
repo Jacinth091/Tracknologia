@@ -141,8 +141,9 @@ export function FeedbackForm({
 
   return (
     <FeedbackFields
-      // A new nonce means a new submission: remount so the fields start blank.
-      key={nonce}
+      // A new submission round remounts blank fields. A rejected retry keeps
+      // the same mounted fields, so keyboard focus stays where it was.
+      key={startedNonce ?? initialNonce}
       formAction={formAction}
       pending={pending}
       nonce={nonce}
