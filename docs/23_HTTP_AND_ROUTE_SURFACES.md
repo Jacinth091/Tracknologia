@@ -37,6 +37,20 @@ Dynamic `params` are awaited. Submission returns an inline receipt containing a
 Request Reference only; it does not create a Repair or return a Tracking Code.
 Unavailable/closed Provider slugs render a generic unavailable state.
 
+### `/feedback`
+
+Anonymous visitors and Customers send product feedback through one shared
+client form, with no account and no Tracking Code or Request Reference. The
+`/track` page and the Request receipt link here with a plain `/feedback`
+(no query string).
+
+Implemented as a Server Component that awaits `connection()` before it
+generates the submission nonce, so each visit gets its own. It renders the
+shared `FeedbackForm` with the route-local `submitPublicFeedbackAction`. The
+action reads only the form fields through `submitFeedbackForm` and always
+records the `PUBLIC_FEEDBACK` source. The browser supplies no identity, source,
+or participant class. Copy is the #87 draft proposal and is not yet approved.
+
 ## Authentication routes
 
 - `/login`
@@ -53,6 +67,7 @@ Exact Supabase Auth callbacks may add framework-specific routes as implementatio
 - `/dashboard/repairs`
 - `/dashboard/repairs/new`
 - `/dashboard/repairs/[repairId]`
+- `/dashboard/feedback`
 - `/dashboard/settings`
 
 `/dashboard/repairs` is implemented as a Server Component using awaited
@@ -92,6 +107,13 @@ state.
 profile. Provider business profile and Service Mode forms are rendered for
 Owners only; their Server Actions derive Provider/user identity from the
 authenticated membership rather than accepting IDs from form data.
+
+`/dashboard/feedback` is open to every Provider role (SHOP OWNER, SHOP STAFF,
+and INDEPENDENT), and it is linked from the Provider nav. It requires Provider
+membership before render, and it
+renders the same `FeedbackForm` with the protected `submitProviderFeedbackAction`.
+That action derives the participant class and the `PROVIDER_WORKSPACE` source
+from the authenticated membership. The browser sends no Provider or user identity.
 
 ## Server Actions
 
@@ -133,6 +155,14 @@ Feature 03 actions are:
 
 Actions do not accept a Provider identifier. Hidden/route Request IDs are
 untrusted locators; the Module and PostgreSQL derive ownership independently.
+
+Feedback actions are:
+
+- public `submitPublicFeedbackAction(previousState, formData)`;
+- protected `submitProviderFeedbackAction(previousState, formData)`.
+
+Both delegate to `submitFeedbackForm` and return a `FeedbackFormState`. Neither
+accepts a source, participant class, or identity from the form.
 
 ## Route Handler candidates
 

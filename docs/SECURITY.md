@@ -170,6 +170,15 @@ roles, not `user_metadata`, and not inferred from owning or joining a Provider:
 - The Feedback `feedback_submit` budget covers both public and Provider
   submissions. Provider membership is resolved before the budget, and the budget
   runs before any input is parsed.
+- Participant feedback surfaces (issue #91): `/feedback` (anonymous) and
+  `/dashboard/feedback` (Provider) read only `category`, `title`, `message`, and
+  the submission nonce from the form. `source` and participant class come from
+  the server (`PUBLIC_FEEDBACK` on the public page, derived from membership on the
+  Provider page), so a forged value never reaches storage. Entry links from
+  Tracking, the Request receipt, and the Provider nav carry no query string and
+  no Tracking Code or Request Reference. The participant copy and privacy notice
+  are the #87 draft proposal, not approved, and the branch is held until #87
+  approval and a working deletion process.
 - Operational validation metrics (issue #93) independently require the operator
   guard and a successful access audit. The aggregate RPC rechecks the enabled
   mapping under `FOR SHARE` and is executable only by `service_role`. It returns

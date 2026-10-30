@@ -10,11 +10,16 @@ bounded way to review it. It owns validation, trusted participant
 classification, the shared abuse budget, review transitions, internal reads,
 and count-only summaries.
 
-It is a Module with a small Interface. It has no participant UI or public
-routes, and no coupling to Repairs, Repair Requests, or Tracking. Route
-adapters (#91) pass only public/Provider browser input for the future
-participant forms; the internal operator inbox (#92) is the one rendered
-surface: `src/app/(internal)/internal/feedback/` lists bounded previews, shows
+It is a Module with a small Interface, with no coupling to Repairs, Repair
+Requests, or Tracking. Participant forms (#91) are thin route adapters:
+`src/app/(public)/feedback/` for anonymous visitors and Customers, and
+`src/app/(provider)/dashboard/feedback/` for Provider members. They pass only
+browser input to `submitFeedbackForm`; the public page always records
+`PUBLIC_FEEDBACK`. Their copy and inline privacy notice are the #87 draft
+proposal and are **not approved**: the branch is a held draft PR and must not
+merge until #87 approves the copy and a working 90-day deletion process exists.
+The internal operator inbox (#92) is also a rendered surface:
+`src/app/(internal)/internal/feedback/` lists bounded previews, shows
 the bounded original text to enabled operators only, and adapts triage
 decisions through `recordFeedbackReview`. The adapter passes only browser
 input; the operator, transition allow-list, optimistic version and audit
@@ -29,8 +34,10 @@ let operators review them without exposing raw text to Provider users.
 ## Public Interface
 
 The barrel `src/features/feedback/index.ts` is server-only. It exports the six
-use cases, `FeedbackError`, and types. Client code imports the client-safe
-schemas and types directly from `schemas.ts` and `types.ts`.
+use cases, `submitFeedbackForm`, `FeedbackError`, and types, including
+`FeedbackFormState`. Client code imports the client-safe schemas and types
+directly from `schemas.ts` and `types.ts`, and the shared participant form
+component from `ui/feedback-form.tsx`.
 
 | Operation                                                | Caller                        | Result                                                              |
 | -------------------------------------------------------- | ----------------------------- | ------------------------------------------------------------------- |
@@ -40,6 +47,12 @@ schemas and types directly from `schemas.ts` and `types.ts`.
 | `getInternalFeedback(id)`                                | Enabled internal operator     | Original, separate review state, bounded history; `null` if missing |
 | `recordFeedbackReview(id, decision, expectedRowVersion)` | Enabled internal operator     | `{ status, priority, rowVersion }`                                  |
 | `getFeedbackAggregateSummary(window)`                    | Enabled internal operator     | Count-only summary                                                  |
+
+`submitFeedbackForm(formData, submit)` is the participant form adapter, not a
+use case. It reads only `category`, `title`, `message`, and `submissionNonce`
+from `FormData`, passes them to the supplied submit function, and maps the
+outcome to a `FeedbackFormState`. A rejected attempt keeps the typed values and
+a valid nonce, so a retry stays idempotent. Acceptance returns a fresh nonce.
 
 Errors are `FeedbackError` with a fixed code: `INVALID_INPUT`,
 `RATE_LIMITED` (with a bounded `retryAfterSeconds`), `UNAVAILABLE`,
@@ -67,7 +80,8 @@ SQLSTATE-shaped code, never SQL text, messages, input, or error payloads.
 - **Forged fields:** input is parsed by a strict schema. Keys such as `source`,
   `participantClass`, `status`, `priority`, `reviewedBy`, `providerId`, or
   `userId` are rejected with a generic message, and they never affect the
-  stored row.
+  stored row. The participant form adapter reads only its four form fields
+  from `FormData`, so extra fields never reach the strict schema.
 - **Reviewer identity:** derived inside the operator guard. The browser never
   supplies it.
 
@@ -195,8 +209,8 @@ reviewer identity appear in the result.
 
 ## Explicit non-goals
 
-- No participant UI, routes, notifications, or support engagement (#91 and later;
-  participant surfaces stay gated by issue #87 activation).
+- No notifications, replies, or support engagement. The participant surfaces
+  stay gated by the held-copy status in the Description.
 - No Feedback reference on Repair, Repair Request, or Tracking records.
 - No public lookup, receipt identifier, or status endpoint.
 - No new tables beyond #89 and the owner-only `feedback_privacy_audit` (one
@@ -215,6 +229,24 @@ reviewer identity appear in the result.
   the three protected reads, review preconditions and transitions, null
   clearing, RPC error and malformed-response mapping, sanitized transport and
   client failures with log-canary checks, and schema bounds.
+- `src/features/feedback/form.test.ts` calls `submitFeedbackForm` directly with
+  real `FormData` and a fake submit function. It covers acceptance and nonce
+  rotation, the exact four-field input, field errors with kept values, the
+  malformed-nonce replacement, the rate-limit, forbidden, and unavailable copy,
+  and unexpected errors that never reveal their text in state or logs.
+- `tests/contracts/feedback-ui.contract.test.tsx` renders the shared form
+  (category radios and prompts, field-error wiring, pending, alert, accepted
+  receipt), the plain `/feedback` links from Tracking and the Request receipt,
+  the Provider nav Feedback item by role, and the two pages' nonce and
+  Provider-context wiring.
+- `tests/e2e/feedback.spec.ts` (E2E-10) drives the real forms: an anonymous
+  visitor reaches `/feedback` from `/track` and stores four categories with the
+  public source and class; a 121-character title is refused in place; the
+  sixth submission in a window is throttled; each Provider role stores its
+  trusted class and `PROVIDER_WORKSPACE`; and the form fits a 375px viewport.
+  Every scenario resets the shared `feedback_submit` limiter row before and
+  after, scopes its reads to a per-run title marker, and deletes its rows
+  through trusted SQL before its actors are removed.
 - `tests/integration/feedback.db.test.ts` covers the summary RPC grants, the
   denial of unprovisioned and revoked operators, and window shape.
 - `tests/integration/feedback-summary-manila.db.test.ts` is a direct SQL proof of
