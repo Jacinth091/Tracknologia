@@ -212,9 +212,14 @@ test.describe("E2E-10 Participant feedback forms", () => {
       );
 
       // An edited retry that is refused again keeps keyboard focus on the title.
+      // Wait for the rotated nonce: the first rejection shows the same error,
+      // so only the new response proves the second round finished.
       const longerTitle = marker.padEnd(122, "y");
+      const hiddenNonce = page.locator('input[name="submissionNonce"]');
+      const firstNonce = await hiddenNonce.inputValue();
       await page.getByLabel("Title (optional)").fill(longerTitle);
       await page.getByLabel("Title (optional)").press("Enter");
+      await expect(hiddenNonce).not.toHaveValue(firstNonce);
 
       await expect(
         page.getByText(TITLE_TOO_LONG_COPY, { exact: true }),
