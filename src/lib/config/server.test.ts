@@ -339,6 +339,97 @@ describe("Configuration Seam (src/lib/config/server.ts)", () => {
     });
   });
 
+  describe("Client IP source", () => {
+    it("defaults to the trusted proxy and still requires its secret in production", () => {
+      expect(
+        parseServerConfig(VALID_PROD_ENV, "production").publicAbuse
+          .clientIpSource,
+      ).toBe("trusted-proxy");
+
+      expect(() =>
+        parseServerConfig(
+          { ...VALID_PROD_ENV, PUBLIC_ABUSE_TRUSTED_PROXY_SECRET: undefined },
+          "production",
+        ),
+      ).toThrow(
+        "PUBLIC_ABUSE_TRUSTED_PROXY_SECRET must be at least 32 characters long",
+      );
+    });
+
+    it("accepts vercel on Vercel without the trusted proxy secret", () => {
+      const config = parseServerConfig(
+        {
+          ...VALID_PROD_ENV,
+          VERCEL: "1",
+          PUBLIC_ABUSE_CLIENT_IP_SOURCE: " Vercel ",
+          PUBLIC_ABUSE_TRUSTED_PROXY_SECRET: undefined,
+        },
+        "production",
+      );
+      expect(config.publicAbuse.clientIpSource).toBe("vercel");
+      expect(config.publicAbuse.trustedProxySecret).toBe("");
+      expect(config.publicAbuse.hmacSecret).toBe(
+        VALID_PROD_ENV.PUBLIC_ABUSE_HMAC_SECRET,
+      );
+    });
+
+    it("still requires the HMAC secret in vercel mode", () => {
+      expect(() =>
+        parseServerConfig(
+          {
+            ...VALID_PROD_ENV,
+            VERCEL: "1",
+            PUBLIC_ABUSE_CLIENT_IP_SOURCE: "vercel",
+            PUBLIC_ABUSE_HMAC_SECRET: "short_secret",
+          },
+          "production",
+        ),
+      ).toThrow("PUBLIC_ABUSE_HMAC_SECRET must be at least 32 characters long");
+    });
+
+    it("rejects vercel mode outside Vercel without leaking secrets", () => {
+      const secret = "vercel_mode_secret_value_1234567890_abcdef";
+      expect(() =>
+        parseServerConfig(
+          {
+            ...VALID_PROD_ENV,
+            PUBLIC_ABUSE_CLIENT_IP_SOURCE: "vercel",
+            PUBLIC_ABUSE_HMAC_SECRET: secret,
+          },
+          "production",
+        ),
+      ).toThrow(
+        "Configuration error: PUBLIC_ABUSE_CLIENT_IP_SOURCE=vercel requires running on Vercel (VERCEL=1).",
+      );
+
+      try {
+        parseServerConfig(
+          {
+            ...VALID_PROD_ENV,
+            VERCEL: "0",
+            PUBLIC_ABUSE_CLIENT_IP_SOURCE: "vercel",
+            PUBLIC_ABUSE_HMAC_SECRET: secret,
+          },
+          "production",
+        );
+      } catch (err: unknown) {
+        const msg = err instanceof Error ? err.message : String(err);
+        expect(msg).not.toContain(secret);
+      }
+    });
+
+    it("rejects an unknown client IP source", () => {
+      expect(() =>
+        parseServerConfig(
+          { ...VALID_PROD_ENV, PUBLIC_ABUSE_CLIENT_IP_SOURCE: "cloudflare" },
+          "production",
+        ),
+      ).toThrow(
+        'Configuration error: PUBLIC_ABUSE_CLIENT_IP_SOURCE must be "trusted-proxy" or "vercel".',
+      );
+    });
+  });
+
   describe("Secret privacy invariant", () => {
     it("never includes secret keys in error messages", () => {
       const secret = "SUPER_SECRET_VALUE_12345678901234567890";
