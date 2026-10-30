@@ -24,11 +24,13 @@ const DB_CASE_TIMEOUT_MS = 90_000;
 const PAGE_CANARY = "projection-preview-canary-3d8a";
 const DETAIL_CANARY = "projection-message-canary-5b2e";
 const NOTES_CANARY = "projection-notes-canary-9a4f";
+const DUE_CANARY = "projection-due-canary-6e0b";
 const LINK = "https://github.com/Jacinth091/Tracknologia/issues/12";
 const PREVIEW_KEYS = [
   "category",
   "createdAt",
   "id",
+  "mayContainContactDetails",
   "participantClass",
   "priority",
   "reviewedAt",
@@ -212,6 +214,25 @@ describe("Feedback projections through PostgREST (persistence)", () => {
       expect(occurred).toEqual([...(occurred ?? [])].sort((a, b) => a - b));
       expect(JSON.stringify(history)).not.toContain(DETAIL_CANARY);
       expect(JSON.stringify(history)).not.toContain(NOTES_CANARY);
+    },
+    DB_CASE_TIMEOUT_MS,
+  );
+
+  it(
+    "lists only submissions older than 90 days for the due filter",
+    async () => {
+      const old = await submitFixture(`${DUE_CANARY} old row`);
+      const recent = await submitFixture(`${DUE_CANARY} recent row`);
+      await runLocalSql(
+        testUrl,
+        `UPDATE public.feedback_submissions SET created_at = now() - interval '100 days' WHERE id = ${sqlUuidLiteral(old)};`,
+      );
+
+      const due = await listFeedbackPreviews(admin, { dueForReview: true });
+      const dueIds = due.items.map((item) => item.id);
+
+      expect(dueIds).toContain(old);
+      expect(dueIds).not.toContain(recent);
     },
     DB_CASE_TIMEOUT_MS,
   );
