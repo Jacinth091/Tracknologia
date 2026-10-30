@@ -78,7 +78,8 @@ Optional validated overrides are
 (default `20`), and `PUBLIC_ABUSE_FEEDBACK_WINDOW_SECONDS` (default `600`).
 
 Production also requires a trusted ingress and a separate
-`PUBLIC_ABUSE_TRUSTED_PROXY_SECRET`. The ingress must remove any incoming
+`PUBLIC_ABUSE_TRUSTED_PROXY_SECRET`, unless `PUBLIC_ABUSE_CLIENT_IP_SOURCE=vercel`
+on Vercel (see [Deploying on Vercel](#deploying-on-vercel)). The ingress must remove any incoming
 `x-tracknologia-proxy-secret` and `x-tracknologia-client-ip` values, set the
 client-IP header itself, inject the proof secret, and block direct access to the
 Next.js upstream. Do not reuse the HMAC secret as the proxy proof secret. The
@@ -104,6 +105,72 @@ In `production` (when `APP_ENV=production` or `APP_ENV=staging`):
 - `PUBLIC_ABUSE_SHARED_DEV_BUCKET=true` and `NEXT_PUBLIC_REQUIRE_EMAIL_CONFIRMATION=false` throw validation errors at startup via Next.js `instrumentation.ts`.
 
 `.env.local` must be ignored by Git.
+
+## Deploying on Vercel
+
+Vercel hosts the Next.js app directly, so no separate ingress is needed. Vercel
+keeps Production, Preview and Development environment variables separate. A
+variable set only for Production is not available to Preview deployments, so
+each environment you deploy needs its own complete set. `VERCEL=1` is a system
+variable that Vercel sets on both Preview and Production deployments. Do not
+add it yourself.
+
+Each environment needs these variables, scoped to that environment:
+
+- `APP_ENV=production`
+- `NEXT_PUBLIC_APP_URL`: the deployed `https://` URL of that environment
+- `NEXT_PUBLIC_SUPABASE_URL`, `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY` and `SUPABASE_SERVICE_ROLE_KEY` for that environment's Supabase project
+- `PUBLIC_ABUSE_HMAC_SECRET`: at least 32 random characters, unique to that environment
+- `PUBLIC_ABUSE_CLIENT_IP_SOURCE=vercel`: reads each visitor's IP from Vercel's `x-vercel-forwarded-for` header. It is a configuration check, not proof of origin. Set it only on Vercel-served deployments, never on a self-hosted or other host; see the trust limit in `docs/SECURITY.md`.
+- `RESEND_API_KEY` and `RESEND_FROM_EMAIL`: a verified sender address, not `onboarding@resend.dev`
+
+Do not set `PUBLIC_ABUSE_TRUSTED_PROXY_SECRET`; this mode does not use it.
+Never set `PUBLIC_ABUSE_SHARED_DEV_BUCKET` or
+`NEXT_PUBLIC_REQUIRE_EMAIL_CONFIRMATION=false`. Production rules, which Preview
+deployments also follow, reject both at startup.
+
+Vercel bakes `NEXT_PUBLIC_*` values into the build, so redeploy after you change
+them.
+
+### Production: the pilot setup
+
+Set the same variables with the **Production** scope. Point them at the pilot
+Supabase project, and set `NEXT_PUBLIC_APP_URL` to the production URL. In the
+pilot project's Supabase Authentication → URL Configuration, set the Site URL
+to the production URL, and add `<app-url>/auth/callback` to the redirect URLs.
+
+### Production: pre-launch acceptance check
+
+Run this check on the production deployment **before the pilot opens**, against
+the pilot Supabase project. That project holds no participant data before
+launch. The owner approved running the check here (#109, 2026-10-30).
+
+1. Open the Vercel deployment page and confirm it shows the exact merged commit you expect. Record that SHA.
+2. Put the marker `SMOKE-TEST` in every test title or message you submit. Create the test Provider account through the normal registration UI, with `SMOKE-TEST` in its name.
+3. Run the checklist on the production URL:
+   - A Tracking lookup with the tracking code of a `SMOKE-TEST` Repair shows the Repair.
+   - A Repair Request submitted from the test Provider's public page succeeds.
+   - Feedback submission succeeds.
+   - **Throttle:** from one device, the 21st feedback submission within 10 minutes is throttled (default `PUBLIC_ABUSE_FEEDBACK_MAX=20`).
+   - **Spoof:** repeat the throttle check with a browser header extension, such as ModHeader, adding forged `x-vercel-forwarded-for`, `x-forwarded-for`, `x-real-ip` and `x-tracknologia-client-ip` values. It must still throttle at the 21st submission.
+   - **Isolation:** from a second device on a different network, such as a phone on mobile data, a submission still succeeds while the first device is throttled.
+4. Record pass or fail, the deployed SHA and the date only. Do not record IP
+   addresses, tracking codes or personal data.
+
+### Test data cleanup
+
+Delete all `SMOKE-TEST` data before you invite anyone. Use this order, because
+feedback has no link to a Provider and cannot be removed by deleting one:
+
+1. **Feedback:** the owner runs the feedback-purge runbook in `docs/OPERATIONS.md` ("Feedback redaction and deletion") for each `SMOKE-TEST` submission. It is owner-only, irreversible and needs an approval reference.
+2. **Test Provider:** in the Supabase dashboard, delete the `SMOKE-TEST` Provider. This cascades to its Repairs, Repair Requests, status events, updates and tracking observations.
+3. **Test user:** in Supabase Authentication, delete the `SMOKE-TEST` user.
+
+### Preview deployments (optional)
+
+Preview deployments are not needed for the pre-launch check. If you use one,
+give it its own Preview-scoped variables, following the list above. A Preview
+must never hold real participant data.
 
 ## Start the application
 
