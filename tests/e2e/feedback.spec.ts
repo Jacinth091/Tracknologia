@@ -18,11 +18,13 @@ import { runLocalSql } from "../helpers/local-postgres";
 type FeedbackAdmin = ReturnType<typeof createServiceClient>;
 
 const SUCCESS_COPY =
-  "Thanks — your feedback was received. We can't reply to every submission.";
+  "Thanks! We got your feedback. We read everything, but we can't reply to each message.";
 const TITLE_TOO_LONG_COPY =
-  "Your title is too long. Keep it to 120 characters or fewer.";
+  "That title is a bit long. Please keep it under 120 characters.";
 const THROTTLED_COPY =
-  "Too many submissions. Wait a few minutes and try again.";
+  "You've sent a lot in a short time. Please wait a few minutes and try again.";
+const CONTACT_WARNING_COPY =
+  "This looks like a phone number or email address. Please remove it before sending.";
 
 function successStatus(page: Page) {
   return page.getByRole("status").filter({ hasText: SUCCESS_COPY });
@@ -89,6 +91,7 @@ test.describe("E2E-10 Participant feedback forms", () => {
       await page
         .getByRole("link", { name: "Send feedback", exact: true })
         .click();
+      await page.waitForLoadState("networkidle");
       await expect(
         page.getByRole("heading", { name: "Send feedback", level: 1 }),
       ).toBeVisible();
@@ -110,25 +113,35 @@ test.describe("E2E-10 Participant feedback forms", () => {
           label: "Bug Report",
           value: "BUG",
           prompt:
-            "What were you trying to do? / What happened? / What did you expect?",
+            "Something not working? Tell us what you were doing and what went wrong.",
         },
         {
           label: "Usability",
           value: "USABILITY",
-          prompt:
-            "What were you trying to do, and what made it harder than expected?",
+          prompt: "Was something confusing or hard to use?",
         },
         {
           label: "Feature Request",
           value: "FEATURE_REQUEST",
-          prompt: "What would you like to be able to do, and why?",
+          prompt: "What would make Tracknologia more useful for you?",
         },
         {
           label: "General",
           value: "GENERAL",
-          prompt: "What would you like us to know?",
+          prompt: "Anything else you'd like to tell us?",
         },
       ];
+
+      // Typing contact details shows the warning; clearing the text hides it.
+      const messageBox = page.getByLabel("Message", { exact: true });
+      await messageBox.fill("call me 0917 123 4567");
+      await expect(
+        page.getByText(CONTACT_WARNING_COPY, { exact: true }),
+      ).toBeVisible();
+      await messageBox.fill("");
+      await expect(
+        page.getByText(CONTACT_WARNING_COPY, { exact: true }),
+      ).toHaveCount(0);
 
       for (const [index, category] of categories.entries()) {
         if (index > 0) {
@@ -180,6 +193,7 @@ test.describe("E2E-10 Participant feedback forms", () => {
     const page = await context.newPage();
     try {
       await page.goto("/feedback");
+      await page.waitForLoadState("networkidle");
       await fillAndSubmit(page, {
         label: "Bug Report",
         title: longTitle,
@@ -205,9 +219,10 @@ test.describe("E2E-10 Participant feedback forms", () => {
     }
   });
 
-  test("the sixth submission in a window is throttled and keeps the text", async ({
+  test("the twenty-first submission in a window is throttled and keeps the text", async ({
     browser,
   }) => {
+    test.setTimeout(240_000);
     const admin = createServiceClient();
     const runId = randomUUID().slice(0, 8);
     const marker = `e2e-fb91-${runId}-throttle`;
@@ -217,7 +232,8 @@ test.describe("E2E-10 Participant feedback forms", () => {
     const page = await context.newPage();
     try {
       await page.goto("/feedback");
-      for (let index = 1; index <= 5; index += 1) {
+      await page.waitForLoadState("networkidle");
+      for (let index = 1; index <= 20; index += 1) {
         await fillAndSubmit(page, {
           label: "General",
           title: `${marker}-${index}`,
@@ -229,21 +245,23 @@ test.describe("E2E-10 Participant feedback forms", () => {
           .click();
       }
 
-      const sixthTitle = `${marker}-6`;
-      const sixthMessage = `Throttle text 6 ${runId}`;
+      const overflowTitle = `${marker}-21`;
+      const overflowMessage = `Throttle text 21 ${runId}`;
       await fillAndSubmit(page, {
         label: "General",
-        title: sixthTitle,
-        message: sixthMessage,
+        title: overflowTitle,
+        message: overflowMessage,
       });
 
       await expect(throttleAlert(page)).toHaveCount(1);
-      await expect(page.getByLabel("Title (optional)")).toHaveValue(sixthTitle);
+      await expect(page.getByLabel("Title (optional)")).toHaveValue(
+        overflowTitle,
+      );
       await expect(page.getByLabel("Message", { exact: true })).toHaveValue(
-        sixthMessage,
+        overflowMessage,
       );
 
-      expect(await storedRowsFor(admin, marker)).toHaveLength(5);
+      expect(await storedRowsFor(admin, marker)).toHaveLength(20);
     } finally {
       await context.close();
       await cleanupFeedbackRows(marker);
@@ -306,6 +324,7 @@ test.describe("E2E-10 Participant feedback forms", () => {
             .getByRole("link", { name: "Feedback", exact: true })
             .click();
           await expect(page).toHaveURL(/\/dashboard\/feedback$/);
+          await page.waitForLoadState("networkidle");
 
           const title = `${marker}-${index}`;
           await fillAndSubmit(page, {
@@ -343,6 +362,7 @@ test.describe("E2E-10 Participant feedback forms", () => {
     const page = await context.newPage();
     try {
       await page.goto("/feedback");
+      await page.waitForLoadState("networkidle");
 
       const fitsWidth = await page.evaluate(
         () => document.documentElement.scrollWidth <= window.innerWidth,
