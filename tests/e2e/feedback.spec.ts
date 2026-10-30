@@ -275,6 +275,7 @@ test.describe("E2E-10 Participant feedback forms", () => {
     const admin = createServiceClient();
     const runId = randomUUID().slice(0, 8);
     const marker = `e2e-fb91-${runId}-provider`;
+    // Team & Staff is Shop-only, not Owner-only: every SHOP member sees it.
     const cases: Array<{
       options: SeedOptions;
       participantClass: string;
@@ -288,7 +289,7 @@ test.describe("E2E-10 Participant feedback forms", () => {
       {
         options: { providerType: "SHOP", role: "STAFF" },
         participantClass: "SHOP_STAFF",
-        hasTeamLink: false,
+        hasTeamLink: true,
       },
       {
         options: { providerType: "INDEPENDENT" },
