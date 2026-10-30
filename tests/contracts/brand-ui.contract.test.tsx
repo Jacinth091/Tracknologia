@@ -95,6 +95,7 @@ describe("Provider navigation", () => {
     ["/dashboard", "Dashboard"],
     ["/dashboard/repairs/repair-1", "Repairs"],
     ["/dashboard/requests/request-1", "Requests"],
+    ["/dashboard/feedback", "Feedback"],
     ["/dashboard/settings", "Settings"],
   ])("marks only the current section for %s", (route, label) => {
     pathname.mockReturnValue(route);
@@ -141,12 +142,14 @@ describe("Provider navigation", () => {
       "Requests",
       "Repairs",
       "Team &amp; Staff",
+      "Feedback",
       "Settings",
     ]);
     expect(linkLabels(false)).toEqual([
       "Dashboard",
       "Requests",
       "Repairs",
+      "Feedback",
       "Settings",
     ]);
   });
