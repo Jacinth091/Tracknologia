@@ -78,7 +78,8 @@ Optional validated overrides are
 (default `20`), and `PUBLIC_ABUSE_FEEDBACK_WINDOW_SECONDS` (default `600`).
 
 Production also requires a trusted ingress and a separate
-`PUBLIC_ABUSE_TRUSTED_PROXY_SECRET`. The ingress must remove any incoming
+`PUBLIC_ABUSE_TRUSTED_PROXY_SECRET`, unless `PUBLIC_ABUSE_CLIENT_IP_SOURCE=vercel`
+on Vercel (see [Deploying on Vercel](#deploying-on-vercel)). The ingress must remove any incoming
 `x-tracknologia-proxy-secret` and `x-tracknologia-client-ip` values, set the
 client-IP header itself, inject the proof secret, and block direct access to the
 Next.js upstream. Do not reuse the HMAC secret as the proxy proof secret. The
@@ -104,6 +105,37 @@ In `production` (when `APP_ENV=production` or `APP_ENV=staging`):
 - `PUBLIC_ABUSE_SHARED_DEV_BUCKET=true` and `NEXT_PUBLIC_REQUIRE_EMAIL_CONFIRMATION=false` throw validation errors at startup via Next.js `instrumentation.ts`.
 
 `.env.local` must be ignored by Git.
+
+## Deploying on Vercel
+
+Vercel hosts the Next.js app directly, so no separate ingress is needed. Set
+these variables on the Vercel project's Production environment:
+
+- `APP_ENV=production`
+- `NEXT_PUBLIC_APP_URL`: the deployed `https://` URL (the Vercel domain or your custom domain)
+- `NEXT_PUBLIC_SUPABASE_URL`, `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY` and `SUPABASE_SERVICE_ROLE_KEY`
+- `PUBLIC_ABUSE_HMAC_SECRET`: at least 32 random characters
+- `PUBLIC_ABUSE_CLIENT_IP_SOURCE=vercel`: reads each visitor's IP from Vercel's `x-vercel-forwarded-for` header. It is accepted only on Vercel, where `VERCEL=1` is set automatically, so do not set it anywhere else.
+- `RESEND_API_KEY` and `RESEND_FROM_EMAIL`: a verified sender address, not `onboarding@resend.dev`
+
+Do not set `PUBLIC_ABUSE_TRUSTED_PROXY_SECRET`; this mode does not use it.
+Never set `PUBLIC_ABUSE_SHARED_DEV_BUCKET` or
+`NEXT_PUBLIC_REQUIRE_EMAIL_CONFIRMATION=false`. Production rejects both at
+startup.
+
+In Supabase, open Authentication → URL Configuration. Set the Site URL to the
+Vercel `NEXT_PUBLIC_APP_URL`, and add `<app-url>/auth/callback` to the redirect
+URLs.
+
+Each Vercel deployment page shows the Git commit it was built from. Check that
+it is the commit you expect before you test it.
+
+Smoke checklist for the deployed URL:
+
+- A Tracking lookup with a real tracking code shows the Repair.
+- A Repair Request submitted from a Provider's public page succeeds.
+- Feedback submission succeeds.
+- From one device, the 21st feedback submission within 10 minutes is throttled (default `PUBLIC_ABUSE_FEEDBACK_MAX=20`).
 
 ## Start the application
 
