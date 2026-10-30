@@ -108,34 +108,70 @@ In `production` (when `APP_ENV=production` or `APP_ENV=staging`):
 
 ## Deploying on Vercel
 
-Vercel hosts the Next.js app directly, so no separate ingress is needed. Set
-these variables on the Vercel project's Production environment:
+Vercel hosts the Next.js app directly, so no separate ingress is needed. Vercel
+keeps Production, Preview and Development environment variables separate. A
+variable set only for Production is not available to Preview deployments, so
+each environment you deploy needs its own complete set. `VERCEL=1` is a system
+variable that Vercel sets on both Preview and Production deployments. Do not
+add it yourself.
+
+Each environment needs these variables, scoped to that environment:
 
 - `APP_ENV=production`
-- `NEXT_PUBLIC_APP_URL`: the deployed `https://` URL (the Vercel domain or your custom domain)
-- `NEXT_PUBLIC_SUPABASE_URL`, `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY` and `SUPABASE_SERVICE_ROLE_KEY`
-- `PUBLIC_ABUSE_HMAC_SECRET`: at least 32 random characters
-- `PUBLIC_ABUSE_CLIENT_IP_SOURCE=vercel`: reads each visitor's IP from Vercel's `x-vercel-forwarded-for` header. It is accepted only on Vercel, where `VERCEL=1` is set automatically, so do not set it anywhere else.
+- `NEXT_PUBLIC_APP_URL`: the deployed `https://` URL of that environment
+- `NEXT_PUBLIC_SUPABASE_URL`, `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY` and `SUPABASE_SERVICE_ROLE_KEY` for that environment's Supabase project
+- `PUBLIC_ABUSE_HMAC_SECRET`: at least 32 random characters, unique to that environment
+- `PUBLIC_ABUSE_CLIENT_IP_SOURCE=vercel`: reads each visitor's IP from Vercel's `x-vercel-forwarded-for` header. It is a configuration check, not proof of origin. Set it only on Vercel-served deployments, never on a self-hosted or other host; see the trust limit in `docs/SECURITY.md`.
 - `RESEND_API_KEY` and `RESEND_FROM_EMAIL`: a verified sender address, not `onboarding@resend.dev`
 
 Do not set `PUBLIC_ABUSE_TRUSTED_PROXY_SECRET`; this mode does not use it.
 Never set `PUBLIC_ABUSE_SHARED_DEV_BUCKET` or
-`NEXT_PUBLIC_REQUIRE_EMAIL_CONFIRMATION=false`. Production rejects both at
-startup.
+`NEXT_PUBLIC_REQUIRE_EMAIL_CONFIRMATION=false`. Production rules, which Preview
+deployments also follow, reject both at startup.
 
-In Supabase, open Authentication → URL Configuration. Set the Site URL to the
-Vercel `NEXT_PUBLIC_APP_URL`, and add `<app-url>/auth/callback` to the redirect
-URLs.
+Vercel bakes `NEXT_PUBLIC_*` values into the build, so redeploy after you change
+them.
 
-Each Vercel deployment page shows the Git commit it was built from. Check that
-it is the commit you expect before you test it.
+### Preview: the #109 acceptance check
 
-Smoke checklist for the deployed URL:
+Run the acceptance check on a Preview deployment backed by a separate, free
+**test** Supabase project, so pilot data stays clean. Running it against
+Production instead needs the owner's explicit approval.
+
+1. Link the repo to the test project and apply every migration:
+
+   ```bash
+   npx supabase link --project-ref <test-ref>
+   npx supabase db push
+   ```
+
+2. Set the variables above with the **Preview** scope, using the test project's values. Set `NEXT_PUBLIC_APP_URL` to the branch's stable Preview URL, `https://<project>-git-<branch>-<scope>.vercel.app`.
+3. In the test project's Supabase Authentication → URL Configuration, set the Site URL to that Preview URL, and add `<preview-url>/auth/callback` to the redirect URLs.
+4. Vercel Deployment Protection may require you to be signed in to Vercel to open the Preview URL.
+
+Each Vercel deployment page shows the Git commit it was built from. Use the
+deployment at the PR's exact head SHA, and confirm that SHA before you test.
+
+Smoke and anti-spoof checklist, run on the Preview:
 
 - A Tracking lookup with a real tracking code shows the Repair.
 - A Repair Request submitted from a Provider's public page succeeds.
 - Feedback submission succeeds.
-- From one device, the 21st feedback submission within 10 minutes is throttled (default `PUBLIC_ABUSE_FEEDBACK_MAX=20`).
+- **Throttle:** from one device, the 21st feedback submission within 10 minutes is throttled (default `PUBLIC_ABUSE_FEEDBACK_MAX=20`).
+- **Spoof:** repeat the throttle check with a browser header extension, such as ModHeader, adding forged `x-vercel-forwarded-for`, `x-forwarded-for`, `x-real-ip` and `x-tracknologia-client-ip` values. It must still throttle at the 21st submission.
+- **Isolation:** from a second device on a different network, such as a phone on mobile data, a submission still succeeds while the first device is throttled.
+
+Record pass or fail, the deployed SHA and the date only. Do not record IP
+addresses, tracking codes or personal data.
+
+### Production: the pilot
+
+Set the same variables with the **Production** scope. Point them at the pilot
+Supabase project, and set `NEXT_PUBLIC_APP_URL` to the production URL. In the
+pilot project's Supabase Authentication → URL Configuration, set the Site URL
+to the production URL, and add `<app-url>/auth/callback` to the redirect URLs.
+
+Never put real participant data in a Preview deployment.
 
 ## Start the application
 

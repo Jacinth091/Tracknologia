@@ -381,11 +381,21 @@ and `x-real-ip` in this mode, and `PUBLIC_ABUSE_TRUSTED_PROXY_SECRET` is not
 required. `PUBLIC_ABUSE_HMAC_SECRET` is still required, and the visitor IP is
 still stored only as the keyed HMAC actor key.
 
-The mode needs both conditions. The explicit setting keeps the trusted-ingress
-contract as the default. The `VERCEL=1` check, which only Vercel sets, makes
-the configuration throw at startup when the setting is copied to any other
-host, where a client could forge `x-vercel-forwarded-for` and obtain a fresh
-bucket on every request.
+The explicit setting keeps the trusted-ingress contract as the default. The
+`VERCEL=1` check is only a configuration sanity check. It makes the
+configuration throw at startup when the setting is copied to a host that does
+not set `VERCEL`. It is not proof of origin: anyone who controls a process's
+environment can set that variable, so it cannot establish where a request came
+from.
+
+Vercel mode is safe only when the application is actually served by Vercel's
+managed edge. There, Vercel overwrites `X-Forwarded-For` and does not forward
+external IPs, so `x-vercel-forwarded-for` carries the visitor IP. Never copy
+`PUBLIC_ABUSE_CLIENT_IP_SOURCE=vercel` together with `VERCEL=1` to a
+self-hosted or other host. A caller there could send arbitrary
+`x-vercel-forwarded-for` values, obtain a fresh abuse-control bucket on each
+request and bypass throttling. Other hosts must use the trusted-proxy mode,
+with its ingress proof.
 
 Residual risk: a proxy placed in front of Vercel would make every visitor that
 reaches the application through it appear with that proxy's IP, so they would
