@@ -9,6 +9,8 @@ import TrackRepairPage from "@/app/(public)/track/page";
 import { FeedbackForm } from "@/features/feedback/ui/feedback-form";
 import type { FeedbackFormState } from "@/features/feedback/types";
 
+type FormAction = Parameters<typeof FeedbackForm>[0]["action"];
+
 const { actionState, connection, pathname, requireProviderContext } =
   vi.hoisted(() => ({
     actionState: vi.fn(),
@@ -69,7 +71,10 @@ function rejectedWith(overrides: Partial<Omit<Rejected, "status">>): Rejected {
 function renderForm(state: FeedbackFormState | null, pending = false) {
   actionState.mockReturnValue([state, vi.fn(), pending]);
   return renderToStaticMarkup(
-    <FeedbackForm action={vi.fn()} initialNonce={INITIAL_NONCE} />,
+    <FeedbackForm
+      action={vi.fn<FormAction>()}
+      initialNonce={INITIAL_NONCE}
+    />,
   );
 }
 
@@ -226,7 +231,7 @@ describe("feedback form submission wrapper", () => {
   }
 
   // The wrapper is the first argument of the mocked useActionState.
-  function wrapperFor(action: ReturnType<typeof vi.fn>) {
+  function wrapperFor(action: FormAction) {
     renderToStaticMarkup(
       <FeedbackForm action={action} initialNonce={INITIAL_NONCE} />,
     );
@@ -237,7 +242,9 @@ describe("feedback form submission wrapper", () => {
   }
 
   it("returns an unconfirmed rejection that keeps the nonce sent when the action throws", async () => {
-    const action = vi.fn().mockRejectedValue(new Error("connection reset"));
+    const action = vi.fn<FormAction>().mockRejectedValue(
+      new Error("connection reset"),
+    );
     const wrapper = wrapperFor(action);
 
     const state = await wrapper(
@@ -257,9 +264,10 @@ describe("feedback form submission wrapper", () => {
   });
 
   it("keeps the nonce when an identical resend follows a rejection", async () => {
-    const action = vi
-      .fn()
-      .mockResolvedValue({ status: "accepted", nextNonce: NEXT_NONCE });
+    const action = vi.fn<FormAction>().mockResolvedValue({
+      status: "accepted",
+      nextNonce: NEXT_NONCE,
+    });
     const wrapper = wrapperFor(action);
 
     await wrapper(previous, formFor({ ...savedText, submissionNonce: NONCE }));
@@ -268,9 +276,10 @@ describe("feedback form submission wrapper", () => {
   });
 
   it("replaces the nonce when the text changed after a rejection", async () => {
-    const action = vi
-      .fn()
-      .mockResolvedValue({ status: "accepted", nextNonce: NEXT_NONCE });
+    const action = vi.fn<FormAction>().mockResolvedValue({
+      status: "accepted",
+      nextNonce: NEXT_NONCE,
+    });
     const wrapper = wrapperFor(action);
 
     await wrapper(
