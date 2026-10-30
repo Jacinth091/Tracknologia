@@ -98,6 +98,10 @@ docker compose run --rm web npm run lint
 docker compose run --rm web npm run build
 ```
 
+In CI the `Verify` build step also scans the browser bundle (`.next/static`)
+for its placeholder server secrets and fails on any match; see
+`docs/SECURITY.md`.
+
 ## UAT pilot data pack (Plan 11)
 
 Manual UAT runs against repeatable seed data, never production personal data.
