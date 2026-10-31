@@ -51,10 +51,9 @@ function recipientQuery(email: string): string {
 export async function purgeRecoveryMailbox(email: string): Promise<void> {
   assertLocalMailpitUrl();
   try {
-    await fetch(
-      `${MAILPIT_URL}/api/v1/search?query=${recipientQuery(email)}`,
-      { method: "DELETE" },
-    );
+    await fetch(`${MAILPIT_URL}/api/v1/search?query=${recipientQuery(email)}`, {
+      method: "DELETE",
+    });
   } catch {
     // Purging is best-effort isolation, not validation.
   }

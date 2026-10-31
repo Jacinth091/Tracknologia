@@ -121,9 +121,7 @@ export async function getCurrentSessionId(): Promise<string | undefined> {
     const supabase = await createClient();
     const { data } = await supabase.auth.getSession();
     const accessToken = data.session?.access_token;
-    return accessToken
-      ? readSessionClaims(accessToken)?.session_id
-      : undefined;
+    return accessToken ? readSessionClaims(accessToken)?.session_id : undefined;
   } catch {
     return undefined;
   }
