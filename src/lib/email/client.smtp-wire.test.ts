@@ -1,4 +1,9 @@
-import { createServer, type AddressInfo, type Server, type Socket } from "node:net";
+import {
+  createServer,
+  type AddressInfo,
+  type Server,
+  type Socket,
+} from "node:net";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
 // No nodemailer mock here: these tests run the real transport against a local
