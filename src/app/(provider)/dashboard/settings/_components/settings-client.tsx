@@ -2,6 +2,7 @@
 
 import { useActionState, useState, useSyncExternalStore } from "react";
 import { HugeiconsIcon } from "@hugeicons/react";
+import Link from "next/link";
 import {
   AlertCircleIcon,
   CheckmarkCircle02Icon,
@@ -10,6 +11,7 @@ import {
   Home01Icon,
   MoreHorizontalCircle01Icon,
   Package01Icon,
+  SquareLock02Icon,
   Store01Icon,
   Tick02Icon,
   UserIcon,
@@ -17,6 +19,7 @@ import {
 
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
+import { buttonVariants } from "@/components/ui/button";
 import {
   Card,
   CardContent,
@@ -123,6 +126,7 @@ interface SettingsClientProps {
   personalProfile: ProviderUserProfile;
   serviceModes: ProviderServiceMode[];
   canManageProvider: boolean;
+  accountEmail: string | null;
   requestLinkUrl: string;
 }
 
@@ -131,6 +135,7 @@ export function SettingsClient({
   personalProfile,
   serviceModes,
   canManageProvider,
+  accountEmail,
   requestLinkUrl,
 }: SettingsClientProps) {
   const [acceptingRequests, setAcceptingRequests] = useState(
@@ -321,7 +326,7 @@ export function SettingsClient({
             </h3>
             <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
               <div className="space-y-2">
-                <Label htmlFor="provider-email">Contact Email</Label>
+                <Label htmlFor="provider-email">Customer Contact Email</Label>
                 <Input
                   id="provider-email"
                   name="contactEmail"
@@ -329,6 +334,11 @@ export function SettingsClient({
                   defaultValue={provider.contactEmail ?? ""}
                   disabled={providerPending}
                 />
+                <p className="text-xs leading-relaxed text-muted-foreground">
+                  Shown publicly for repair inquiries. This is not your sign-in
+                  email; editing it never changes sign-in credentials or
+                  recovery delivery.
+                </p>
               </div>
               <div className="space-y-2">
                 <Label htmlFor="provider-phone">Contact Phone</Label>
@@ -508,9 +518,66 @@ export function SettingsClient({
     </Card>
   );
 
+  const accountPanel = (
+    <Card>
+      <CardHeader>
+        <CardTitle className="flex items-center gap-2.5 text-lg">
+          <HugeiconsIcon
+            icon={SquareLock02Icon}
+            strokeWidth={1.8}
+            className="size-4 text-muted-foreground"
+            aria-hidden="true"
+          />
+          Account &amp; Security
+        </CardTitle>
+        <CardDescription>
+          The sign-in identity for this person&apos;s Tracknologia account.
+        </CardDescription>
+      </CardHeader>
+      <CardContent className="space-y-6">
+        <div className="space-y-2">
+          <Label htmlFor="account-signin-email">Sign-in email</Label>
+          <Input
+            id="account-signin-email"
+            value={accountEmail ?? ""}
+            disabled
+            readOnly
+          />
+          <p className="text-xs leading-relaxed text-muted-foreground">
+            This is the email you sign in with. Password recovery emails are
+            sent here, never to the customer contact email. It is separate from
+            your Provider&apos;s public contact email and cannot be changed
+            here.
+          </p>
+        </div>
+        <section
+          className="space-y-2 border-t border-border pt-5"
+          aria-labelledby="account-password-heading"
+        >
+          <h3 id="account-password-heading" className="text-sm font-semibold">
+            Password
+          </h3>
+          <p className="text-xs leading-relaxed text-muted-foreground">
+            Forgot your password, or want to change it? Request a password
+            recovery email from your sign-in email&apos;s recovery form; each
+            person recovers their own account, and Staff never use the Shop
+            Owner&apos;s credentials.
+          </p>
+          <Link
+            href="/forgot-password"
+            className={buttonVariants({ variant: "outline" })}
+          >
+            Open password recovery
+          </Link>
+        </section>
+      </CardContent>
+    </Card>
+  );
+
   if (!canManageProvider) {
     return (
       <div className="space-y-6">
+        {accountPanel}
         {personalPanel}
         <RequestLinkCard
           url={requestLinkUrl}
@@ -572,6 +639,18 @@ export function SettingsClient({
           Business
         </TabsTrigger>
         <TabsTrigger
+          value="account"
+          className="min-h-11 px-2 text-xs sm:text-sm"
+        >
+          <HugeiconsIcon
+            icon={SquareLock02Icon}
+            strokeWidth={1.8}
+            aria-hidden="true"
+            className="hidden sm:block"
+          />
+          Account
+        </TabsTrigger>
+        <TabsTrigger
           value="service-modes"
           className="min-h-11 px-2 text-xs sm:text-sm"
         >
@@ -599,6 +678,9 @@ export function SettingsClient({
         </TabsContent>
         <TabsContent value="service-modes" className="w-full">
           {serviceModesPanel}
+        </TabsContent>
+        <TabsContent value="account" className="w-full">
+          {accountPanel}
         </TabsContent>
       </div>
     </Tabs>
