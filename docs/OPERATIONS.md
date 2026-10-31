@@ -138,7 +138,21 @@ Handling:
 
 Restoring replaces data in the target. Restore only into a fresh project or a
 reset database, never over a live project without an owner decision to roll
-data back:
+data back.
+
+Before the restore, remove the project's default privileges on the target, as
+the postgres role:
+
+```sql
+ALTER DEFAULT PRIVILEGES FOR ROLE postgres IN SCHEMA public REVOKE ALL ON TABLES FROM anon, authenticated, service_role;
+ALTER DEFAULT PRIVILEGES FOR ROLE postgres IN SCHEMA public REVOKE ALL ON SEQUENCES FROM anon, authenticated, service_role;
+ALTER DEFAULT PRIVILEGES FOR ROLE postgres IN SCHEMA public REVOKE ALL ON FUNCTIONS FROM anon, authenticated, service_role;
+```
+
+> **Warning:** skipping this step silently re-grants `anon` and `authenticated`
+> on every restored table, sequence and function. `pg_dump` records only the
+> grants that differ from the built-in default, never "anon was revoked", so the
+> project's default privileges would bring the revoked access back.
 
 ```bash
 psql --single-transaction --variable ON_ERROR_STOP=1 \
@@ -147,12 +161,21 @@ psql --single-transaction --variable ON_ERROR_STOP=1 \
   --file data.sql --dbname "$TARGET_DATABASE_URL"
 ```
 
+After the restore, put the default privileges back, so later migrations behave
+as on the original project. Restored objects keep the dump's grants:
+
+```sql
+ALTER DEFAULT PRIVILEGES IN SCHEMA public GRANT ALL ON TABLES TO anon, authenticated, service_role;
+ALTER DEFAULT PRIVILEGES IN SCHEMA public GRANT ALL ON FUNCTIONS TO anon, authenticated, service_role;
+ALTER DEFAULT PRIVILEGES IN SCHEMA public GRANT ALL ON SEQUENCES TO anon, authenticated, service_role;
+```
+
 Then check:
 
 1. `select count(*) from supabase_migrations.schema_migrations;` equals the
    number of files in `supabase/migrations/`.
-2. RLS is enabled on the Provider-owned and feedback tables, and `anon` cannot
-   select from `public.feedback_submissions`.
+2. RLS is enabled on the Provider-owned and feedback tables, and `anon` and
+   `authenticated` cannot select from `public.feedback_submissions`.
 3. The expected operators are enabled in `public.internal_operators`.
 4. Reset custom role passwords and recreate any replication subscriptions, as
    Supabase's backup guide requires after a restore.

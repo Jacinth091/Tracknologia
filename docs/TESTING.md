@@ -271,12 +271,18 @@ internal operator mapping. It then:
 1. dumps roles, schema and data with `supabase db dump --local`;
 2. wipes the restored scope in place (public schema, every Auth table except
    `schema_migrations`, the whole `supabase_migrations` schema);
-3. restores with `psql --single-transaction -v ON_ERROR_STOP=1`, in the order
-   schema, `session_replication_role = replica`, data;
+3. removes the default privileges for `anon`, `authenticated` and
+   `service_role` before the restore. Without this, restored tables silently
+   regain the grants that the migrations revoked, because `pg_dump` does not
+   record revocations. Then restores with `psql --single-transaction
+   -v ON_ERROR_STOP=1`, in the order schema, `session_replication_role =
+   replica`, data, and puts the default privileges back afterwards;
 4. verifies with SQL and fails on the first mismatch: fixture rows and values,
-   RLS on the Provider-owned and feedback tables, `anon` denial, RPC EXECUTE
-   grants unchanged, the migration history count equal to the number of files
-   in `supabase/migrations/`, and the operator mapping.
+   RLS on the Provider-owned and feedback tables, `anon` denial on
+   `feedback_submissions` and `repairs`, `authenticated` denial on
+   `feedback_submissions`, RPC EXECUTE grants unchanged, the migration history
+   count equal to the number of files in `supabase/migrations/`, and the
+   operator mapping.
 
 The script refuses any API host other than `127.0.0.1` or `localhost`, and it
 refuses to run without `DRILL_DISPOSABLE=1`. Dumps go to a temporary directory
