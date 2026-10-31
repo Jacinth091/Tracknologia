@@ -416,7 +416,7 @@ test.describe("E2E-08 Internal operator access", () => {
       const appOrigin = new URL(baseURL).origin;
       const bodies: Promise<string>[] = [];
       operatorPage.on("response", (response) => {
-        const { status } = response;
+        const status = response.status();
         const isRedirect = status >= 300 && status < 400;
         if (!isRedirect && new URL(response.url()).origin === appOrigin) {
           bodies.push(response.text());
