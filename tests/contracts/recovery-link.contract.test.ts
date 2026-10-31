@@ -11,7 +11,8 @@ const expected: RecoveryLinkExpectation = {
   appOrigin: "http://localhost:3000",
 };
 
-const CALLBACK = "http%3A%2F%2Flocalhost%3A3000%2Fauth%2Fcallback%3Fnext%3D%2Freset-password";
+const CALLBACK =
+  "http%3A%2F%2Flocalhost%3A3000%2Fauth%2Fcallback%3Fnext%3D%2Freset-password";
 
 // A representative Supabase default recovery email: the button links to the
 // verify endpoint, and the query separators are HTML-escaped as `&amp;`.
