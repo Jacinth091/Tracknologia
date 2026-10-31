@@ -1,4 +1,8 @@
-import { beforeEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+
+// Captured before any fake timers are installed, so the test can wait one real
+// macrotask for unhandled-rejection reporting.
+const realSetImmediate = globalThis.setImmediate;
 
 type SmtpSettings = {
   host: string;
@@ -52,6 +56,10 @@ beforeEach(() => {
     user: "project@gmail.com",
     password: "app_password_test",
   };
+});
+
+afterEach(() => {
+  vi.useRealTimers();
 });
 
 describe("sendEmail", () => {
@@ -134,6 +142,46 @@ describe("sendEmail", () => {
     expect(logged).not.toContain(bodySentinel);
     expect(logged).not.toContain(urlSentinel);
     expect(logged).not.toContain("staff@example.com");
+  });
+
+  it("gives up at the send deadline and handles the abandoned send without an unhandled rejection", async () => {
+    vi.useFakeTimers();
+    let rejectSend: (error: Error) => void = () => undefined;
+    mocks.sendMail.mockReturnValue(
+      new Promise((_, reject) => {
+        rejectSend = reject;
+      }),
+    );
+    const unhandled = vi.fn();
+    process.on("unhandledRejection", unhandled);
+
+    try {
+      const pending = sendEmail({
+        to: "staff@example.com",
+        subject: "Invitation",
+        html: "<p>Invite</p>",
+        text: "Join Link: https://app.tracknologia.example/register?invite=INVITE_DEADLINE_SENTINEL",
+      });
+      await vi.advanceTimersByTimeAsync(8_001);
+      const result = await pending;
+
+      expect(result).toEqual({ success: false, reason: "provider_error" });
+      expect(mocks.close).toHaveBeenCalledTimes(1);
+      const logged = mocks.consoleError.mock.calls.flat().join(" ");
+      expect(logged).toContain(
+        "[Email Error]: SMTP delivery failed (ETIMEDOUT)",
+      );
+      expect(logged).not.toContain("app_password_test");
+      expect(logged).not.toContain("staff@example.com");
+      expect(logged).not.toContain("INVITE_DEADLINE_SENTINEL");
+
+      rejectSend(new Error("socket closed after the deadline"));
+      await vi.runAllTimersAsync();
+      await new Promise((resolve) => realSetImmediate(resolve));
+      expect(unhandled).not.toHaveBeenCalled();
+    } finally {
+      process.off("unhandledRejection", unhandled);
+    }
   });
 
   it("returns EMAIL_DISABLED without SMTP settings, with no transport and no logs", async () => {
