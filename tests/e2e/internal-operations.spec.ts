@@ -413,21 +413,29 @@ test.describe("E2E-08 Internal operator access", () => {
       });
 
       // Listen only from here, so sign-in and redirect traffic is not captured.
-      // Redirects carry no body, and Playwright cannot read one.
+      // Redirects carry no body, and Playwright cannot read one. Bodies of
+      // requests the browser abandoned on navigation are unavailable and were
+      // never shown; the document reads below are what must succeed.
       const appOrigin = new URL(baseURL).origin;
-      const bodies: Promise<string>[] = [];
+      const bodies: Promise<string | null>[] = [];
       operatorPage.on("response", (response) => {
         const status = response.status();
         const isRedirect = status >= 300 && status < 400;
         if (!isRedirect && new URL(response.url()).origin === appOrigin) {
-          bodies.push(response.text());
+          bodies.push(response.text().catch(() => null));
         }
       });
 
       // Default window, then a wider one that includes the seeds.
       const windows = ["/internal/activity", "/internal/activity?period=30d"];
       for (const path of windows) {
-        await operatorPage.goto(path);
+        const response = await operatorPage.goto(path);
+        if (response === null) {
+          throw new Error(`[E2E] no document response for ${path}`);
+        }
+        // Read the page's own document before the next navigation discards it.
+        const documentBody = await response.text();
+
         await expect(
           operatorPage.getByRole("heading", {
             name: "Validation metrics",
@@ -439,8 +447,11 @@ test.describe("E2E-08 Internal operator access", () => {
         // The HTML includes the inline RSC payload, so page.content() covers
         // the server-rendered data as well as the markup.
         const html = await operatorPage.content();
-        const responseBodies = await Promise.all(bodies);
+        const responseBodies = (await Promise.all(bodies)).filter(
+          (body): body is string => body !== null,
+        );
         for (const value of Object.values(canaries)) {
+          expect(documentBody).not.toContain(value);
           expect(html).not.toContain(value);
           for (const body of responseBodies) {
             expect(body).not.toContain(value);
