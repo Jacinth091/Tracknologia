@@ -15,6 +15,7 @@ export { submitFeedbackForm } from "./form";
 export {
   getFeedbackAggregateSummary,
   getInternalFeedback,
+  getNewFeedbackCount,
   listInternalFeedback,
 } from "./queries";
 

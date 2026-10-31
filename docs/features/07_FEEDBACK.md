@@ -67,6 +67,10 @@ malformed database response, an unexpected auth throw) becomes `UNAVAILABLE`
 with no original message. Logs carry only a fixed operation name and a
 SQLSTATE-shaped code, never SQL text, messages, input, or error payloads.
 
+`getNewFeedbackCount()` is an enabled-operator-only, audited read of the current
+`NEW` backlog across all retained submissions, independent of submission date.
+It returns one exact nonnegative count, not rows or identifiers.
+
 ## Trust and classification
 
 - **Public submission:** the source is a trusted server argument, validated
@@ -138,11 +142,11 @@ Validation matches the `feedback_submissions` constraints:
 
 ## Internal reads and the access audit
 
-Each of the four internal operations calls `requireInternalOperator()` first.
+Each internal operation calls `requireInternalOperator()` first.
 A denial returns `FORBIDDEN`, and an unavailable guard returns `UNAVAILABLE`.
 Both happen before any query and before input is parsed.
 
-The three protected reads (list, detail, summary) then call
+The protected reads (list, detail, period summary, current NEW count) then call
 `recordSensitiveInternalAccess("INTERNAL_ACCESS_VIEW")` before their privileged
 query. An audit failure returns `UNAVAILABLE`, and protected data is withheld.
 
@@ -192,6 +196,15 @@ keys in every decision: send the current text to keep it, or `null` to clear it.
 An omitted key is rejected before any read or write, so a status-only edit cannot
 erase stored text.
 Original submitted text is never modified.
+
+## Current NEW backlog
+
+`getNewFeedbackCount()` uses a service-role PostgREST HEAD query with an exact
+count and `status = NEW`, without a creation-date predicate. No record payload
+is transferred. A missing/malformed count or database failure is `UNAVAILABLE`,
+never an invented zero. The internal Overview uses this count for
+**New feedback (now)**; period analytics retain their bounded cohort semantics.
+This read uses existing table grants and adds no schema or RPC.
 
 ## Count-only summary
 
@@ -273,8 +286,8 @@ other features to copy.
 - `src/features/feedback/feedback.test.ts` mocks the auth, limiter, Supabase
   client, and access seams. It covers limiter-first ordering and clamping,
   forged-field rejection, Provider class derivation and auth mapping, guard
-  denial and unavailability for all four internal operations, audit failure for
-  the three protected reads, review preconditions and transitions, null
+  denial and unavailability for all internal operations, audit failure for
+  protected reads, exact HEAD backlog counts and unavailable responses, review preconditions and transitions, null
   clearing, RPC error and malformed-response mapping, sanitized transport and
   client failures with log-canary checks, and schema bounds.
 - `src/features/feedback/form.test.ts` calls `submitFeedbackForm` directly with

@@ -8,6 +8,7 @@ import { createInternalOpsClient } from "@/lib/supabase/internal";
 
 import { sanitizeFeedbackError } from "./errors";
 import {
+  countNewFeedback,
   listFeedbackPreviews,
   readFeedbackDetail,
   readFeedbackSummaryRows,
@@ -54,6 +55,16 @@ async function requireAuditedOperatorRead(): Promise<string> {
   }
 
   return access.userId;
+}
+
+/** Current NEW backlog across all retained submissions, without a date window. */
+export async function getNewFeedbackCount(): Promise<number> {
+  try {
+    await requireAuditedOperatorRead();
+    return await countNewFeedback(await createInternalOpsClient());
+  } catch (error) {
+    throw sanitizeFeedbackError("count internal new feedback", error);
+  }
 }
 
 /**

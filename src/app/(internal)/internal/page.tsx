@@ -9,6 +9,7 @@ import {
 } from "@hugeicons/core-free-icons";
 import { PageHeader } from "@/components/shared/page-header";
 import { buttonVariants } from "@/components/ui/button";
+import { FeedbackError, getNewFeedbackCount } from "@/features/feedback";
 import {
   Card,
   CardContent,
@@ -53,9 +54,9 @@ export default async function InternalPage() {
     return <InternalServiceUnavailable />;
   }
 
-  // The metrics read writes the one INTERNAL_ACCESS_VIEW row before it reads
-  // any number, so a successful read needs no second audit here.
+  // Feature reads audit themselves; the page audits its fallback links only.
   let metrics: ValidationMetrics | null = null;
+  let newFeedbackCount: number | null = null;
   try {
     metrics = await getValidationMetrics({ mode: "7d" });
   } catch (error) {
@@ -67,6 +68,17 @@ export default async function InternalPage() {
 
     if (!audited) {
       return <InternalServiceUnavailable />;
+    }
+  }
+
+  if (metrics) {
+    try {
+      newFeedbackCount = await getNewFeedbackCount();
+    } catch (error) {
+      if (error instanceof FeedbackError && error.code === "FORBIDDEN") {
+        notFound();
+      }
+      newFeedbackCount = null;
     }
   }
 
@@ -127,8 +139,8 @@ export default async function InternalPage() {
               href="/internal/feedback?status=NEW"
               label="New feedback (now)"
               value={
-                metrics.feedback
-                  ? formatCount(metrics.feedback.byStatus.NEW)
+                newFeedbackCount !== null
+                  ? formatCount(newFeedbackCount)
                   : "Unavailable"
               }
               status="AWAITING_APPROVAL"
