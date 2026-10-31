@@ -125,11 +125,21 @@ export async function requestPasswordReset(params: {
 
 export async function resetPassword(params: { newPassword: string }) {
   const supabase = await createClient();
+  const config = getServerConfig();
   const { data, error } = await supabase.auth.updateUser({
     password: params.newPassword,
   });
 
   if (error) {
+    if (config.runtime === "production") {
+      // Fail closed without exposing Auth internals: the recovery session may
+      // be missing, expired, or already used, or the Auth service may be
+      // degraded. The reset page directs the visitor back to a fresh
+      // recovery request instead.
+      throw new Error(
+        "Unable to set your password right now. Request a fresh password reset email and try again.",
+      );
+    }
     throw new Error(error.message);
   }
 

@@ -4,6 +4,8 @@ const mocks = vi.hoisted(() => ({
   signUp: vi.fn(),
   signInWithPassword: vi.fn(),
   resetPasswordForEmail: vi.fn(),
+  updateUser: vi.fn(),
+  getAuthUser: vi.fn(),
   createClient: vi.fn(),
   redirect: vi.fn(),
   cookies: vi.fn(),
@@ -26,7 +28,12 @@ vi.mock("@/lib/config/server", () => ({
 vi.mock("next/navigation", () => ({ redirect: mocks.redirect }));
 vi.mock("next/headers", () => ({ cookies: mocks.cookies }));
 
-import { forgotPasswordAction, loginAction, registerAction } from "./actions";
+import {
+  forgotPasswordAction,
+  loginAction,
+  registerAction,
+  updatePasswordAction,
+} from "./actions";
 
 function registerFormData() {
   const formData = new FormData();
@@ -55,6 +62,8 @@ beforeEach(() => {
       signUp: mocks.signUp,
       signInWithPassword: mocks.signInWithPassword,
       resetPasswordForEmail: mocks.resetPasswordForEmail,
+      updateUser: mocks.updateUser,
+      getUser: mocks.getAuthUser,
     },
   });
 });
@@ -191,11 +200,104 @@ describe("forgotPasswordAction", () => {
     const result = await forgotPasswordAction(null, formData);
 
     expect(result).toEqual({
-      success: "Password reset link sent. Please check your email inbox.",
+      success:
+        "If an account is registered with this email, a password reset email is on its way. If you don't receive one shortly, try again later.",
     });
     expect(mocks.resetPasswordForEmail).toHaveBeenCalledWith("owner@shop.com", {
       redirectTo:
         "https://tracknologia.example/auth/callback?next=/reset-password",
     });
+  });
+
+  it("keeps a production delivery failure neutral about account existence", async () => {
+    const sentinel = "SMTP_RESET_SENTINEL_74b1";
+    mocks.resetPasswordForEmail.mockResolvedValue({
+      data: {},
+      error: { message: sentinel, status: 500 },
+    });
+    const formData = new FormData();
+    formData.set("email", "owner@shop.com");
+
+    const result = await forgotPasswordAction(null, formData);
+
+    expect(result).toEqual({
+      error:
+        "Unable to send password reset email at this time. Please try again later.",
+    });
+    expect(JSON.stringify(result)).not.toContain(sentinel);
+  });
+});
+
+describe("updatePasswordAction", () => {
+  function resetFormData(password = "newPassw0rd", confirm?: string) {
+    const formData = new FormData();
+    formData.set("password", password);
+    formData.set("confirmPassword", confirm ?? password);
+    return formData;
+  }
+
+  it("sends the new password to Supabase Auth for the recovery session user", async () => {
+    mocks.getAuthUser.mockResolvedValue({
+      data: { user: { id: "user-1", email: "owner@shop.com" } },
+      error: null,
+    });
+    mocks.updateUser.mockResolvedValue({ data: {}, error: null });
+
+    await updatePasswordAction(null, resetFormData());
+
+    expect(mocks.updateUser).toHaveBeenCalledWith({
+      password: "newPassw0rd",
+    });
+    expect(mocks.redirect).toHaveBeenCalledWith("/dashboard");
+  });
+
+  it("fails closed before touching Auth when no recovery session exists", async () => {
+    mocks.getAuthUser.mockResolvedValue({
+      data: { user: null },
+      error: {
+        name: "AuthSessionMissingError",
+        message: "Auth session missing!",
+      },
+    });
+
+    const result = await updatePasswordAction(null, resetFormData());
+
+    expect(result).toEqual({
+      error:
+        "Your password recovery session has expired or was never established. Request a fresh password reset email and try again.",
+    });
+    expect(mocks.updateUser).not.toHaveBeenCalled();
+    expect(mocks.redirect).not.toHaveBeenCalled();
+  });
+
+  it("rejects mismatched confirmation fields", async () => {
+    const result = await updatePasswordAction(
+      null,
+      resetFormData("newPassw0rd", "differentPassw0rd"),
+    );
+
+    expect(result).toEqual({ error: "Passwords do not match" });
+    expect(mocks.getAuthUser).not.toHaveBeenCalled();
+    expect(mocks.updateUser).not.toHaveBeenCalled();
+  });
+
+  it("does not expose a raw production Auth failure", async () => {
+    const sentinel = "AUTH_UPDATE_SENTINEL_99c2";
+    mocks.getAuthUser.mockResolvedValue({
+      data: { user: { id: "user-1", email: "owner@shop.com" } },
+      error: null,
+    });
+    mocks.updateUser.mockResolvedValue({
+      data: {},
+      error: { message: sentinel, status: 500 },
+    });
+
+    const result = await updatePasswordAction(null, resetFormData());
+
+    expect(result).toEqual({
+      error:
+        "Unable to set your password right now. Request a fresh password reset email and try again.",
+    });
+    expect(JSON.stringify(result)).not.toContain(sentinel);
   });
 });

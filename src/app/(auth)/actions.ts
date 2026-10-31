@@ -9,6 +9,7 @@ import {
   registerProviderAccount,
   requestPasswordReset,
   resetPassword,
+  getUser,
   signOutUser,
   AuthError,
 } from "@/features/auth";
@@ -175,7 +176,11 @@ export async function forgotPasswordAction(
   }
 
   return {
-    success: "Password reset link sent. Please check your email inbox.",
+    // Neutral deliberate confirmation: never reveals whether the email is
+    // registered. Supabase Auth either delivers the recovery email or
+    // silently skips unknown addresses.
+    success:
+      "If an account is registered with this email, a password reset email is on its way. If you don't receive one shortly, try again later.",
   };
 }
 
@@ -189,6 +194,16 @@ export async function updatePasswordAction(
   if (!parsed.success) {
     return {
       error: parsed.error.issues[0]?.message ?? "Invalid password provided",
+    };
+  }
+
+  // Fail closed on the trusted recovery context: the recovery exchange must
+  // have established this visitor's session before their password changes.
+  const recoveryUser = await getUser();
+  if (!recoveryUser) {
+    return {
+      error:
+        "Your password recovery session has expired or was never established. Request a fresh password reset email and try again.",
     };
   }
 
