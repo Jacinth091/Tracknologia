@@ -4,6 +4,7 @@ import {
   type Request as PlaywrightRequest,
 } from "@playwright/test";
 import { randomUUID } from "node:crypto";
+import { runLocalSql, sqlUuidLiteral } from "../helpers/local-postgres";
 import {
   cleanupActors,
   cleanupInternalOperator,
@@ -66,7 +67,6 @@ async function feedbackRowByTitle(admin: FeedbackAdmin, title: string) {
  * operator with ON DELETE RESTRICT, so the events go first.
  */
 async function cleanupRunRows(admin: FeedbackAdmin, runId: string) {
-  const { runLocalSql } = await import("../helpers/local-postgres");
   const marker = `e2e-fb-run-${runId}-%`;
   await runLocalSql(
     supabaseUrl,
@@ -81,6 +81,107 @@ async function cleanupRunRows(admin: FeedbackAdmin, runId: string) {
 }
 
 test.describe("E2E-09 Internal feedback inbox", () => {
+  test("the current NEW backlog includes older feedback while period analytics stay windowed", async ({
+    browser,
+  }) => {
+    const admin = createServiceClient();
+    const operator = await seedInternalOperator(admin);
+    const context = await browser.newContext();
+    const page = await context.newPage();
+    const runId = randomUUID().slice(0, 8);
+    const kinds = ["older-new", "recent-new", "older-resolved"] as const;
+    const nonces = kinds.map(() => randomUUID());
+    const titles = kinds.map((kind) => `e2e-fb-run-${runId}-${kind}`);
+    try {
+      await page.goto("/login?redirectTo=%2Finternal");
+      await page.getByLabel("Email", { exact: true }).fill(operator.email);
+      await page.locator('input[name="password"]').fill(operator.password);
+      await page.getByRole("button", { name: "Sign in", exact: true }).click();
+      await expect(page).toHaveURL(/\/internal$/);
+      const before = await admin
+        .from("feedback_submissions")
+        .select("id", { head: true, count: "exact" })
+        .eq("status", "NEW");
+      if (before.error || before.count === null)
+        throw new Error("[E2E] backlog baseline unavailable");
+
+      await page.goto("/internal/activity");
+      await page.getByText("All numbers", { exact: true }).click();
+      const periodNewValue = page
+        .getByText("Status: New", { exact: true })
+        .locator("..")
+        .locator("dd");
+      const periodBefore = Number(
+        (await periodNewValue.innerText()).replaceAll(",", ""),
+      );
+      expect(Number.isFinite(periodBefore)).toBe(true);
+
+      const seed = kinds
+        .map(
+          (kind, index) => `
+        PERFORM public.submit_feedback(${sqlUuidLiteral(nonces[index])}, 'GENERAL', 'PUBLIC_TRACKING', 'PUBLIC_SELF_REPORTED_CUSTOMER', '${titles[index]}', 'private-backlog-canary-${runId}');
+        ${kind !== "recent-new" ? `UPDATE public.feedback_submissions SET created_at = now() - interval '45 days' WHERE submission_nonce = ${sqlUuidLiteral(nonces[index])};` : ""}
+      `,
+        )
+        .join("\n");
+      const resolvedId = `(SELECT id FROM public.feedback_submissions WHERE submission_nonce = ${sqlUuidLiteral(nonces[2])})`;
+      await runLocalSql(
+        supabaseUrl,
+        `DO $$ BEGIN
+        ${seed}
+        PERFORM public.record_feedback_review(${resolvedId}, ${sqlUuidLiteral(operator.userId)}, 1, 'REVIEWING', 'NORMAL', NULL, NULL, NULL);
+        PERFORM public.record_feedback_review(${resolvedId}, ${sqlUuidLiteral(operator.userId)}, 2, 'RESOLVED', 'NORMAL', NULL, NULL, NULL);
+      END $$;`,
+      );
+
+      await page.goto("/internal");
+      const tile = page.getByRole("link", { name: /New feedback \(now\)/ });
+      await expect(tile.locator('[data-slot="card-title"]')).toHaveText(
+        (before.count + 2).toLocaleString("en-PH"),
+      );
+      const overviewHtml = await page.content();
+      expect(overviewHtml).not.toContain(`private-backlog-canary-${runId}`);
+      for (const value of [...titles, ...nonces]) {
+        expect(overviewHtml).not.toContain(value);
+      }
+
+      await tile.click();
+      await expect(
+        page.getByRole("link", {
+          name: `Open feedback: ${titles[0]}`,
+          exact: true,
+        }),
+      ).toBeVisible();
+      await expect(
+        page.getByRole("link", {
+          name: `Open feedback: ${titles[1]}`,
+          exact: true,
+        }),
+      ).toBeVisible();
+      await expect(
+        page.getByRole("link", {
+          name: `Open feedback: ${titles[2]}`,
+          exact: true,
+        }),
+      ).toHaveCount(0);
+
+      await page.goto("/internal/activity");
+      await page.getByText("All numbers", { exact: true }).click();
+      await expect(periodNewValue).toHaveText(
+        (periodBefore + 1).toLocaleString("en-PH"),
+      );
+      expect(await page.content()).not.toContain(
+        `private-backlog-canary-${runId}`,
+      );
+      await revokeInternalOperator(admin, operator.userId);
+      expect((await page.goto("/internal"))?.status()).toBe(404);
+    } finally {
+      await context.close();
+      await cleanupRunRows(admin, runId);
+      await cleanupInternalOperator(admin, operator.userId);
+    }
+  });
+
   test("providers cannot load the inbox or forge operator access", async ({
     browser,
     request,
