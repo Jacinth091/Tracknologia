@@ -117,19 +117,33 @@ Auth Module requestPasswordReset → Supabase Auth resetPasswordForEmail
 (callback target: <origin>/auth/callback?next=/reset-password)
         ↓
 Supabase Auth emails the recovery link to the account's sign-in email
-(unknown accounts are silently skipped; the UI confirms neutrally)
+(unknown accounts are silently skipped; the UI confirms neutrally). The default
+link is Supabase's own verify endpoint, /auth/v1/verify?type=recovery, whose
+redirect_to returns to /auth/callback?next=/reset-password
         ↓
-The visitor opens the link; /auth/callback exchanges the code for a session
+The visitor opens the verify link in the same browser that requested the reset
+(the PKCE verifier cookie lives there). Supabase verifies the token and redirects
+to /auth/callback?code=…, which exchanges the code for a session
         ↓
-The callback redirects to /reset-password?flow=recovery
+/auth/callback checks the redeemed session's access-token amr claim. It issues
+the recovery grant only when amr names method "recovery" with a recent
+timestamp. The grant is a signed HttpOnly cookie for /reset-password, bound to
+the Auth user and the session id, valid for 10 minutes
         ↓
-The reset page resolves state server-side (Auth Module getUser()):
-- no session            → "Recovery link required" card with a fresh-link CTA
-- session + flow marker → password form → updatePasswordAction
-- session, no marker    → redirect /dashboard (ordinary signed-in visit)
+The callback redirects to /reset-password?flow=recovery, or to
+/reset-password?callback_error=auth_callback_failed when the code, the amr or the
+session is not a recovery
         ↓
-updatePasswordAction validates input, re-checks the trusted recovery session,
-then Auth Module resetPassword → Supabase Auth updateUser({ password })
+The reset page resolves state server-side (Auth Module getUser() and the
+session id):
+- no session                         → "Recovery link required" card, fresh-link CTA
+- session, flow marker, no grant     → "Recovery link required" card (expired or missing)
+- session, flow marker, valid grant  → password form, naming the account by masked email
+- session, no flow marker            → redirect /dashboard (ordinary signed-in visit)
+        ↓
+updatePasswordAction checks the signed-in user and session against the grant,
+then Auth Module resetPassword → Supabase Auth updateUser({ password }). On
+success the browser's grant cookie is cleared
         ↓
 Post-reset destination: /dashboard (the exchange established a signed-in session)
 ```
@@ -141,10 +155,14 @@ Rules the workflow depends on:
   redirects signed-in visitors away from `/login` and `/register`. Recovery
   entry pages resolve their own state; an automatic redirect there would
   strand a valid recovery session on the dashboard.
-- The `?flow=recovery` marker is appended only by `/auth/callback` after a
-  successful recovery exchange. The reset form is never a silent password
-  change during an arbitrary signed-in visit, and no application reset-token
-  table exists — Supabase Auth credentials own the mechanism.
+- The `?flow=recovery` marker is a navigation hint only. On its own it
+  authorizes nothing: the form opens and the password changes only with a valid
+  recovery grant for the signed-in user and session. A plain signed-in visit
+  without the marker goes to /dashboard. No application reset-token table
+  exists; Supabase Auth credentials own the mechanism.
+- The grant is short-lived (10 minutes), user- and session-bound, and cleared by
+  the browser after a successful change. It is not an atomic server-side spent
+  token: a copied cookie stays usable from the same session until it expires.
 - A recovery exchange replaces any existing session with the recovery
   account's session. Each person recovers their own account; a Staff member
   must use their own sign-in email, never the Shop Owner's.
@@ -156,8 +174,10 @@ Rules the workflow depends on:
 - The reset request response is neutral: it never reveals whether an email
   is registered, and production Auth failures are never surfaced as raw
   errors. Expired, reused, or missing recovery credentials lead to the
-  deliberate recovery screen with a fresh-link request path; a failed
-  callback exchange lands on /login with a useful message.
+  deliberate recovery screen with a fresh-link request path, even for a
+  signed-in visitor. A failed recovery callback lands on
+  /reset-password?callback_error=auth_callback_failed. A failed sign-in
+  callback (not a recovery) still lands on /login with a useful message.
 
 ## Security requirements
 
