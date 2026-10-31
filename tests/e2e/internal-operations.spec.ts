@@ -1,7 +1,8 @@
-import { expect, test } from "@playwright/test";
+import { expect, test, type Response } from "@playwright/test";
 import { randomUUID } from "node:crypto";
 import { runLocalSql, sqlUuidLiteral } from "../helpers/local-postgres";
 import {
+  baseURL,
   cleanupActors,
   cleanupInternalOperator,
   createServiceClient,
@@ -228,5 +229,294 @@ test.describe("E2E-08 Internal operator access", () => {
       await cleanupInternalOperator(admin, operator.userId);
       await cleanupActors(admin, seededActors);
     }
+  });
+
+  test("the activity page admits only enabled operators", async ({
+    browser,
+  }) => {
+    const admin = createServiceClient();
+    const operator = await seedInternalOperator(admin);
+    const seededActors: TestActor[] = [];
+
+    try {
+      // 1. Anonymous visitors return to login. The internal layout's redirect
+      //    (to /internal) currently wins over the page's /internal/activity one.
+      const anonymousContext = await browser.newContext();
+      const anonymousPage = await anonymousContext.newPage();
+      await anonymousPage.goto("/internal/activity");
+      await expect(anonymousPage).toHaveURL(
+        /\/login\?redirectTo=%2Finternal(%2Factivity)?$/,
+      );
+      await anonymousContext.close();
+
+      // 2. Every Provider-backed role gets the shared internal 404.
+      for (const options of providerWithoutMapping) {
+        const actor = await seedActor(admin, options);
+        seededActors.push(actor);
+
+        const context = await browser.newContext();
+        const page = await context.newPage();
+        await loginAndCaptureState(page, actor);
+        const denied = await page.goto("/internal/activity");
+        expect(denied?.status()).toBe(404);
+        await expect(
+          page.getByRole("heading", { name: "Validation metrics" }),
+        ).toHaveCount(0);
+        await context.close();
+      }
+
+      // 3. The enabled operator sees the picker and a chosen period round-trips
+      //    through the GET form. The form also submits empty start/end fields.
+      const operatorContext = await browser.newContext();
+      const operatorPage = await operatorContext.newPage();
+      await operatorPage.goto("/login?redirectTo=%2Finternal%2Factivity");
+      await operatorPage.locator('input[name="email"]').fill(operator.email);
+      await operatorPage
+        .locator('input[name="password"]')
+        .fill(operator.password);
+      await operatorPage
+        .getByRole("button", { name: "Sign in", exact: true })
+        .click();
+      await expect(operatorPage).toHaveURL(/\/internal\/activity$/, {
+        timeout: 20_000,
+      });
+
+      const heading = operatorPage.getByRole("heading", {
+        name: "Validation metrics",
+        exact: true,
+      });
+      await expect(heading).toBeVisible();
+      await expect(operatorPage.locator("#metrics-period")).toHaveValue("7d");
+
+      await operatorPage.locator("#metrics-period").selectOption("30d");
+      await operatorPage
+        .getByRole("button", { name: "Show period", exact: true })
+        .click();
+      await expect(operatorPage).toHaveURL(/[?&]period=30d(&|$)/);
+      await expect(operatorPage.locator("#metrics-period")).toHaveValue("30d");
+      await expect(heading).toBeVisible();
+
+      // 4. Revocation applies to the same session on the next request.
+      await revokeInternalOperator(admin, operator.userId);
+      const afterRevoke = await operatorPage.goto("/internal/activity");
+      expect(afterRevoke?.status()).toBe(404);
+      await expect(heading).toHaveCount(0);
+      await operatorContext.close();
+    } finally {
+      await cleanupInternalOperator(admin, operator.userId);
+      await cleanupActors(admin, seededActors);
+    }
+  });
+
+  test("the activity page renders no customer or feedback canary", async ({
+    browser,
+  }) => {
+    const admin = createServiceClient();
+    const canary = randomUUID().replaceAll("-", "").slice(0, 16);
+    const upper = canary.toUpperCase();
+    const feedbackTitle = `CANARY-TITLE-${canary}`;
+    const reportedProblem = `CANARY-PROBLEM-${canary}`;
+    const canaries = {
+      requestName: `CANARY-REQNAME-${canary}`,
+      customerName: `CANARY-NAME-${canary}`,
+      customerPhone: `CANARY-PHONE-${canary}`,
+      internalNotes: `CANARY-NOTES-${canary}`,
+      reportedProblem,
+      feedbackTitle,
+      feedbackMessage: `CANARY-FEEDBACK-${canary}`,
+    };
+    const seededActors: TestActor[] = [];
+
+    const operator = await seedInternalOperator(admin);
+    const actor = await seedActor(admin, {
+      providerType: "SHOP",
+      role: "OWNER",
+    });
+    seededActors.push(actor);
+
+    try {
+      // Customer and Repair data seeded as the Provider's own rows, so the
+      // activity page has real records that must stay out of its output.
+      // Set both timestamps from one base time: submitted_at otherwise defaults
+      // to the database clock, which can be later than the runner's clock.
+      const decidedAt = new Date();
+      const submittedAt = new Date(decidedAt.getTime() - 60 * 60 * 1000);
+      const { data: request, error: requestError } = await admin
+        .from("repair_requests")
+        .insert({
+          provider_id: actor.providerId,
+          reference_code: `REQ-${upper}`,
+          customer_name: canaries.requestName,
+          customer_phone: canaries.customerPhone,
+          device_type: "Laptop",
+          reported_problem: reportedProblem,
+          status: "ACCEPTED",
+          submitted_at: submittedAt.toISOString(),
+          accepted_at: decidedAt.toISOString(),
+          accepted_by_user_id: actor.userId,
+        })
+        .select("id")
+        .single();
+      if (requestError) {
+        throw new Error(
+          `[E2E fixture] request seed failed: ${requestError.message}`,
+        );
+      }
+
+      const { error: repairError } = await admin.from("repairs").insert({
+        provider_id: actor.providerId,
+        repair_request_id: request.id,
+        origin: "CUSTOMER_REQUEST",
+        ticket_number: `TN-2026-${upper.slice(0, 10)}`,
+        tracking_code: `TRK-${upper}${upper.slice(0, 8)}`,
+        customer_name: canaries.customerName,
+        customer_phone: canaries.customerPhone,
+        device_type: "Laptop",
+        reported_problem: reportedProblem,
+        internal_notes: canaries.internalNotes,
+        created_by_user_id: actor.userId,
+      });
+      if (repairError) {
+        throw new Error(
+          `[E2E fixture] repair seed failed: ${repairError.message}`,
+        );
+      }
+
+      const feedback = await admin.rpc("submit_feedback", {
+        p_submission_nonce: randomUUID(),
+        p_category: "BUG",
+        p_source: "PUBLIC_TRACKING",
+        p_participant_class: "PUBLIC_SELF_REPORTED_CUSTOMER",
+        p_title: feedbackTitle,
+        p_message: canaries.feedbackMessage,
+      });
+      if (feedback.error) {
+        throw new Error(
+          `[E2E fixture] feedback seed failed: ${feedback.error.message}`,
+        );
+      }
+      const { data: feedbackRow, error: feedbackReadError } = await admin
+        .from("feedback_submissions")
+        .select("id")
+        .eq("title", feedbackTitle)
+        .single();
+      if (feedbackReadError) {
+        throw new Error(
+          `[E2E fixture] feedback read failed: ${feedbackReadError.message}`,
+        );
+      }
+
+      const operatorContext = await browser.newContext();
+      const operatorPage = await operatorContext.newPage();
+      await operatorPage.goto("/login?redirectTo=%2Finternal%2Factivity");
+      await operatorPage.locator('input[name="email"]').fill(operator.email);
+      await operatorPage
+        .locator('input[name="password"]')
+        .fill(operator.password);
+      await operatorPage
+        .getByRole("button", { name: "Sign in", exact: true })
+        .click();
+      await expect(operatorPage).toHaveURL(/\/internal\/activity$/, {
+        timeout: 20_000,
+      });
+
+      // Listen only from here, so sign-in traffic is not captured. Collect the
+      // app-origin HTML, RSC and JSON responses that are not navigations; the
+      // documents are read straight from goto. Static assets and redirects are
+      // skipped, because they carry no text the page could leak.
+      const appOrigin = new URL(baseURL).origin;
+      const collected: Response[] = [];
+      operatorPage.on("response", (response) => {
+        const status = response.status();
+        const isRedirect = status >= 300 && status < 400;
+        const contentType = response.headers()["content-type"] ?? "";
+        const isText = /text\/html|text\/x-component|application\/json/.test(
+          contentType,
+        );
+        if (
+          !isRedirect &&
+          isText &&
+          !response.request().isNavigationRequest() &&
+          new URL(response.url()).origin === appOrigin
+        ) {
+          collected.push(response);
+        }
+      });
+
+      // Reads what was collected since the last call. Runs before the next
+      // navigation, because a body is unavailable once its page has gone.
+      // A body that cannot be read fails the test with its URL and status.
+      const readCollectedBodies = async (): Promise<string[]> => {
+        const bodies: string[] = [];
+        for (const response of collected.splice(0)) {
+          try {
+            bodies.push(await response.text());
+          } catch (error) {
+            throw new Error(
+              `[E2E] could not read ${response.url()} (${response.status()}): ${String(error)}`,
+            );
+          }
+        }
+        return bodies;
+      };
+
+      // Default window, then a wider one that includes the seeds.
+      const windows = ["/internal/activity", "/internal/activity?period=30d"];
+      for (const path of windows) {
+        const response = await operatorPage.goto(path);
+        if (response === null) {
+          throw new Error(`[E2E] no document response for ${path}`);
+        }
+        // Read the page's own document before the next navigation discards it.
+        const documentBody = await response.text();
+
+        await expect(
+          operatorPage.getByRole("heading", {
+            name: "Validation metrics",
+            exact: true,
+          }),
+        ).toBeVisible();
+        await operatorPage.waitForLoadState("networkidle");
+
+        // The HTML includes the inline RSC payload, so page.content() covers
+        // the server-rendered data as well as the markup.
+        const html = await operatorPage.content();
+        const responseBodies = await readCollectedBodies();
+        for (const value of Object.values(canaries)) {
+          expect(documentBody).not.toContain(value);
+          expect(html).not.toContain(value);
+          for (const body of responseBodies) {
+            expect(body).not.toContain(value);
+          }
+        }
+      }
+
+      // The same feedback canary must be visible on the authorized detail
+      // page, which proves the seed is real and the absence check means
+      // something.
+      await operatorPage.goto(`/internal/feedback/${feedbackRow.id}`);
+      await expect(
+        operatorPage.getByText(canaries.feedbackMessage, { exact: true }),
+      ).toBeVisible();
+      await operatorContext.close();
+    } finally {
+      await runLocalSql(
+        supabaseUrl,
+        `delete from public.feedback_submissions where title = '${feedbackTitle}';`,
+      );
+      await cleanupInternalOperator(admin, operator.userId);
+      await cleanupActors(admin, seededActors);
+    }
+  });
+
+  test("the health endpoint answers anonymous probes with no cache or cookie", async ({
+    request,
+  }) => {
+    const response = await request.get(`${baseURL}/api/health`);
+
+    expect(response.status()).toBe(200);
+    expect(await response.text()).toBe('{"status":"healthy"}');
+    expect(response.headers()["cache-control"]).toContain("no-store");
+    expect(response.headers()["set-cookie"]).toBeUndefined();
   });
 });

@@ -19,7 +19,8 @@
     "test:db": "vitest run tests/integration",
     "test:e2e": "playwright test",
     "db:reset": "supabase db reset",
-    "rehearse:migrations": "bash scripts/rehearse-pending-migrations.sh"
+    "rehearse:migrations": "bash scripts/rehearse-pending-migrations.sh",
+    "drill:backup-restore": "bash scripts/drill-backup-restore.sh"
   },
   "dependencies": {
     "@base-ui/react": "^1.7.0",

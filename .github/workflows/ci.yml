@@ -218,6 +218,14 @@ jobs:
           echo "=== Supabase status ==="
           supabase status 2>&1 || true
 
+      # Restore drill for docs/OPERATIONS.md ("Manual backups"). It runs only
+      # after the DB suite passed, on this disposable stack, and the script
+      # refuses any non-local API host.
+      - name: Run backup and restore drill
+        env:
+          DRILL_DISPOSABLE: "1"
+        run: pnpm drill:backup-restore
+
       - name: Stop local Supabase
         if: always()
         run: supabase stop --no-backup || true
