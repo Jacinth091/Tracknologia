@@ -93,7 +93,13 @@ client components that take plain props from the server pages. They show the
 same data as the count sections beside them, with no new query. `/internal/activity`
 charts daily Active providers and Feedback and the Repairs by status and Feedback
 by category bars. `/internal` shows four headline numbers and the seven-day
-Active providers chart from the same 7-day read. A zero period shows an empty
+Active providers chart from the 7-day metrics read. Its **New feedback (now)**
+tile separately uses Feedback's audited `getNewFeedbackCount()` across all
+retained `NEW` submissions, including those older than seven days. It returns
+only an exact count; unavailable counts display **Unavailable**, while a real
+empty backlog displays **0**. The tile links to the unwindowed NEW inbox.
+The count, inbox, and period analytics are separate current reads, not one
+atomic shared snapshot. A zero period shows an empty
 state rather than an empty chart, and an unavailable Feedback section shows
 "Unavailable" in place of its charts.
 

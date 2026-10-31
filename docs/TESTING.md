@@ -250,6 +250,18 @@ audit seams to prove limiter-first ordering, forged-field rejection, Provider cl
 derivation, no-query denials, audit-failure withholding, review preconditions, and
 schema bounds. It needs no database.
 
+Current feedback-backlog coverage checks exact HEAD counts, zero, malformed or
+failed counts, operator denial, and audit failure. The overview rendering tests
+separate a current backlog of two from a period NEW count of one, and exercise
+unavailable and revoked-access outcomes.
+
+`tests/e2e/internal-feedback-inbox.spec.ts` also seeds older NEW, recent NEW, and
+older RESOLVED feedback through the disposable database. It checks that the
+Overview count grows by two, the seven-day NEW metric by one, and the NEW inbox
+contains both unresolved fixtures. It verifies that count pages expose no
+fixture content and that revoked operators lose access. Baseline-relative
+assertions use the existing single-worker E2E configuration.
+
 `src/features/feedback/form.test.ts` calls `submitFeedbackForm` directly with a
 real `FormData` and a fake submit function, with no mocks of the adapter. It
 proves acceptance and nonce rotation, that only the four form fields reach

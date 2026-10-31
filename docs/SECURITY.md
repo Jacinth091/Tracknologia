@@ -223,6 +223,10 @@ roles, not `user_metadata`, and not inferred from owning or joining a Provider:
   fixed count groups for a bounded Asia/Manila calendar window and never message, notes, nonce,
   identity, or row identifiers. Every internal Feedback read passes the operator
   guard and the required access audit before its privileged query.
+- The current NEW feedback backlog uses the same operator guard and required
+  audit, then a service-role exact-count HEAD query over retained `NEW` rows.
+  It returns no row payload or identifiers and does not widen table grants.
+  Missing counts and query failures are unavailable, not zero.
 - The Feedback `feedback_submit` budget covers both public and Provider
   submissions. Provider membership is resolved before the budget, and the budget
   runs before any input is parsed.
