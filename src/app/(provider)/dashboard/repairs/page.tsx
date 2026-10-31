@@ -120,7 +120,6 @@ export default async function RepairsPage({
   return (
     <div className="space-y-6">
       <PageHeader
-        eyebrow="Repair work"
         title="Repairs"
         description="Manage accepted work from intake through completion."
         actions={
@@ -142,7 +141,7 @@ export default async function RepairsPage({
           <HugeiconsIcon
             icon={Search01Icon}
             aria-hidden="true"
-            className="pointer-events-none absolute top-1/2 left-3 size-4 -translate-y-1/2 text-muted-foreground"
+            className="pointer-events-none absolute top-3.5 left-3 size-4 text-muted-foreground sm:top-2.5"
           />
           <Input
             type="search"
@@ -196,7 +195,7 @@ export default async function RepairsPage({
                 query: options.query,
               })}
               className={cn(
-                "relative shrink-0 px-3 py-2.5 text-sm font-medium whitespace-nowrap transition-colors",
+                "relative inline-flex min-h-11 shrink-0 items-center px-3 py-2.5 text-sm font-medium whitespace-nowrap transition-colors outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring",
                 active
                   ? "text-foreground after:absolute after:inset-x-3 after:bottom-0 after:h-0.5 after:bg-primary"
                   : "text-muted-foreground hover:text-foreground",
@@ -239,33 +238,42 @@ export default async function RepairsPage({
                   <Link
                     href={`/dashboard/repairs/${repair.id}`}
                     aria-label={`Open Repair: ${device}`}
-                    className="flex items-center gap-3 px-4 py-3 transition-colors hover:bg-muted/50 sm:px-5 sm:py-3.5"
+                    className="flex items-start gap-3 px-4 py-4 transition-colors outline-none hover:bg-muted/50 focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring sm:px-5"
                   >
                     <StatusGauge
                       status={repair.currentStatus}
-                      className="size-7 shrink-0"
+                      className="mt-0.5 size-7 shrink-0"
                     />
                     <div className="min-w-0 flex-1">
-                      <p className="line-clamp-1 text-sm font-bold break-words text-foreground">
-                        {device}
-                        <span className="font-normal text-muted-foreground">
-                          {" · "}
-                          {repair.reportedProblem}
+                      <div className="flex flex-wrap items-start justify-between gap-2">
+                        <p className="min-w-0 flex-1 basis-40 line-clamp-2 text-sm font-semibold leading-snug text-foreground wrap-anywhere">
+                          {device}
+                        </p>
+                        <RepairStatusPill status={repair.currentStatus} />
+                      </div>
+                      <p className="mt-1 line-clamp-2 text-sm leading-relaxed text-muted-foreground wrap-anywhere">
+                        {repair.reportedProblem}
+                      </p>
+                      <div className="mt-2 flex flex-wrap items-baseline gap-x-3 gap-y-1 text-xs leading-relaxed text-muted-foreground">
+                        <span className="font-mono wrap-anywhere">
+                          {repair.ticketNumber}
                         </span>
-                      </p>
-                      <p className="mt-0.5 truncate font-mono text-xs text-muted-foreground">
-                        {repair.ticketNumber} · {repair.customerName} · Updated{" "}
-                        {formatUpdatedAt(repair.updatedAt)}
-                      </p>
+                        <span className="wrap-anywhere">
+                          {repair.customerName}
+                        </span>
+                        <time
+                          dateTime={repair.updatedAt}
+                          className="tabular-nums"
+                        >
+                          Updated {formatUpdatedAt(repair.updatedAt)}
+                        </time>
+                      </div>
                     </div>
-                    <div className="flex shrink-0 items-center gap-2">
-                      <RepairStatusPill status={repair.currentStatus} />
-                      <HugeiconsIcon
-                        icon={ArrowRight01Icon}
-                        aria-hidden="true"
-                        className="size-4 text-muted-foreground"
-                      />
-                    </div>
+                    <HugeiconsIcon
+                      icon={ArrowRight01Icon}
+                      aria-hidden="true"
+                      className="mt-1 size-4 shrink-0 text-muted-foreground"
+                    />
                   </Link>
                 </li>
               );
@@ -278,7 +286,7 @@ export default async function RepairsPage({
       repairPage.hasPrevious ||
       repairPage.hasNext ? (
         <nav
-          className="flex items-center justify-between gap-3"
+          className="grid grid-cols-[auto_minmax(0,1fr)_auto] items-center gap-2"
           aria-label="Repair pagination"
         >
           {repairPage.hasPrevious ? (
@@ -290,7 +298,7 @@ export default async function RepairsPage({
               })}
               className={cn(
                 buttonVariants({ variant: "outline", size: "sm" }),
-                "min-w-24",
+                "min-h-11 min-w-20 sm:min-h-8 sm:min-w-24",
               )}
             >
               Previous
@@ -299,14 +307,14 @@ export default async function RepairsPage({
             <span
               className={cn(
                 buttonVariants({ variant: "outline", size: "sm" }),
-                "pointer-events-none min-w-24 opacity-50",
+                "pointer-events-none min-h-11 min-w-20 opacity-50 sm:min-h-8 sm:min-w-24",
               )}
               aria-disabled="true"
             >
               Previous
             </span>
           )}
-          <span className="text-sm tabular-nums text-muted-foreground">
+          <span className="text-center text-xs leading-relaxed tabular-nums text-muted-foreground sm:text-sm">
             Page {repairPage.page} ·{" "}
             {repairPage.items.length > 0
               ? `Showing ${rangeStart}–${rangeEnd}`
@@ -321,7 +329,7 @@ export default async function RepairsPage({
               })}
               className={cn(
                 buttonVariants({ variant: "outline", size: "sm" }),
-                "min-w-24",
+                "min-h-11 min-w-20 sm:min-h-8 sm:min-w-24",
               )}
             >
               Next
@@ -330,7 +338,7 @@ export default async function RepairsPage({
             <span
               className={cn(
                 buttonVariants({ variant: "outline", size: "sm" }),
-                "pointer-events-none min-w-24 opacity-50",
+                "pointer-events-none min-h-11 min-w-20 opacity-50 sm:min-h-8 sm:min-w-24",
               )}
               aria-disabled="true"
             >

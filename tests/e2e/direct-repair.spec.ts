@@ -37,6 +37,30 @@ test.describe("E2E-01 Direct Repair", () => {
       await page.waitForURL(/\/dashboard\/repairs\/[0-9a-f-]{36}$/);
       await expectVisibleStatus(page, "In Progress");
 
+      await page.setViewportSize({ width: 375, height: 812 });
+      await page.goto("/dashboard/repairs");
+      const repairLink = page.getByRole("link", {
+        name: "Open Repair: Lenovo ThinkPad X1",
+        exact: true,
+      });
+      await expect(
+        repairLink.getByText("Lenovo ThinkPad X1", { exact: true }),
+      ).toBeVisible();
+      await expect(
+        repairLink.getByText("No power on battery", { exact: true }),
+      ).toBeVisible();
+      await expect(
+        repairLink.getByText("In Progress", { exact: true }),
+      ).toBeVisible();
+      expect(
+        await page.evaluate(
+          () => document.documentElement.scrollWidth <= window.innerWidth,
+        ),
+      ).toBe(true);
+      await repairLink.click();
+      await page.waitForURL(/\/dashboard\/repairs\/[0-9a-f-]{36}$/);
+      await page.setViewportSize({ width: 1280, height: 800 });
+
       const trackingCode = await readTrackingCode(page);
       expect(trackingCode).toMatch(/^TRK-[A-F0-9]{24}$/);
 
