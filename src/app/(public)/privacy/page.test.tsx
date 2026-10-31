@@ -16,7 +16,7 @@ describe("privacy page", () => {
     ]) {
       expect(html).toContain(`>${heading}</h2>`);
     }
-    expect(html).toContain('href="mailto:TODO-OWNER-EMAIL@example.invalid"');
+    expect(html).toContain('href="mailto:tracknologia67@gmail.com"');
     expect(html).toContain("We can&#x27;t reply to every message.");
     expect(html).toContain("Last updated: 31 October 2026.");
   });

@@ -187,8 +187,8 @@ roles, not `user_metadata`, and not inferred from owning or joining a Provider:
   feedback text): static, anonymous, and read-free. Section 1 renders the same
   `FeedbackPrivacyNotice` component as the feedback form, so the approved
   wording cannot drift between the two. The page is linked from the public
-  feedback, Repair Request, `/track` and `/register` surfaces. The team contact
-  is a placeholder constant until the owner's address is approved.
+  feedback, Repair Request, `/track` and `/register` surfaces. The page shows
+  the project contact address (owner decision on #87, 2026-10-31).
 - Operational validation metrics (issue #93) independently require the operator
   guard and a successful access audit. The aggregate RPC rechecks the enabled
   mapping under `FOR SHARE` and is executable only by `service_role`. It returns

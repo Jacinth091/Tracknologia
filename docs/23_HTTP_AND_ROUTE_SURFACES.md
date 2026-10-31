@@ -58,8 +58,8 @@ Public, anonymous, static content: no reads, no writes, no data, no Server
 Actions. It explains what Tracknologia keeps for feedback, repair requests,
 tracking and Provider accounts, and who can see it. Section 1 renders the same
 `FeedbackPrivacyNotice` component as the feedback form, so the approved text
-exists once. The contact address is a single placeholder constant in the page
-file until the owner's team address is set. Linked from the feedback form, the
+exists once. The contact address is the project address, a single constant in
+the page file (owner decision on #87, 2026-10-31). Linked from the feedback form, the
 Repair Request form, `/track` and `/register`.
 
 Implemented as a Server Component with no client JavaScript and no

@@ -3,8 +3,7 @@ import { FeedbackPrivacyNotice } from "@/features/feedback/ui/feedback-privacy-n
 import type { Metadata } from "next";
 import Link from "next/link";
 
-// Placeholder until the owner's team address is approved. Replace it before push.
-const PRIVACY_CONTACT_EMAIL = "TODO-OWNER-EMAIL@example.invalid";
+const PRIVACY_CONTACT_EMAIL = "tracknologia67@gmail.com";
 
 export const metadata: Metadata = {
   title: "Privacy — Tracknologia",
