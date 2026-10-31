@@ -261,8 +261,8 @@ deletes its rows and operator through the fixtures and `runLocalSql`.
 `scripts/drill-backup-restore.sh` (`pnpm drill:backup-restore`) is the CI proof
 for the manual backup routine in
 [OPERATIONS.md](OPERATIONS.md#manual-backups-free-plan). The Database integration
-job runs it after the DB suite passes, on the same disposable local Supabase
-stack, with `DRILL_DISPOSABLE=1`.
+job runs it only in GitHub Actions, after the DB suite passes, on the same
+disposable local Supabase stack, with `DRILL_DISPOSABLE=1`.
 
 It seeds a fixed fixture: a Provider with an OWNER, an accepted Request, a
 Repair with status history, a Feedback submission with a review event, and an
@@ -284,9 +284,11 @@ internal operator mapping. It then:
    count equal to the number of files in `supabase/migrations/`, and the
    operator mapping.
 
-The script refuses any API host other than `127.0.0.1` or `localhost`, and it
-refuses to run without `DRILL_DISPOSABLE=1`. Dumps go to a temporary directory
-that is deleted on exit. They never enter the repository or CI artifacts.
+The script refuses any API host other than `127.0.0.1` or `localhost`. It
+refuses to run without `DRILL_DISPOSABLE=1`, and it refuses outside GitHub
+Actions (`GITHUB_ACTIONS=true`), so a local run stops before it touches
+anything. There is no manual override. Dumps go to a temporary directory that
+is deleted on exit. They never enter the repository or CI artifacts.
 
 Scope: the drill proves the dump-and-restore mechanics on the local stack. It
 does not replay `roles.sql`, because the roles already exist in that cluster.

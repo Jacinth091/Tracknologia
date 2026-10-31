@@ -11,7 +11,8 @@
 # public schema and every Auth table before restoring them from the dump.
 #
 #  1. Refuses any API host other than 127.0.0.1 or localhost, and requires
-#     DRILL_DISPOSABLE=1 so a developer's shared local stack is never wiped.
+#     DRILL_DISPOSABLE=1 and GITHUB_ACTIONS=true (CI only), so a developer's
+#     local stack is never wiped. There is no manual override.
 #  2. Seeds a fixed fixture (own fixed UUIDs): auth users, a Provider with an
 #     OWNER membership, an accepted Repair Request, a Repair with status
 #     history, a Feedback submission with a review event, and an internal
@@ -35,6 +36,7 @@
 # Usage:  pnpm drill:backup-restore
 # Env:    SUPABASE_TEST_URL   local API URL; host must be 127.0.0.1 or localhost
 #         DRILL_DISPOSABLE    must be 1 (CI sets it; never set it on a shared stack)
+#         GITHUB_ACTIONS      must be true (set by GitHub Actions; refuses elsewhere)
 #
 set -euo pipefail
 
@@ -53,6 +55,8 @@ case "$api_host" in
 esac
 [ "${DRILL_DISPOSABLE:-}" = "1" ] \
   || die "set DRILL_DISPOSABLE=1 to confirm this is a disposable stack"
+[ "${GITHUB_ACTIONS:-}" = "true" ] \
+  || die "the drill wipes the local database and runs only on CI's disposable stack (GITHUB_ACTIONS=true); refusing to run here"
 command -v supabase >/dev/null 2>&1 || die "supabase CLI is not on PATH"
 
 project_id="$(sed -n 's/^project_id = "\([^"]*\)".*/\1/p' supabase/config.toml | head -n 1)"
