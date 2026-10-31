@@ -46,6 +46,38 @@ Tracknologia must not implement its own password hashing or JWT system.
 
 `/login?redirectTo=` targets are untrusted input. One helper, `getSafeInternalRedirectUrl`, is shared by the login page, `loginAction`, the auth callback, and `proxy`: it accepts only single-leading-slash local paths of at most 2048 characters, trims boundary whitespace, preserves safe query/fragment values, and falls back to `/dashboard` for absolute, protocol-relative, backslash, control-character, or oversized targets. The login form re-posts only the sanitized target and the Server Action re-sanitizes it, so a forged form field cannot redirect off-site. `proxy` treats `/internal` and `/internal/...` (not lookalikes such as `/internally`) as coarse authenticated destinations only; that redirect is not operator authorization, which is enforced by the `/internal` guard and the service-role-only internal seams described below.
 
+### Password recovery routing
+
+- Supabase Auth owns every recovery token: its single-use recovery link is
+  exchanged only by `/auth/callback`; the application keeps no reset-token
+  table and never derives account state from link text.
+- The reset-request response is neutral. It never reveals whether an email
+  is registered (Supabase silently skips unknown addresses), and production
+  Auth failures are surfaced as generic messages only. The recovery email
+  goes to the account's sign-in email — never to a Provider's customer
+  contact email, and never to another person's account on request of a
+  third party.
+- `proxy.ts` keeps `/forgot-password` and `/reset-password` reachable for
+  signed-in visitors (it still refreshes their session) but redirects
+  signed-in visitors only from `/login` and `/register`. Recovery entry
+  pages resolve their own state deliberately; an automatic redirect would
+  strand a valid recovery session on the dashboard.
+- The reset form opens only after a successful recovery exchange, marked by
+  the `?flow=recovery` target the callback routes to `/reset-password`,
+  and `updatePasswordAction` re-checks the trusted recovery session server
+  side before changing credentials. A signed-in visit without the marker is
+  redirected to the dashboard, so the page cannot be used as a silent
+  password change — and no attacker can steer it: the credential change
+  only ever affects the signed-in visitor's own account.
+- A recovery exchange replaces any existing session with the recovered
+  account's session. A failed or reused exchange returns the visitor to
+  `/login?error=auth_callback_failed`, where a specific message explains
+  the link was unverifiable and points at fresh recovery; unknown `error`
+  values are not echoed.
+- Production credential updates fail closed: Auth internals such as
+  missing or expired recovery sessions surface as one deliberate message
+  directing the person to request a fresh recovery email.
+
 ## Authorization
 
 Tracknologia owns application permissions:

@@ -159,6 +159,26 @@ configuration only.
    - Sender email: the project Gmail address
 3. Gmail limits how many messages an account can send each day. That limit covers both Supabase Auth email and invitation email, so keep pilot volume within it. Google sets the limit and can change it.
 
+Supabase Auth configuration matters for password recovery specifically. Do not
+assume the application's SMTP settings or email templates configure it — the
+recovery email is sent entirely by Supabase:
+
+- **Redirect allow list**: Supabase → Authentication → URL Configuration must
+  allow `<app>/auth/callback` for each environment (local, preview, production),
+  where `<app>` is the value of `NEXT_PUBLIC_APP_URL`. The recovery link lands
+  on `/auth/callback?next=/reset-password`; a missing entry shows Supabase's
+  own "redirect not allowed" error instead of the app.
+- **Recovery email template**: Supabase → Authentication → Emails → "Recover
+  Password" must keep `{{ .ConfirmationURL }}` in the message body. The app
+  routes the exchange itself; the template needs no other change.
+- **Email sending**: uses the Supabase SMTP settings above, not the app's
+  `SMTP_*` variables. Password recovery therefore still works when the app's
+  invitation `SMTP_*` settings are intentionally unset and staff invitations
+  run on Copy Link only.
+- Each environment needs its own check: request a reset for a test address in
+  that environment and open the link end to end (see the pre-launch check
+  step 4 below).
+
 ### Production: pre-launch acceptance check
 
 Run this check on the production deployment **before the pilot opens**, against

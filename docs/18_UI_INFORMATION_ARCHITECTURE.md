@@ -214,11 +214,15 @@ label; other surfaces can retain their contextual labels.
 
 Settings uses a vertical tab menu beside a shared content column on desktop,
 and a horizontal tab row above the content on smaller screens. Tab orientation
-and keyboard navigation follow the displayed layout. Profile, Business, and
-Service modes panels use the same available width. The Business form groups
-identity, contact/location, and services; Other arrangement details appear when
-that mode is selected. Staff keep access to their own profile, with Provider
-configuration restricted to Owners.
+and keyboard navigation follow the displayed layout. Profile, Business,
+Account, and Service modes panels use the same available width. The Business
+form groups identity, contact/location, and services, and labels its email
+field Customer Contact Email to mark it as the Provider's public contact
+channel; Other arrangement details appear when that mode is selected. The
+Account & Security panel shows the person's read-only sign-in email (the
+password-recovery destination) with a link to password recovery, and Staff
+keep access to it alongside their own profile, with Provider configuration
+restricted to Owners.
 
 Settings and onboarding use the same Supported devices checkboxes. Settings
 preselects saved categories, including any existing custom labels, and saves all

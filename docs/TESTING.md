@@ -93,6 +93,18 @@ Mandatory release scenarios (one spec file each under `tests/e2e/`):
    link or enters the code during onboarding, accepts, gets permitted
    access, owner-only controls are denied, OWNER removes Staff, access is
    denied.
+7. `password-recovery.spec.ts` (#126) — real forgot-password request → captured
+   recovery email → callback exchange → reset form → new-password sign-in
+   with the old password rejected, a reused link landing on the login error
+   message, an unauthenticated bare `/reset-password` visit staying on the
+   deliberate recovery screen, and the settings Account & Security area
+   keeping the read-only sign-in email clearly separate from the editable
+   customer contact email.
+
+Password recovery mail is read from the local stack's Inbucket capture
+(`supabase/config.toml` `[inbucket]` port, default `54324`) by
+`tests/e2e/helpers/mail.ts`; override the URL with `E2E_INBUCKET_URL` if the
+port is moved. Like every destructive fixture, it refuses non-local hosts.
 
 Participant feedback has its own spec, `tests/e2e/feedback.spec.ts` (E2E-10),
 outside the numbered release list. It drives the real public and Provider forms

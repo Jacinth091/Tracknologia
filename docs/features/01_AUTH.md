@@ -105,6 +105,60 @@ src/app/(auth)/
 └── actions.ts (Next.js Server Actions adapter)
 ```
 
+## Core workflow — password recovery
+
+Supabase Auth owns recovery tokens and email delivery. Tracknologia owns the
+routing and the deliberate recovery states:
+
+```text
+Account holder opens /forgot-password with a sign-in email
+        ↓
+Auth Module requestPasswordReset → Supabase Auth resetPasswordForEmail
+(callback target: <origin>/auth/callback?next=/reset-password)
+        ↓
+Supabase Auth emails the recovery link to the account's sign-in email
+(unknown accounts are silently skipped; the UI confirms neutrally)
+        ↓
+The visitor opens the link; /auth/callback exchanges the code for a session
+        ↓
+The callback redirects to /reset-password?flow=recovery
+        ↓
+The reset page resolves state server-side (Auth Module getUser()):
+- no session            → "Recovery link required" card with a fresh-link CTA
+- session + flow marker → password form → updatePasswordAction
+- session, no marker    → redirect /dashboard (ordinary signed-in visit)
+        ↓
+updatePasswordAction validates input, re-checks the trusted recovery session,
+then Auth Module resetPassword → Supabase Auth updateUser({ password })
+        ↓
+Post-reset destination: /dashboard (the exchange established a signed-in session)
+```
+
+Rules the workflow depends on:
+
+- `proxy.ts` keeps `/forgot-password` and `/reset-password` reachable for
+  signed-in visitors (proxy-time session refresh still runs) and only
+  redirects signed-in visitors away from `/login` and `/register`. Recovery
+  entry pages resolve their own state; an automatic redirect there would
+  strand a valid recovery session on the dashboard.
+- The `?flow=recovery` marker is appended only by `/auth/callback` after a
+  successful recovery exchange. The reset form is never a silent password
+  change during an arbitrary signed-in visit, and no application reset-token
+  table exists — Supabase Auth credentials own the mechanism.
+- A recovery exchange replaces any existing session with the recovery
+  account's session. Each person recovers their own account; a Staff member
+  must use their own sign-in email, never the Shop Owner's.
+- Editing the Provider's customer contact email never affects sign-in
+  credentials or recovery delivery; recovery emails always go to the
+  sign-in email shown in the settings Account & Security area. The sign-in
+  email and the Provider's customer/public contact email are distinct
+  domain concepts.
+- The reset request response is neutral: it never reveals whether an email
+  is registered, and production Auth failures are never surfaced as raw
+  errors. Expired, reused, or missing recovery credentials lead to the
+  deliberate recovery screen with a fresh-link request path; a failed
+  callback exchange lands on /login with a useful message.
+
 ## Security requirements
 
 Staff signup creates only the authenticated account, with email and password.
@@ -129,4 +183,11 @@ At minimum test:
 - multiple memberships without active selection fail closed with `AMBIGUOUS_PROVIDER_CONTEXT`;
 - valid membership resolves correct Provider context for both `OWNER` and `STAFF`;
 - Independent Repairer context resolves correctly;
-- allowed roles pass and disallowed roles fail with `UNAUTHORIZED_ROLE`.
+- allowed roles pass and disallowed roles fail with `UNAUTHORIZED_ROLE`;
+- password recovery keeps its deliberate routing contract: recovery sessions
+  reach `/reset-password`, the marker-less signed-in visit does not open the
+  reset form, the reset-request response is neutral, production Auth
+  failures do not leak raw messages, and stale/failed callback exchanges
+  recover on the login page (`tests/contracts/auth-proxy.contract.test.ts`,
+  the `(auth)` action/page/route tests, and
+  `tests/e2e/password-recovery.spec.ts` against a disposable local stack).
