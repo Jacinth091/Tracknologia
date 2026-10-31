@@ -239,9 +239,7 @@ test.describe("E2E-08 Internal operator access", () => {
       await page.goto("/login");
       await page.locator('input[name="email"]').fill(operator.email);
       await page.locator('input[name="password"]').fill(operator.password);
-      await page
-        .getByRole("button", { name: "Sign in", exact: true })
-        .click();
+      await page.getByRole("button", { name: "Sign in", exact: true }).click();
       await expect(page).toHaveURL(/\/internal$/, { timeout: 20_000 });
       await expect(
         page.getByRole("heading", { name: "Overview" }).first(),
