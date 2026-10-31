@@ -239,9 +239,13 @@ describe("forgotPasswordAction", () => {
         "If an account is registered with this email, a password reset email is on its way. If you don't receive one shortly, try again later.",
     });
     expect(JSON.stringify(result)).not.toContain(sentinel);
+    // The log carries the provider's status, never its message.
     expect(mocks.consoleError).toHaveBeenCalledWith(
       "Password reset request failed",
-      expect.objectContaining({ message: sentinel }),
+      expect.objectContaining({ status: 500 }),
+    );
+    expect(JSON.stringify(mocks.consoleError.mock.calls)).not.toContain(
+      sentinel,
     );
   });
 });

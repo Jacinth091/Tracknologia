@@ -147,6 +147,20 @@ export async function registerAction(
   };
 }
 
+// The provider's status and code are enough to operate the outage. Its message
+// can echo the address being reset, so it is never logged.
+function deliveryFailureDetails(err: unknown): {
+  status?: unknown;
+  code?: unknown;
+} {
+  const cause =
+    typeof err === "object" && err !== null
+      ? (err as { cause?: unknown }).cause
+      : undefined;
+  const source = (cause ?? err) as { status?: unknown; code?: unknown } | null;
+  return { status: source?.status, code: source?.code };
+}
+
 export async function forgotPasswordAction(
   _prevState: ActionState | null,
   formData: FormData,
@@ -176,7 +190,10 @@ export async function forgotPasswordAction(
     // identical to a successful request; operators still see the failure in
     // server logs. In local/test runtimes a real error message aids debugging.
     if (getServerConfig().runtime === "production") {
-      console.error("Password reset request failed", err);
+      console.error(
+        "Password reset request failed",
+        deliveryFailureDetails(err),
+      );
       return {
         success:
           "If an account is registered with this email, a password reset email is on its way. If you don't receive one shortly, try again later.",

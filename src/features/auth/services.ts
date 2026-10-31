@@ -112,12 +112,16 @@ export async function requestPasswordReset(params: {
   );
 
   if (error) {
+    // The original Supabase error travels as the cause, so the action can log
+    // its status and code while the public answer stays neutral.
     if (config.runtime === "production") {
-      throw new Error(
+      throw new AuthError(
         "Unable to send password reset email at this time. Please try again later.",
+        "INFRASTRUCTURE_FAILURE",
+        error,
       );
     }
-    throw new Error(error.message);
+    throw new AuthError(error.message, "INFRASTRUCTURE_FAILURE", error);
   }
 
   return data;
