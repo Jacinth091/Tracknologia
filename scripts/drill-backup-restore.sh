@@ -19,9 +19,10 @@
 #  3. Dumps roles (--role-only), schema, and data (--data-only --use-copy,
 #     including the migration history) with `supabase db dump --local`.
 #  4. Wipes the restored scope in place: drops and recreates public with
-#     Supabase's default grants, truncates every table in the auth schema
-#     (except schema_migrations, which the dump excludes) and clears the
-#     migration history. This matches a fresh project's empty Auth schema.
+#     Supabase's default grants, then truncates every table in the auth schema
+#     (except schema_migrations, which the dump excludes) and every table in
+#     the supabase_migrations schema. This matches a fresh project's empty
+#     Auth and migration-history schemas.
 #  5. Restores with psql --single-transaction -v ON_ERROR_STOP=1: schema, then
 #     session_replication_role = replica, then data.
 #  6. Verifies with SQL and fails on the first mismatch, then prints a summary.
@@ -169,18 +170,18 @@ ALTER DEFAULT PRIVILEGES IN SCHEMA public GRANT ALL ON FUNCTIONS TO anon, authen
 ALTER DEFAULT PRIVILEGES IN SCHEMA public GRANT ALL ON SEQUENCES TO anon, authenticated, service_role;
 DO $$
 DECLARE
-  auth_tables text;
+  wiped_tables text;
 BEGIN
   SELECT string_agg(format('%I.%I', schemaname, tablename), ', ')
-    INTO auth_tables
+    INTO wiped_tables
     FROM pg_tables
-    WHERE schemaname = 'auth' AND tablename <> 'schema_migrations';
-  IF auth_tables IS NOT NULL THEN
-    EXECUTE 'TRUNCATE ' || auth_tables || ' CASCADE';
+    WHERE (schemaname = 'auth' AND tablename <> 'schema_migrations')
+       OR schemaname = 'supabase_migrations';
+  IF wiped_tables IS NOT NULL THEN
+    EXECUTE 'TRUNCATE ' || wiped_tables || ' CASCADE';
   END IF;
 END
 $$;
-TRUNCATE supabase_migrations.schema_migrations;
 SQL
 
 log "restoring: schema, then data with replica triggers"
