@@ -222,7 +222,10 @@ describe("Configuration Seam (src/lib/config/server.ts)", () => {
 
     it("rejects an invalid SMTP port when SMTP is configured", () => {
       expect(() =>
-        parseServerConfig({ ...VALID_PROD_ENV, SMTP_PORT: "70000" }, "production"),
+        parseServerConfig(
+          { ...VALID_PROD_ENV, SMTP_PORT: "70000" },
+          "production",
+        ),
       ).toThrow("SMTP_PORT must be a whole number from 1 to 65535");
     });
 
