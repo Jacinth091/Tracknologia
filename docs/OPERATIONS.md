@@ -103,11 +103,16 @@ rollback increases inconsistency/risk
 
 ## Manual backups (free plan)
 
-The Supabase free plan has no hosted backups. The pilot accepts this risk
-explicitly: the recovery point (RPO) is the time since the last manual dump, so
-data written after that dump is lost if the database fails. Migrations are
-forward-only, so schema problems are fixed forward. Dumps cover data loss, not
-rollback.
+The Supabase free plan has no hosted backups, so the pilot relies on manual
+dumps. Owner decision (2026-10-30, recorded on #87:
+https://github.com/Jacinth091/Tracknologia/issues/87#issuecomment-6537380262).
+
+The accepted data-loss window (RPO) is up to about 7 days, the time since the
+last successful dump. Data written after that dump is lost if the database
+fails. The owner runs the dumps and checks them.
+
+Recovery is forward-fix, because migrations are forward-only. Restore from the
+latest dump only for data loss.
 
 ### Routine
 
