@@ -416,12 +416,6 @@ export default async function ActivityPage({
         >
           <div className="grid grid-cols-2 gap-3">
             <StatTile
-              label="Created"
-              value={formatCount(metrics.repairs.created.total)}
-              status="IN_PROGRESS"
-              icon={Wrench01Icon}
-            />
-            <StatTile
               label="Reached READY"
               value={formatCount(metrics.repairs.readyReached)}
               status="READY"
