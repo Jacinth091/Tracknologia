@@ -399,14 +399,6 @@ test.describe("E2E-08 Internal operator access", () => {
 
       const operatorContext = await browser.newContext();
       const operatorPage = await operatorContext.newPage();
-      const appOrigin = new URL(baseURL).origin;
-      const bodies: Promise<string>[] = [];
-      operatorPage.on("response", (response) => {
-        if (new URL(response.url()).origin === appOrigin) {
-          bodies.push(response.text());
-        }
-      });
-
       await operatorPage.goto("/login?redirectTo=%2Finternal%2Factivity");
       await operatorPage.locator('input[name="email"]').fill(operator.email);
       await operatorPage
@@ -417,6 +409,18 @@ test.describe("E2E-08 Internal operator access", () => {
         .click();
       await expect(operatorPage).toHaveURL(/\/internal\/activity$/, {
         timeout: 20_000,
+      });
+
+      // Listen only from here, so sign-in and redirect traffic is not captured.
+      // Redirects carry no body, and Playwright cannot read one.
+      const appOrigin = new URL(baseURL).origin;
+      const bodies: Promise<string>[] = [];
+      operatorPage.on("response", (response) => {
+        const { status } = response;
+        const isRedirect = status >= 300 && status < 400;
+        if (!isRedirect && new URL(response.url()).origin === appOrigin) {
+          bodies.push(response.text());
+        }
       });
 
       // Default window, then a wider one that includes the seeds.
