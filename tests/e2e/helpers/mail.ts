@@ -1,21 +1,24 @@
 /**
  * Reads password recovery mail from the local Supabase Inbucket capture
- * service (supabase/config.toml: `[inbucket] port`, default 54324). Like the
- * destructive fixtures, this must only ever talk to the disposable local
- * stack; recovery links read here are worthless outside it, but the host
- * check below keeps the helper honest.
+ * service. Capture is off in the repo default (`[local_smtp] enabled = false`
+ * in supabase/config.toml) and switched on only by the E2E workflow, before
+ * `supabase start`. The HTTP API is on `[local_smtp] port` (default 54324).
+ * Like the destructive fixtures, this must only ever talk to the disposable
+ * local stack; the host check below keeps the helper honest.
+ *
+ * Inbucket v1 API used here:
+ *   GET    /api/v1/mailbox/{mailbox}        list message summaries
+ *   GET    /api/v1/mailbox/{mailbox}/{id}   one message with its body
+ *   DELETE /api/v1/mailbox/{mailbox}        purge a mailbox
  */
 
 const INBUCKET_URL = process.env.E2E_INBUCKET_URL || "http://127.0.0.1:54324";
 
-type InbucketSubject = { address: string; personal?: string };
-type InbucketMessageSummary = {
-  id: string;
-  from: InbucketSubject;
-  to: InbucketSubject[];
-  subject: string;
-};
-type InbucketMessageView = {
+// The list summary is not relied on for the recipient: the mailbox name (the
+// recipient's local part) is the association, and the detail is checked too.
+type InbucketSummary = { id: string };
+type InbucketMessageDetail = {
+  to?: { address: string }[];
   body: { text?: string; html?: string };
 };
 
@@ -36,20 +39,18 @@ function assertLocalInbucketUrl(): URL {
   return parsed;
 }
 
-/** Inbucket names a mailbox after the recipient's full or local address. */
-function mailboxCandidates(email: string): string[] {
-  return [email.toLowerCase(), email.toLowerCase().split("@")[0]];
+/** Inbucket names a mailbox after the recipient's local part. */
+function mailboxFor(email: string): string {
+  return email.toLowerCase().split("@")[0];
 }
 
 export async function purgeRecoveryMailbox(email: string): Promise<void> {
   assertLocalInbucketUrl();
-  for (const mailbox of mailboxCandidates(email)) {
-    const url = `${INBUCKET_URL}/api/v1/mailbox/${encodeURIComponent(mailbox)}`;
-    try {
-      await fetch(url, { method: "DELETE" });
-    } catch {
-      // Purging is best-effort isolation, not validation.
-    }
+  const url = `${INBUCKET_URL}/api/v1/mailbox/${encodeURIComponent(mailboxFor(email))}`;
+  try {
+    await fetch(url, { method: "DELETE" });
+  } catch {
+    // Purging is best-effort isolation, not validation.
   }
 }
 
@@ -74,39 +75,46 @@ export async function findRecoveryLink(
   const deadline = Date.now() + (options.deadlineMs ?? 20_000);
   const recoveryLinkPattern =
     /https?:\/\/[^\s"'<>]+\/auth\/callback\?next=%?2?F?\/?reset-password[^"'<>\s]+/i;
+  const mailbox = encodeURIComponent(mailboxFor(email));
 
   while (Date.now() < deadline) {
-    for (const mailbox of mailboxCandidates(email)) {
-      const listUrl = `${INBUCKET_URL}/api/v1/mailbox/${encodeURIComponent(mailbox)}`;
-      let summaries: InbucketMessageSummary[];
+    let summaries: InbucketSummary[];
+    try {
+      const response = await fetch(
+        `${INBUCKET_URL}/api/v1/mailbox/${mailbox}`,
+      );
+      if (!response.ok) {
+        summaries = [];
+      } else {
+        summaries = (await response.json()) as InbucketSummary[];
+      }
+    } catch {
+      summaries = [];
+    }
+
+    // Newest first, so a fresh link wins over an earlier one in the same box.
+    for (const summary of [...summaries].reverse()) {
+      let detail: InbucketMessageDetail;
       try {
-        const response = await fetch(listUrl);
+        const response = await fetch(
+          `${INBUCKET_URL}/api/v1/mailbox/${mailbox}/${encodeURIComponent(summary.id)}`,
+        );
         if (!response.ok) continue;
-        summaries = (await response.json()) as InbucketMessageSummary[];
+        detail = (await response.json()) as InbucketMessageDetail;
       } catch {
         continue;
       }
 
-      for (const summary of summaries) {
-        const toAddress = (summary.to ?? []).map((s) => s.address).join(",");
-        if (!toAddress.toLowerCase().includes(email.toLowerCase())) {
-          continue;
-        }
-        const viewUrl = `${INBUCKET_URL}/api/v1/view/${encodeURIComponent(summary.id)}`;
-        let view: InbucketMessageView;
-        try {
-          const response = await fetch(viewUrl);
-          if (!response.ok) continue;
-          view = (await response.json()) as InbucketMessageView;
-        } catch {
-          continue;
-        }
+      // When the detail names recipients, the address must be this one.
+      const recipients = (detail.to ?? []).map((to) => to.address.toLowerCase());
+      if (recipients.length > 0 && !recipients.includes(email.toLowerCase())) {
+        continue;
+      }
 
-        const raw = [view.body?.text ?? "", view.body?.html ?? ""].join("\n");
-        const match = raw.match(recoveryLinkPattern);
-        if (match) {
-          return decodeHtmlEntities(match[0]);
-        }
+      const raw = [detail.body?.text ?? "", detail.body?.html ?? ""].join("\n");
+      const match = raw.match(recoveryLinkPattern);
+      if (match) {
+        return decodeHtmlEntities(match[0]);
       }
     }
 
@@ -117,6 +125,7 @@ export async function findRecoveryLink(
     `[E2E fixture] no password recovery email with a /reset-password callback ` +
       `link arrived at ${INBUCKET_URL} for ${email} within ` +
       `${options.deadlineMs ?? 20_000}ms. Is the local Supabase stack's ` +
-      "Inbucket capture running ([inbucket] port in supabase/config.toml)?",
+      "mail capture running ([local_smtp] in supabase/config.toml, enabled " +
+      "by the E2E workflow)?",
   );
 }
