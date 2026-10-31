@@ -405,14 +405,46 @@ describe("Validation metrics page", () => {
       ["Shop", "var(--chart-cat-1)"],
       ["Independent", "var(--chart-cat-2)"],
     ]);
+    // Dismissed is zero in the fixture, so its slice is not drawn. The slots
+    // keep their place, so Resolved stays in slot 4.
     expect(donuts[2].data.map((row) => row.label)).toEqual([
       "New",
       "Reviewing",
       "Planned",
       "Resolved",
-      "Dismissed",
     ]);
-    expect(donuts[2].data[4].color).toBe("var(--chart-cat-5)");
+    expect(donuts[2].data[3].color).toBe("var(--chart-cat-4)");
+  });
+
+  it("draws no zero slices in any donut", async () => {
+    await renderActivity();
+
+    const donuts = charts.DonutChart.mock.calls.map(([props]) => props);
+    for (const donut of donuts) {
+      expect(donut.data.every((row) => row.value > 0)).toBe(true);
+    }
+  });
+
+  it("renders an empty donut as one muted line", async () => {
+    feature.getValidationMetrics.mockResolvedValue({
+      ...fixture,
+      feedback: {
+        ...fixture.feedback,
+        byStatus: {
+          NEW: 0,
+          REVIEWING: 0,
+          PLANNED: 0,
+          RESOLVED: 0,
+          DISMISSED: 0,
+        },
+      },
+    });
+
+    const html = await renderActivity();
+
+    expect(html).toContain(
+      '<p class="py-6 text-sm text-muted-foreground">No feedback in this period</p>',
+    );
   });
 
   it("passes the repeat share and adoption percentages to the gauges", async () => {
