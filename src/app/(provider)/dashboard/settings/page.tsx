@@ -35,7 +35,7 @@ export default async function ProviderSettingsPage() {
       <PageHeader
         eyebrow="Provider"
         title="Provider Settings"
-        description="Manage your personal identity and the operating details customers can use to understand this Provider."
+        description="Manage your profile, business details, and repair arrangements."
       />
 
       <SettingsClient
