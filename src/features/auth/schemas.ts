@@ -22,18 +22,7 @@ export const registerSchema = z
   .refine((data) => data.password === data.confirmPassword, {
     message: "Passwords do not match",
     path: ["confirmPassword"],
-  })
-  .refine(
-    (data) =>
-      !(
-        data.intent === "STAFF" &&
-        (!data.inviteToken || data.inviteToken.length < 6)
-      ),
-    {
-      message: "Please enter a valid invitation code from your Shop Owner",
-      path: ["inviteToken"],
-    },
-  );
+  });
 
 export const forgotPasswordSchema = z.object({
   email: z.string().trim().email("Please enter a valid email address"),

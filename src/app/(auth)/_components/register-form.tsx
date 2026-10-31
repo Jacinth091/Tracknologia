@@ -48,14 +48,7 @@ export function RegisterForm({ initialInvite }: RegisterFormProps) {
   const [intent, setIntent] = useState<"INDEPENDENT" | "SHOP" | "STAFF">(
     initialInvite ? "STAFF" : "INDEPENDENT",
   );
-  const [changingInvite, setChangingInvite] = useState(false);
   const [state, formAction, isPending] = useActionState(registerAction, null);
-  // A code that arrived with the link stays out of the way until someone asks
-  // to change it, unless the server rejected it and the field must be shown.
-  const inviteCollapsed =
-    Boolean(initialInvite) &&
-    !changingInvite &&
-    !state?.fieldErrors?.inviteToken;
 
   return (
     <div className="space-y-6">
@@ -139,45 +132,16 @@ export function RegisterForm({ initialInvite }: RegisterFormProps) {
         )}
 
         {intent === "STAFF" && (
-          <div className="space-y-2">
-            {inviteCollapsed && (
-              <div className="flex items-center justify-between gap-3 rounded-lg bg-muted/50 px-3 py-2 text-sm text-muted-foreground">
-                <span>Invite code added ✓</span>
-                <Button
-                  type="button"
-                  variant="ghost"
-                  size="sm"
-                  onClick={() => setChangingInvite(true)}
-                >
-                  Change
-                </Button>
-              </div>
+          <>
+            {initialInvite && (
+              <input type="hidden" name="inviteToken" value={initialInvite} />
             )}
-            {/* Stays in the form when collapsed, so the code still submits. */}
-            <div hidden={inviteCollapsed} className="space-y-2">
-              <Label htmlFor="inviteToken">Shop Invitation Code *</Label>
-              <Input
-                id="inviteToken"
-                name="inviteToken"
-                defaultValue={initialInvite ?? ""}
-                placeholder="Paste the invitation token from your Shop Owner"
-                disabled={isPending}
-                required
-                aria-describedby="inviteToken-help"
-              />
-              {state?.fieldErrors?.inviteToken && (
-                <p className="text-xs text-destructive">
-                  {state.fieldErrors.inviteToken}
-                </p>
-              )}
-              <p
-                id="inviteToken-help"
-                className="text-xs text-muted-foreground"
-              >
-                Ask your Shop Owner for an invite link.
-              </p>
-            </div>
-          </div>
+            <p className="text-sm text-muted-foreground">
+              {initialInvite
+                ? "Your invitation will be applied during setup."
+                : "You’ll enter your shop’s invitation code during setup."}
+            </p>
+          </>
         )}
 
         <div className="space-y-2">
@@ -246,8 +210,6 @@ export function RegisterForm({ initialInvite }: RegisterFormProps) {
               <LoadingSpinner size="sm" />
               Creating account...
             </span>
-          ) : intent === "STAFF" ? (
-            "Join shop"
           ) : (
             "Create account"
           )}

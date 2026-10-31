@@ -17,17 +17,19 @@ beforeEach(() => {
 });
 
 describe("RegisterForm initial state", () => {
-  it("preselects Shop Staff and collapses the code when an invite arrives", () => {
+  it("preselects Shop Staff and carries a link invitation without a code field", () => {
     const html = renderToStaticMarkup(<RegisterForm initialInvite="tok_abc" />);
 
     expect(html.match(/<input[^>]*value="STAFF"[^>]*>/)?.[0]).toContain(
       'checked=""',
     );
-    expect(html).toContain("Invite code added ✓");
-    expect(html).toContain("Change");
-    expect(html).toMatch(/<input[^>]*name="inviteToken"[^>]*value="tok_abc"/);
-    expect(html).toMatch(/<div[^>]*hidden=""[^>]*>/);
-    expect(html).toContain("Join shop");
+    expect(html).toMatch(
+      /<input[^>]*type="hidden"[^>]*name="inviteToken"[^>]*value="tok_abc"/,
+    );
+    expect(html).not.toContain('id="inviteToken"');
+    expect(html).not.toContain("Shop Invitation Code");
+    expect(html).toContain("Your invitation will be applied during setup.");
+    expect(html).toContain("Create account");
   });
 
   it("starts on Independent without an invite and shows no code field", () => {
@@ -54,23 +56,5 @@ describe("RegisterForm initial state", () => {
     expect(html).toContain('id="intent-SHOP-title"');
     expect(html).toContain("Shop Owner");
     expect(html).toContain("Shop Staff");
-  });
-});
-
-describe("RegisterForm invite errors", () => {
-  it("shows the code field and its error when the server rejects a prefilled invite", () => {
-    useActionState.mockReturnValue([
-      { fieldErrors: { inviteToken: "This invite has expired." } },
-      vi.fn(),
-      false,
-    ]);
-
-    const html = renderToStaticMarkup(<RegisterForm initialInvite="tok_old" />);
-
-    expect(html).toContain("This invite has expired.");
-    expect(html).toMatch(/<input[^>]*name="inviteToken"[^>]*value="tok_old"/);
-    expect(html).not.toContain("Invite code added");
-    // Nothing in the form is hidden, so the field and its error are visible.
-    expect(html).not.toContain('hidden=""');
   });
 });
