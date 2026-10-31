@@ -13,9 +13,15 @@ export interface ServerConfig {
     url: string;
     origin: string;
   };
-  resend: {
-    apiKey: string | null;
-    fromEmail: string;
+  email: {
+    smtp: {
+      host: string;
+      port: number;
+      secure: boolean;
+      user: string;
+      password: string;
+    } | null;
+    from: string;
     isDevLogger: boolean;
   };
   publicAbuse: {
@@ -150,26 +156,38 @@ export function parseServerConfig(
     );
   }
 
-  // 3. Resend Configuration
-  const resendApiKey = env.RESEND_API_KEY?.trim() || null;
-  const resendFromEmail =
-    env.RESEND_FROM_EMAIL?.trim() || "Tracknologia <onboarding@resend.dev>";
-
-  if (runtime === "production") {
-    if (!resendApiKey) {
-      throw new Error(
-        "Configuration error: RESEND_API_KEY is required in production.",
-      );
-    }
-    if (resendFromEmail.includes("onboarding@resend.dev")) {
-      throw new Error(
-        "Configuration error: RESEND_FROM_EMAIL cannot use default onboarding@resend.dev address in production.",
-      );
-    }
+  // 3. Email Configuration (SMTP through nodemailer)
+  const smtpHost = env.SMTP_HOST?.trim() || "";
+  const smtpUser = env.SMTP_USER?.trim() || "";
+  const smtpPassword = env.SMTP_PASSWORD?.trim() || "";
+  const smtpConfigured = Boolean(smtpHost && smtpUser && smtpPassword);
+  if (!smtpConfigured && (smtpHost || smtpUser || smtpPassword)) {
+    throw new Error(
+      "Configuration error: SMTP_HOST, SMTP_USER and SMTP_PASSWORD must all be set, or all left unset.",
+    );
   }
 
-  const isDevLogger =
-    !resendApiKey && (runtime === "local" || runtime === "test");
+  const smtpPort = Number(env.SMTP_PORT?.trim() || "587");
+  if (
+    smtpConfigured &&
+    (!Number.isInteger(smtpPort) || smtpPort < 1 || smtpPort > 65535)
+  ) {
+    throw new Error(
+      "Configuration error: SMTP_PORT must be a whole number from 1 to 65535.",
+    );
+  }
+
+  const smtp = smtpConfigured
+    ? {
+        host: smtpHost,
+        port: smtpPort,
+        secure: smtpPort === 465,
+        user: smtpUser,
+        password: smtpPassword,
+      }
+    : null;
+  const emailFrom = env.EMAIL_FROM?.trim() || smtpUser;
+  const isDevLogger = !smtp && (runtime === "local" || runtime === "test");
 
   // 4. Public-Abuse & Ingress Secrets
   const hmacSecret = env.PUBLIC_ABUSE_HMAC_SECRET?.trim() || "";
@@ -249,9 +267,9 @@ export function parseServerConfig(
       url: rawAppUrl,
       origin,
     },
-    resend: {
-      apiKey: resendApiKey,
-      fromEmail: resendFromEmail,
+    email: {
+      smtp,
+      from: emailFrom,
       isDevLogger,
     },
     publicAbuse: {

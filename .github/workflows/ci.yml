@@ -90,15 +90,16 @@ jobs:
         env:
           NEXT_PUBLIC_APP_URL: https://ci-build.invalid
           SUPABASE_SERVICE_ROLE_KEY: ci-build-only-service-role-placeholder
-          RESEND_API_KEY: re_ci_build_only_placeholder
-          RESEND_FROM_EMAIL: Tracknologia <noreply@ci-build.invalid>
+          SMTP_HOST: smtp.gmail.com
+          SMTP_USER: ci-build-only@ci-build.invalid
+          SMTP_PASSWORD: smtp_ci_build_only_placeholder
         run: |
           pnpm build
           if [ -z "$(ls -A .next/static 2>/dev/null)" ]; then
             echo "::error::.next/static is missing or empty; cannot scan the browser bundle"
             exit 1
           fi
-          for name in SUPABASE_SERVICE_ROLE_KEY RESEND_API_KEY PUBLIC_ABUSE_HMAC_SECRET PUBLIC_ABUSE_TRUSTED_PROXY_SECRET; do
+          for name in SUPABASE_SERVICE_ROLE_KEY SMTP_PASSWORD PUBLIC_ABUSE_HMAC_SECRET PUBLIC_ABUSE_TRUSTED_PROXY_SECRET; do
             [ -n "${!name}" ] || { echo "::error::$name is empty; nothing to scan for"; exit 1; }
             if grep -rlF -- "${!name}" .next/static; then
               echo "::error::$name value found in the browser bundle (files above)"

@@ -1,5 +1,5 @@
 import "server-only";
-import { Resend } from "resend";
+import { createTransport } from "nodemailer";
 import { getServerConfig } from "@/lib/config/server";
 
 export interface SendEmailParams {
@@ -12,17 +12,23 @@ export interface SendEmailParams {
 
 export type EmailDeliveryResult =
   | { success: true; id?: string }
-  | { success: false; reason: "provider_error" | "unavailable" };
+  | { success: false; reason: "provider_error" | "EMAIL_DISABLED" };
+
+// Bounds the invite Server Action, so the one-time Copy Link still returns when SMTP stalls.
+const SMTP_CONNECTION_TIMEOUT_MS = 5_000;
+const SMTP_GREETING_TIMEOUT_MS = 5_000;
+const SMTP_SOCKET_TIMEOUT_MS = 5_000;
+const SMTP_SEND_DEADLINE_MS = 8_000;
 
 export async function sendEmail(
   params: SendEmailParams,
 ): Promise<EmailDeliveryResult> {
   const config = getServerConfig();
-  const from = params.from || config.resend.fromEmail;
+  const from = params.from || config.email.from;
 
-  if (config.resend.isDevLogger) {
+  if (config.email.isDevLogger) {
     console.log("----------------------------------------");
-    console.log("[DEV EMAIL LOGGER] (No RESEND_API_KEY configured)");
+    console.log("[DEV EMAIL LOGGER] (No SMTP_HOST configured)");
     console.log(
       `To: ${Array.isArray(params.to) ? params.to.join(", ") : params.to}`,
     );
@@ -32,33 +38,65 @@ export async function sendEmail(
     return { success: true, id: "dev-mock-id" };
   }
 
-  if (!config.resend.apiKey) {
-    console.error(
-      "[Email Error]: RESEND_API_KEY is missing in non-development environment.",
-    );
-    return { success: false, reason: "unavailable" };
+  // Production without SMTP settings: the pilot shares invite links by Copy
+  // Link. Log nothing here, because the message may carry an invite URL or code.
+  const smtp = config.email.smtp;
+  if (!smtp) {
+    return { success: false, reason: "EMAIL_DISABLED" };
   }
 
+  // Port 465 is implicit TLS. Every other port must upgrade with STARTTLS
+  // before AUTH, so the App Password never crosses an unencrypted connection.
+  const transport = createTransport({
+    host: smtp.host,
+    port: smtp.port,
+    secure: smtp.secure,
+    requireTLS: !smtp.secure,
+    connectionTimeout: SMTP_CONNECTION_TIMEOUT_MS,
+    greetingTimeout: SMTP_GREETING_TIMEOUT_MS,
+    socketTimeout: SMTP_SOCKET_TIMEOUT_MS,
+    auth: { user: smtp.user, pass: smtp.password },
+  });
+
+  let timer: ReturnType<typeof setTimeout> | undefined;
+  const deadline = new Promise<never>((_, reject) => {
+    timer = setTimeout(() => {
+      reject(
+        Object.assign(new Error("SMTP send deadline exceeded"), {
+          code: "ETIMEDOUT",
+        }),
+      );
+    }, SMTP_SEND_DEADLINE_MS);
+  });
+
   try {
-    const resend = new Resend(config.resend.apiKey);
-    const { data, error } = await resend.emails.send({
+    const sending = transport.sendMail({
       from,
       to: params.to,
       subject: params.subject,
       html: params.html,
       text: params.text,
     });
+    // If the deadline wins, this send rejects later with no other handler.
+    sending.catch(() => undefined);
+    const info = await Promise.race([sending, deadline]);
 
-    if (error) {
-      console.error("[Resend Error]: Email delivery failed");
-      return { success: false, reason: "provider_error" };
-    }
-
-    return { success: true, id: data?.id };
-  } catch {
-    console.error("[Email Exception]: Email delivery failed");
+    return { success: true, id: info.messageId };
+  } catch (error) {
+    // Only the SMTP error code: the message can carry the recipient or invite.
+    console.error(
+      `[Email Error]: SMTP delivery failed (${smtpErrorCode(error)})`,
+    );
     return { success: false, reason: "provider_error" };
+  } finally {
+    clearTimeout(timer);
+    transport.close();
   }
+}
+
+function smtpErrorCode(error: unknown): string {
+  const code = (error as { code?: unknown } | null)?.code;
+  return typeof code === "string" ? code : "UNKNOWN";
 }
 
 function escapeHtml(unsafe: string): string {
