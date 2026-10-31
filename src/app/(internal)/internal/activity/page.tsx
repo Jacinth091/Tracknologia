@@ -13,6 +13,7 @@ import {
 } from "@/features/internal-operations";
 import { cn } from "@/lib/utils";
 import { InternalServiceUnavailable } from "../_components/internal-service-unavailable";
+import { CategoryBars, DailyColumns } from "../_components/charts";
 
 export const metadata: Metadata = {
   title: "Validation metrics — Tracknologia",
@@ -24,6 +25,21 @@ const PERIOD_OPTIONS = [
   { value: "7d", label: "Last 7 days" },
   { value: "30d", label: "Last 30 days" },
   { value: "custom", label: "Custom" },
+] as const;
+
+const REPAIR_STATUS_ORDER = [
+  "IN_PROGRESS",
+  "WAITING_FOR_PARTS",
+  "AWAITING_APPROVAL",
+  "READY",
+  "COMPLETED",
+] as const;
+
+const FEEDBACK_CATEGORY_ORDER = [
+  "BUG",
+  "USABILITY",
+  "FEATURE_REQUEST",
+  "GENERAL",
 ] as const;
 
 type Period = (typeof PERIOD_OPTIONS)[number]["value"];
@@ -149,6 +165,58 @@ export default async function ActivityPage({
     <ActivityFrame period={period} start={start} end={end}>
       <PeriodSummary range={metrics.window} asOf={metrics.asOf} />
       <CoverageNotes coverage={metrics.coverage} />
+
+      <div className="grid gap-4 md:grid-cols-2">
+        <Card className="space-y-3 p-5">
+          <DailyColumns
+            title="Active providers per day"
+            days={metrics.activity.daily.map((day) => ({
+              date: day.date,
+              value: day.distinctProviders,
+            }))}
+            unit={{ singular: "active provider", plural: "active providers" }}
+          />
+        </Card>
+
+        <Card className="space-y-3 p-5">
+          {metrics.feedback ? (
+            <DailyColumns
+              title="Feedback per day"
+              days={metrics.feedback.daily.map((day) => ({
+                date: day.date,
+                value: day.count,
+              }))}
+              unit={{ singular: "submission", plural: "submissions" }}
+            />
+          ) : (
+            <UnavailableChart title="Feedback per day" />
+          )}
+        </Card>
+
+        <Card className="space-y-3 p-5">
+          <CategoryBars
+            title="Repairs by status (now)"
+            rows={REPAIR_STATUS_ORDER.map((status) => ({
+              label: humanize(status),
+              value: metrics.repairs.statusNow[status],
+            }))}
+          />
+        </Card>
+
+        <Card className="space-y-3 p-5">
+          {metrics.feedback ? (
+            <CategoryBars
+              title="Feedback by category"
+              rows={FEEDBACK_CATEGORY_ORDER.map((category) => ({
+                label: humanize(category),
+                value: metrics.feedback?.byCategory[category] ?? 0,
+              }))}
+            />
+          ) : (
+            <UnavailableChart title="Feedback by category" />
+          )}
+        </Card>
+      </div>
 
       <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
         <MetricCard title="Providers">
@@ -452,6 +520,17 @@ function MetricCard({
       <h2 className="text-sm font-semibold">{title}</h2>
       {children}
     </Card>
+  );
+}
+
+function UnavailableChart({ title }: { title: string }) {
+  return (
+    <>
+      <h2 className="text-sm font-semibold">{title}</h2>
+      <p className="text-sm text-muted-foreground">
+        Unavailable for this period.
+      </p>
+    </>
   );
 }
 

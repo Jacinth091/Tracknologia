@@ -56,7 +56,19 @@ const fixture: ValidationMetrics = {
     onboardedInPeriod: { shop: 4, independent: 3, total: 7 },
     allTime: { shop: 12, independent: 9, total: 21 },
   },
-  activity: { distinctProviders: 6, repeatProviders: 2, daily: [] },
+  activity: {
+    distinctProviders: 6,
+    repeatProviders: 2,
+    daily: [
+      { date: "2026-10-24", distinctProviders: 1 },
+      { date: "2026-10-25", distinctProviders: 2 },
+      { date: "2026-10-26", distinctProviders: 0 },
+      { date: "2026-10-27", distinctProviders: 3 },
+      { date: "2026-10-28", distinctProviders: 1 },
+      { date: "2026-10-29", distinctProviders: 3 },
+      { date: "2026-10-30", distinctProviders: 2 },
+    ],
+  },
   staff: { memberships: 5, shopsWithStaff: 3 },
   repairs: {
     statusNow: {
@@ -106,7 +118,15 @@ const fixture: ValidationMetrics = {
       PROVIDER_WORKSPACE: 0,
     },
     byStatus: { NEW: 5, REVIEWING: 2, PLANNED: 1, RESOLVED: 1, DISMISSED: 0 },
-    daily: [],
+    daily: [
+      { date: "2026-10-24", count: 1 },
+      { date: "2026-10-25", count: 0 },
+      { date: "2026-10-26", count: 2 },
+      { date: "2026-10-27", count: 0 },
+      { date: "2026-10-28", count: 1 },
+      { date: "2026-10-29", count: 0 },
+      { date: "2026-10-30", count: 0 },
+    ],
   },
   coverage: {
     domain: {
@@ -155,6 +175,58 @@ describe("Validation metrics page", () => {
     expect(html).toContain("Asia/Manila");
   });
 
+  it("renders each chart with its heading and summary", async () => {
+    const html = await renderActivity();
+
+    expect(html).toContain("<h2");
+    expect(html).toContain(
+      'aria-label="Active providers per day, Oct 24 to Oct 30, peak 3 on Oct 27"',
+    );
+    expect(html).toContain(
+      'aria-label="Feedback per day, Oct 24 to Oct 30, peak 2 on Oct 26"',
+    );
+    expect(html).toContain(
+      'aria-label="Repairs by status (now), largest Completed at 33"',
+    );
+    expect(html).toContain(
+      'aria-label="Feedback by category, largest Usability at 3"',
+    );
+  });
+
+  it("shows Unavailable in place of the feedback charts", async () => {
+    feature.getValidationMetrics.mockResolvedValue({
+      ...fixture,
+      feedback: null,
+    });
+
+    const html = await renderActivity();
+
+    expect(html).toContain("Feedback per day");
+    expect(html).toContain("Feedback by category");
+    expect(html).not.toContain("Feedback per day, ");
+    expect(html).not.toContain("Feedback by category, ");
+  });
+
+  it("notes no activity when every daily value is zero", async () => {
+    feature.getValidationMetrics.mockResolvedValue({
+      ...fixture,
+      activity: {
+        ...fixture.activity,
+        daily: fixture.activity.daily.map((day) => ({
+          ...day,
+          distinctProviders: 0,
+        })),
+      },
+    });
+
+    const html = await renderActivity();
+
+    expect(html).toContain(
+      "Active providers per day, Oct 24 to Oct 30, no activity in this period",
+    );
+    expect(html).toContain("No activity in this period.");
+  });
+
   it("renders null ratios as N/A, never as 0", async () => {
     feature.getValidationMetrics.mockResolvedValue({
       ...fixture,
@@ -165,7 +237,7 @@ describe("Validation metrics page", () => {
     const html = await renderActivity();
 
     expect(html.match(/>N\/A</g)).toHaveLength(2);
-    expect(html).not.toContain("0%");
+    expect(html).not.toMatch(/>\s*0(?:\.0+)?%\s*</);
   });
 
   it("renders unavailable feedback when the summary is null", async () => {
