@@ -47,6 +47,7 @@ import { AuthError, type AuthErrorCode } from "@/features/auth";
 import {
   buildFeedbackCountSummary,
   getInternalFeedback,
+  getNewFeedbackCount,
   getFeedbackAggregateSummary,
   listInternalFeedback,
 } from "./queries";
@@ -342,8 +343,58 @@ describe("Provider feedback", () => {
   });
 });
 
+describe("Current NEW feedback backlog", () => {
+  function clientFor(result: {
+    count: unknown;
+    error: { message: string } | null;
+  }) {
+    const eq = vi.fn().mockResolvedValue(result);
+    const select = vi.fn(() => ({ eq }));
+    const from = vi.fn(() => ({ select }));
+    mocks.createInternalOpsClient.mockResolvedValue({ from });
+    allowOperator();
+    return { from, select, eq };
+  }
+
+  it.each([0, 2])(
+    "returns the exact count %i with no row projection",
+    async (count) => {
+      const chain = clientFor({ count, error: null });
+      await expect(getNewFeedbackCount()).resolves.toBe(count);
+      expect(chain.from).toHaveBeenCalledWith("feedback_submissions");
+      expect(chain.select).toHaveBeenCalledWith("id", {
+        count: "exact",
+        head: true,
+      });
+      expect(chain.eq).toHaveBeenCalledWith("status", "NEW");
+      expect(mocks.recordSensitiveInternalAccess).toHaveBeenCalledWith(
+        "INTERNAL_ACCESS_VIEW",
+      );
+    },
+  );
+
+  it.each([null, -1, 1.5, "2"])(
+    "treats malformed count %j as unavailable",
+    async (count) => {
+      clientFor({ count, error: null });
+      expect((await captureError(getNewFeedbackCount())).code).toBe(
+        "UNAVAILABLE",
+      );
+    },
+  );
+
+  it("sanitizes database failures rather than reporting zero", async () => {
+    clientFor({ count: null, error: { message: CANARY } });
+    const error = await captureError(getNewFeedbackCount());
+    expect(error.code).toBe("UNAVAILABLE");
+    expect(error.message).not.toContain(CANARY);
+    expect(loggedText()).not.toContain(CANARY);
+  });
+});
+
 describe("Internal operations: guard denial", () => {
   const cases = {
+    backlog: () => getNewFeedbackCount(),
     list: () => listInternalFeedback({}),
     detail: () => getInternalFeedback(FEEDBACK_ID),
     summary: () =>
@@ -382,7 +433,7 @@ describe("Internal operations: guard denial", () => {
     },
   );
 
-  it.each(["list", "detail", "summary"] as const)(
+  it.each(["list", "detail", "summary", "backlog"] as const)(
     "%s withholds protected data when the access audit fails",
     async (name) => {
       allowOperator();

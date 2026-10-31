@@ -135,6 +135,24 @@ export async function insertFeedbackSubmission(
   }
 }
 
+export async function countNewFeedback(
+  client: SupabaseClient,
+): Promise<number> {
+  const { count, error } = await client
+    .from("feedback_submissions")
+    .select("id", { count: "exact", head: true })
+    .eq("status", "NEW");
+
+  if (error) {
+    throw feedbackUnavailable("count new feedback", error);
+  }
+  const parsed = z.number().int().nonnegative().safeParse(count);
+  if (!parsed.success) {
+    throw malformed("count new feedback");
+  }
+  return parsed.data;
+}
+
 export async function listFeedbackPreviews(
   client: SupabaseClient,
   options: FeedbackListOptions,
