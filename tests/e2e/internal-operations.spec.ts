@@ -334,6 +334,10 @@ test.describe("E2E-08 Internal operator access", () => {
     try {
       // Customer and Repair data seeded as the Provider's own rows, so the
       // activity page has real records that must stay out of its output.
+      // Set both timestamps from one base time: submitted_at otherwise defaults
+      // to the database clock, which can be later than the runner's clock.
+      const decidedAt = new Date();
+      const submittedAt = new Date(decidedAt.getTime() - 60 * 60 * 1000);
       const { data: request, error: requestError } = await admin
         .from("repair_requests")
         .insert({
@@ -344,7 +348,8 @@ test.describe("E2E-08 Internal operator access", () => {
           device_type: "Laptop",
           reported_problem: "CANARY reported problem",
           status: "ACCEPTED",
-          accepted_at: new Date().toISOString(),
+          submitted_at: submittedAt.toISOString(),
+          accepted_at: decidedAt.toISOString(),
           accepted_by_user_id: actor.userId,
         })
         .select("id")
