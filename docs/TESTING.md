@@ -89,7 +89,8 @@ Mandatory release scenarios (one spec file each under `tests/e2e/`):
    shop address, then operates a normal non-shop-mode Repair.
 5. `cross-tenant.spec.ts` — Provider A cannot read **or mutate** Provider B's
    protected data; B's durable Repair state is unchanged after A's attempts.
-6. `staff-lifecycle.spec.ts` — OWNER invites, Staff accepts, gets permitted
+6. `staff-lifecycle.spec.ts` — OWNER invites, Staff registers via an invitation
+   link or enters the code during onboarding, accepts, gets permitted
    access, owner-only controls are denied, OWNER removes Staff, access is
    denied.
 
@@ -102,6 +103,17 @@ before and after it runs. The throttle scenario sends 20 accepted submissions,
 then a 21st that is refused. Each scenario also writes titles with a per-run marker,
 scopes its reads to that marker, and deletes its rows through `runLocalSql` before
 its actors are removed.
+
+`provider-settings.spec.ts` checks the settings layout at desktop and phone
+widths, consistent panel widths, orientation-appropriate arrow-key navigation,
+and the conditional Other arrangement field. It uses the same local-only
+Provider fixtures as the release scenarios.
+
+It also saves device checkbox selections and the request-acceptance switch,
+checks persistence after reload, and checks for the uncontrolled Switch warning.
+`public-recovery.spec.ts` checks that an unknown route retains HTTP 404 and offers
+working navigation back home. Rendered contracts cover the unavailable-request
+copy and the available Provider form path.
 
 Reliability rules:
 
@@ -239,7 +251,8 @@ carry lock, statement, and idle-transaction timeouts and close in `finally`.
 
 `tests/e2e/internal-operations.spec.ts` covers anonymous return-to-login,
 successful auth-only operator login to `/internal`, non-indexable rendering, a
-real `/internal` visit that persists a new `INTERNAL_ACCESS_VIEW` event, a
+real `/internal` visit that persists a new `INTERNAL_ACCESS_VIEW` event, responsive
+navigation-drawer selection and account-menu sign-out, a
 temporary actor-scoped audit failure that shows only the unavailable state and
 persists no view event (the fault is dropped in `finally`), immediate denial
 after revocation, and 404 for Provider OWNER/STAFF/INDEPENDENT accounts that
@@ -250,7 +263,10 @@ non-local Docker endpoints before any SQL runs.
 The same spec also covers the `/internal/activity` surface: anonymous return to
 login; 404 for Provider OWNER, STAFF and INDEPENDENT accounts and for a revoked
 operator; and an enabled operator who sees the period picker and round-trips a
-chosen period through the GET form. A `/api/health` test checks the anonymous
+chosen period through the GET form, resets the filters, and expands grouped
+reference numbers without phone overflow. The feedback inbox E2E also checks
+side-by-side desktop submission/triage panels, phone stacking, and review saving
+from the phone layout. A `/api/health` test checks the anonymous
 contract: 200, body exactly `{"status":"healthy"}`, `no-store`, and no
 `set-cookie`. A privacy test seeds canary customer name, phone and internal
 notes on a Repair Request and Repair, plus a canary Feedback message. It asserts

@@ -208,6 +208,12 @@ Possessing a Staff invitation token permits a restricted lookup of the invited
 email and public Shop identity. The lookup does not return the Provider's
 private contact email or phone.
 
+Choosing Staff at registration creates an Auth identity only; no invitation code
+is required until onboarding. Membership and Provider access are granted only
+after Providers verifies and atomically accepts a valid invitation for that user.
+Codes supplied through shared registration links remain in the temporary
+HttpOnly onboarding cookie, never in Auth metadata.
+
 At most one active pending Staff invitation exists per Shop and normalized
 recipient email: `create_staff_invitation` reuses an existing active pending
 invitation instead of issuing a duplicate credential, so retries and
