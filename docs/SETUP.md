@@ -101,7 +101,7 @@ In `production` (when `APP_ENV=production` or `APP_ENV=staging`):
 
 - `NEXT_PUBLIC_APP_URL` must use `https://` and cannot use `localhost` or loopback IP addresses.
 - `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY` and `SUPABASE_SERVICE_ROLE_KEY` are mandatory.
-- `RESEND_API_KEY` is optional. Without it, invitation email is disabled and invitations are shared with Copy Link. If it is set, `RESEND_FROM_EMAIL` cannot use default `onboarding@resend.dev`.
+- `SMTP_HOST`, `SMTP_USER` and `SMTP_PASSWORD` are optional, but set all three or none: a partial set stops startup. With none, invitation email is disabled and invitations are shared with Copy Link.
 - `PUBLIC_ABUSE_SHARED_DEV_BUCKET=true` and `NEXT_PUBLIC_REQUIRE_EMAIL_CONFIRMATION=false` throw validation errors at startup via Next.js `instrumentation.ts`.
 
 `.env.local` must be ignored by Git.
@@ -122,7 +122,7 @@ Each environment needs these variables, scoped to that environment:
 - `NEXT_PUBLIC_SUPABASE_URL`, `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY` and `SUPABASE_SERVICE_ROLE_KEY` for that environment's Supabase project
 - `PUBLIC_ABUSE_HMAC_SECRET`: at least 32 random characters, unique to that environment
 - `PUBLIC_ABUSE_CLIENT_IP_SOURCE=vercel`: reads each visitor's IP from Vercel's `x-vercel-forwarded-for` header. It is a configuration check, not proof of origin. Set it only on Vercel-served deployments, never on a self-hosted or other host; see the trust limit in `docs/SECURITY.md`.
-- `RESEND_API_KEY` and `RESEND_FROM_EMAIL` are optional. Leave both unset for the pilot: invitations are shared with Copy Link. If you set `RESEND_API_KEY`, set `RESEND_FROM_EMAIL` to a verified sender address, not `onboarding@resend.dev`.
+- `SMTP_HOST=smtp.gmail.com`, `SMTP_PORT=587`, `SMTP_USER` (the project Gmail address), `SMTP_PASSWORD` (the Google App Password from the steps below) and `EMAIL_FROM` (the sender, for example `Tracknologia <project@gmail.com>`; it defaults to `SMTP_USER`). `SMTP_PASSWORD` is a secret: never set it as `NEXT_PUBLIC_*`. Set `SMTP_HOST`, `SMTP_USER` and `SMTP_PASSWORD` together or not at all. Leave all of them unset to keep invitations on Copy Link only.
 
 Do not set `PUBLIC_ABUSE_TRUSTED_PROXY_SECRET`; this mode does not use it.
 Never set `PUBLIC_ABUSE_SHARED_DEV_BUCKET` or
@@ -139,15 +139,16 @@ Supabase project, and set `NEXT_PUBLIC_APP_URL` to the production URL. In the
 pilot project's Supabase Authentication → URL Configuration, set the Site URL
 to the production URL, and add `<app-url>/auth/callback` to the redirect URLs.
 
-Leave `RESEND_API_KEY` and `RESEND_FROM_EMAIL` unset. The pilot has no domain,
-so the app sends no invitation email: the owner shares each invitation with
-Copy Link on the Team page.
+The pilot has no domain. Invitation email is optional: while the SMTP variables
+are unset, the owner shares each invitation with Copy Link on the Team page.
+Set them as described above to send invitation email through the project Gmail.
 
 ### Supabase Auth email via Gmail SMTP
 
 Supabase Auth sends sign-up confirmation and password reset emails. Send them
-through the pilot's project Gmail account. This is dashboard configuration only;
-the app does not use these settings.
+through the pilot's project Gmail account. The app's invitation email uses the
+same Google App Password, as `SMTP_PASSWORD`. The Supabase setting is dashboard
+configuration only.
 
 1. Turn on 2-Step Verification for the project Gmail account, then create a Google App Password for it.
 2. In the Supabase dashboard, open Authentication → SMTP Settings and set:
@@ -156,7 +157,7 @@ the app does not use these settings.
    - Username: the project Gmail address
    - Password: the Google App Password, not the account password
    - Sender email: the project Gmail address
-3. Gmail limits how many messages an account can send each day. Keep pilot sign-ups and password resets within that limit. Google sets the limit and can change it.
+3. Gmail limits how many messages an account can send each day. That limit covers both Supabase Auth email and invitation email, so keep pilot volume within it. Google sets the limit and can change it.
 
 ### Production: pre-launch acceptance check
 

@@ -19,6 +19,11 @@ Supabase adapter / PostgreSQL
 
 Next.js hosts the web UI and server runtime, but Tracknologia's business behavior is concentrated in feature modules rather than pages.
 
+Email goes through SMTP using nodemailer (`src/lib/email/client.ts`, settings in
+`src/lib/config/server.ts`). Resend was replaced because the pilot has no domain
+to verify with it. Any SMTP provider works through settings alone. Invitation
+email is optional, and without SMTP settings invitations are shared with Copy Link.
+
 ## Source structure
 
 ```text
