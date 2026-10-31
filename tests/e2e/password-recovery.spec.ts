@@ -116,6 +116,8 @@ test.describe("E2E-07 Password recovery (#126)", () => {
         .click();
       await expect(verifyPage.getByText("Could not sign in")).toBeVisible();
 
+      // The failed sign-in reset the form, so the email must be typed again.
+      await verifyPage.locator('input[name="email"]').fill(actor.email);
       await verifyPage.locator('input[name="password"]').fill(NEW_PASSWORD);
       await verifyPage
         .getByRole("button", { name: "Sign in", exact: true })
