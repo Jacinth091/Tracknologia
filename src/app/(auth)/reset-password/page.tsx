@@ -12,7 +12,7 @@ import {
   CardTitle,
 } from "@/components/ui/card";
 import { buttonVariants } from "@/components/ui/button";
-import { getUser, hasRecoveryGrant } from "@/features/auth";
+import { getUser, hasRecoveryGrant, maskEmail } from "@/features/auth";
 import { ResetPasswordForm } from "../_components/reset-password-form";
 
 export const metadata: Metadata = {
@@ -90,7 +90,7 @@ function PasswordFormCard({ recoveredEmail }: { recoveredEmail: string }) {
         {/* The recovery exchange decided which account is being recovered:
             show it so a recovered link never changes a password silently. */}
         <p className="rounded-md border border-border bg-muted/60 px-3 py-2 text-sm text-muted-foreground">
-          Recovering account{" "}
+          Setting a new password for{" "}
           <span className="font-medium text-foreground">
             {recoveredEmail}
           </span>
@@ -145,5 +145,5 @@ export default async function ResetPasswordPage({
     redirect("/dashboard");
   }
 
-  return <PasswordFormCard recoveredEmail={user.email ?? "your account"} />;
+  return <PasswordFormCard recoveredEmail={maskEmail(user.email)} />;
 }

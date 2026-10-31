@@ -20,12 +20,44 @@ export const RECOVERY_GRANT_COOKIE = "tracknologia_recovery_grant";
 export const RECOVERY_GRANT_TTL_SECONDS = 10 * 60;
 
 /**
+ * How old Supabase's `recovery_sent_at` may be before the callback stops
+ * treating the exchanged session as a recovery. Supabase's own recovery links
+ * expire on a similar scale.
+ */
+export const RECOVERY_REQUEST_MAX_AGE_MS = 60 * 60 * 1000;
+
+/**
+ * True when the exchanged Auth user shows a recovery email sent recently.
+ * Supabase records `recovery_sent_at` when it mails a recovery link, so this is
+ * the verified purpose of the exchange. The `next` parameter never is.
+ */
+export function hasRecentRecoveryRequest(
+  user: { recovery_sent_at?: string },
+  now: number = Date.now(),
+): boolean {
+  if (!user.recovery_sent_at) {
+    return false;
+  }
+
+  const sentAt = Date.parse(user.recovery_sent_at);
+  return (
+    Number.isFinite(sentAt) &&
+    sentAt <= now &&
+    now - sentAt <= RECOVERY_REQUEST_MAX_AGE_MS
+  );
+}
+
+/**
  * Scoped to the reset page so the grant is only ever sent where a recovery
  * session can be resolved: the reset page render, its Server Action, and
  * nowhere else.
  */
 const RECOVERY_GRANT_COOKIE_PATH = "/reset-password";
-const RECOVERY_GRANT_DOMAIN_SEPARATOR = "recovery-grant";
+
+// The grant key is derived from the abuse secret under its own purpose label,
+// so a grant signature can never be replayed as an abuse-protection token (and
+// the raw secret is never used directly as an HMAC key).
+const RECOVERY_GRANT_KEY_LABEL = "tracknologia:recovery-grant:v1";
 
 function base64UrlEncode(value: string): string {
   return Buffer.from(value, "utf8").toString("base64url");
@@ -35,10 +67,13 @@ function base64UrlDecode(value: string): string {
   return Buffer.from(value, "base64url").toString("utf8");
 }
 
+function deriveGrantKey(secret: string): Buffer {
+  return createHmac("sha256", secret).update(RECOVERY_GRANT_KEY_LABEL).digest();
+}
+
 function signGrantPayload(payload: string, secret: string): string {
-  const consentedPayload = `${RECOVERY_GRANT_DOMAIN_SEPARATOR}|${payload}`;
-  return createHmac("sha256", secret)
-    .update(consentedPayload)
+  return createHmac("sha256", deriveGrantKey(secret))
+    .update(payload)
     .digest("base64url");
 }
 

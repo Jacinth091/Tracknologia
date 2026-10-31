@@ -1,4 +1,7 @@
-import { createRecoveryGrantCookie } from "@/features/auth";
+import {
+  createRecoveryGrantCookie,
+  hasRecentRecoveryRequest,
+} from "@/features/auth";
 import { createClient } from "@/lib/supabase/server";
 import { getSafeInternalRedirectUrl } from "@/lib/utils";
 import { NextResponse } from "next/server";
@@ -18,6 +21,15 @@ export async function GET(request: Request) {
     const { data, error } = await supabase.auth.exchangeCodeForSession(code);
     if (!error && data.user) {
       if (isRecoveryCallback) {
+        // Purpose comes from Supabase, not from `next`: only a code exchanged
+        // for a user whose recovery email was sent recently is a recovery. Any
+        // other code routed here gets no grant and the recovery error state.
+        if (!hasRecentRecoveryRequest(data.user)) {
+          return NextResponse.redirect(
+            `${origin}/reset-password?callback_error=auth_callback_failed`,
+          );
+        }
+
         // A recovery email's one-time code has just been verified and
         // exchanged by the server. This response hands the visitor their
         // recovery grant cookie: the only server-issued proof the password

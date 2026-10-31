@@ -40,7 +40,10 @@ export {
 export {
   consumeRecoveryGrant,
   createRecoveryGrantCookie,
+  hasRecentRecoveryRequest,
   hasRecoveryGrant,
   RECOVERY_GRANT_COOKIE,
   RECOVERY_GRANT_TTL_SECONDS,
 } from "./recovery-grant";
+
+export { maskEmail } from "./mask-email";
