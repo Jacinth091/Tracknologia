@@ -23,7 +23,10 @@ test.describe("E2E-04 Independent Repairer", () => {
     try {
       // 1. Real registration as an Independent Provider (no pre-seeded Provider).
       await page.goto("/register");
-      await page.getByRole("radio", { name: "Independent" }).click();
+      await page.getByText("Independent", { exact: true }).click();
+      await expect(
+        page.getByRole("radio", { name: "Independent", exact: true }),
+      ).toBeChecked();
       await page.locator('input[name="email"]').fill(indEmail);
       await page.locator('input[name="password"]').fill(indPassword);
       await page.locator('input[name="confirmPassword"]').fill(indPassword);

@@ -89,6 +89,7 @@ test.describe("E2E-10 Participant feedback forms", () => {
     try {
       await page.goto("/track");
       await page
+        .getByRole("main")
         .getByRole("link", { name: "Send feedback", exact: true })
         .click();
       await page.waitForLoadState("networkidle");
