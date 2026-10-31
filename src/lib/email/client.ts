@@ -70,16 +70,16 @@ export async function sendEmail(
   });
 
   try {
-    const info = await Promise.race([
-      transport.sendMail({
-        from,
-        to: params.to,
-        subject: params.subject,
-        html: params.html,
-        text: params.text,
-      }),
-      deadline,
-    ]);
+    const sending = transport.sendMail({
+      from,
+      to: params.to,
+      subject: params.subject,
+      html: params.html,
+      text: params.text,
+    });
+    // If the deadline wins, this send rejects later with no other handler.
+    sending.catch(() => undefined);
+    const info = await Promise.race([sending, deadline]);
 
     return { success: true, id: info.messageId };
   } catch (error) {
