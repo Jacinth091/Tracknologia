@@ -66,8 +66,9 @@ beforeEach(() => {
   process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY =
     "sb_publishable_production_test_key";
   process.env.SUPABASE_SERVICE_ROLE_KEY = "service-role-production-test-key";
-  process.env.RESEND_API_KEY = "re_production_test_key";
-  process.env.RESEND_FROM_EMAIL = "Tracknologia <support@example.com>";
+  process.env.SMTP_HOST = "smtp.gmail.com";
+  process.env.SMTP_USER = "project@gmail.com";
+  process.env.SMTP_PASSWORD = "smtp-production-test-password";
   process.env.PUBLIC_ABUSE_HMAC_SECRET = HMAC_SECRET;
   process.env.PUBLIC_ABUSE_TRUSTED_PROXY_SECRET = PROXY_SECRET;
   process.env.NEXT_PUBLIC_REQUIRE_EMAIL_CONFIRMATION = "true";

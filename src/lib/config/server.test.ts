@@ -11,8 +11,9 @@ const VALID_PROD_ENV: Record<string, string> = {
   NEXT_PUBLIC_SUPABASE_URL: "https://xyz.supabase.co",
   NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY: "sb_pub_123456789012345678901234567890",
   SUPABASE_SERVICE_ROLE_KEY: "sb_service_123456789012345678901234567890",
-  RESEND_API_KEY: "re_1234567890",
-  RESEND_FROM_EMAIL: "Tracknologia <noreply@tracknologia.com>",
+  SMTP_HOST: "smtp.gmail.com",
+  SMTP_USER: "project@gmail.com",
+  SMTP_PASSWORD: "app_password_1234567890",
   PUBLIC_ABUSE_HMAC_SECRET: "hmac_secret_32_chars_minimum_length_12345",
   PUBLIC_ABUSE_TRUSTED_PROXY_SECRET:
     "proxy_secret_32_chars_minimum_length_67890",
@@ -73,7 +74,8 @@ describe("Configuration Seam (src/lib/config/server.ts)", () => {
       const config = parseServerConfig(VALID_PROD_ENV, "production");
       expect(config.runtime).toBe("production");
       expect(config.app.origin).toBe("https://app.tracknologia.com");
-      expect(config.resend.isDevLogger).toBe(false);
+      expect(config.email.isDevLogger).toBe(false);
+      expect(config.email.smtp).not.toBeNull();
       expect(config.publicAbuse.sharedDevBucket).toBe(false);
     });
 
@@ -167,37 +169,61 @@ describe("Configuration Seam (src/lib/config/server.ts)", () => {
       ).toThrow("SUPABASE_SERVICE_ROLE_KEY is required");
     });
 
-    it("allows production without a Resend key, with email disabled", () => {
+    it("allows production without SMTP settings, with email disabled", () => {
       const config = parseServerConfig(
-        { ...VALID_PROD_ENV, RESEND_API_KEY: "" },
+        { ...VALID_PROD_ENV, SMTP_HOST: "", SMTP_USER: "", SMTP_PASSWORD: "" },
         "production",
       );
       expect(config.runtime).toBe("production");
-      expect(config.resend.apiKey).toBeNull();
-      expect(config.resend.isDevLogger).toBe(false);
+      expect(config.email.smtp).toBeNull();
+      expect(config.email.isDevLogger).toBe(false);
     });
 
-    it("fails when a Resend key is set with the default onboarding sender in production", () => {
-      expect(() =>
-        parseServerConfig(
-          {
-            ...VALID_PROD_ENV,
-            RESEND_FROM_EMAIL: "Tracknologia <onboarding@resend.dev>",
-          },
-          "production",
-        ),
-      ).toThrow(
-        "RESEND_FROM_EMAIL cannot use default onboarding@resend.dev address in production",
-      );
+    it("enables email with the full SMTP set, on port 587 without implicit TLS", () => {
+      const config = parseServerConfig(VALID_PROD_ENV, "production");
+      expect(config.email.smtp).toEqual({
+        host: "smtp.gmail.com",
+        port: 587,
+        secure: false,
+        user: "project@gmail.com",
+        password: "app_password_1234567890",
+      });
+      expect(config.email.from).toBe("project@gmail.com");
+    });
 
+    it("uses implicit TLS only for port 465 and honours EMAIL_FROM", () => {
+      const config = parseServerConfig(
+        {
+          ...VALID_PROD_ENV,
+          SMTP_PORT: "465",
+          EMAIL_FROM: "Tracknologia <project@gmail.com>",
+        },
+        "production",
+      );
+      expect(config.email.smtp?.port).toBe(465);
+      expect(config.email.smtp?.secure).toBe(true);
+      expect(config.email.from).toBe("Tracknologia <project@gmail.com>");
+    });
+
+    it("rejects a partly set SMTP configuration in every runtime", () => {
       expect(() =>
         parseServerConfig(
-          { ...VALID_PROD_ENV, RESEND_FROM_EMAIL: "" },
+          { ...VALID_PROD_ENV, SMTP_USER: "", SMTP_PASSWORD: "" },
           "production",
         ),
-      ).toThrow(
-        "RESEND_FROM_EMAIL cannot use default onboarding@resend.dev address in production",
-      );
+      ).toThrow("SMTP_HOST, SMTP_USER and SMTP_PASSWORD must all be set");
+      expect(() =>
+        parseServerConfig(
+          { NODE_ENV: "development", SMTP_HOST: "smtp.gmail.com" },
+          "local",
+        ),
+      ).toThrow("SMTP_HOST, SMTP_USER and SMTP_PASSWORD must all be set");
+    });
+
+    it("rejects an invalid SMTP port when SMTP is configured", () => {
+      expect(() =>
+        parseServerConfig({ ...VALID_PROD_ENV, SMTP_PORT: "70000" }, "production"),
+      ).toThrow("SMTP_PORT must be a whole number from 1 to 65535");
     });
 
     it("fails when rate-limiting secrets are too short or identical", () => {
@@ -281,11 +307,11 @@ describe("Configuration Seam (src/lib/config/server.ts)", () => {
         "dev_proxy_secret_32_chars_minimum_length_5678",
     };
 
-    it("allows localhost URL and missing Resend key in dev mode", () => {
+    it("allows localhost URL and missing SMTP settings in dev mode", () => {
       const config = parseServerConfig(VALID_DEV_ENV, "local");
       expect(config.runtime).toBe("local");
       expect(config.app.origin).toBe("http://localhost:3000");
-      expect(config.resend.isDevLogger).toBe(true);
+      expect(config.email.isDevLogger).toBe(true);
     });
 
     it("keeps explicit local and test execution available outside production", () => {
