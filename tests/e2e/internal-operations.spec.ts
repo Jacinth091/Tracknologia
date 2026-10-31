@@ -290,6 +290,15 @@ test.describe("E2E-08 Internal operator access", () => {
       await page.keyboard.press("Escape");
       await expect(drawer).toBeHidden();
       await page.getByRole("button", { name: "Account menu" }).click();
+      const menuItems = page.getByRole("menuitem");
+      await expect(menuItems).toHaveCount(2);
+      await expect(
+        page.getByRole("menuitem", { name: "Sign Out", exact: true }),
+      ).toBeVisible();
+      const menuWidths = await menuItems.evaluateAll((items) =>
+        items.map((item) => item.getBoundingClientRect().width),
+      );
+      expect(Math.max(...menuWidths) - Math.min(...menuWidths)).toBeLessThan(1);
       await page
         .getByRole("menuitem", { name: "Sign Out", exact: true })
         .click();
@@ -369,6 +378,16 @@ test.describe("E2E-08 Internal operator access", () => {
         .getByRole("link", { name: "Clear filters", exact: true })
         .click();
       await expect(operatorPage).toHaveURL(/\/internal\/activity$/);
+      await expect(operatorPage.locator("#metrics-period")).toHaveValue("7d");
+      await expect(operatorPage.locator("#metrics-start")).toHaveValue("");
+      await expect(operatorPage.locator("#metrics-end")).toHaveValue("");
+
+      await operatorPage.locator("#metrics-period").selectOption("custom");
+      await operatorPage.locator("#metrics-start").fill("2026-10-01");
+      await operatorPage.locator("#metrics-end").fill("2026-10-08");
+      await operatorPage
+        .getByRole("link", { name: "Clear filters", exact: true })
+        .click();
       await expect(operatorPage.locator("#metrics-period")).toHaveValue("7d");
       await expect(operatorPage.locator("#metrics-start")).toHaveValue("");
       await expect(operatorPage.locator("#metrics-end")).toHaveValue("");

@@ -211,7 +211,8 @@ export default async function FeedbackInboxPage({
             <Label htmlFor="filter-due">Due for review (90+ days)</Label>
           </div>
           <div className="flex gap-2">
-            <Link
+            {/* eslint-disable-next-line @next/next/no-html-link-for-pages -- Reload resets uncontrolled fields, including same-URL navigation. */}
+            <a
               href="/internal/feedback"
               className={buttonVariants({
                 variant: "outline",
@@ -219,7 +220,7 @@ export default async function FeedbackInboxPage({
               })}
             >
               Clear filters
-            </Link>
+            </a>
             <Button type="submit" className="flex-1 sm:flex-none">
               Apply filters
             </Button>

@@ -872,7 +872,8 @@ function PeriodPicker({
           <Button type="submit" className="flex-1 sm:flex-none">
             Show period
           </Button>
-          <Link
+          {/* eslint-disable-next-line @next/next/no-html-link-for-pages -- Reload resets uncontrolled fields, including same-URL navigation. */}
+          <a
             href="/internal/activity"
             className={buttonVariants({
               variant: "outline",
@@ -880,7 +881,7 @@ function PeriodPicker({
             })}
           >
             Clear filters
-          </Link>
+          </a>
         </div>
       </div>
       <p id="metrics-range-help" className="text-xs text-muted-foreground">
