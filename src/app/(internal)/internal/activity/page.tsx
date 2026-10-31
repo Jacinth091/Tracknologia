@@ -546,18 +546,14 @@ function allNumberGroups(metrics: ValidationMetrics) {
   const feedbackRows: [string, string][] = feedback
     ? [
         ["Submissions in period", formatCount(feedback.total)],
-        ...FEEDBACK_CATEGORY_ORDER.map(
-          (category): [string, string] => [
-            `Category: ${humanize(category)}`,
-            formatCount(feedback.byCategory[category]),
-          ],
-        ),
-        ...FEEDBACK_STATUS_ORDER.map(
-          (status): [string, string] => [
-            `Status: ${humanize(status)}`,
-            formatCount(feedback.byStatus[status]),
-          ],
-        ),
+        ...FEEDBACK_CATEGORY_ORDER.map((category): [string, string] => [
+          `Category: ${humanize(category)}`,
+          formatCount(feedback.byCategory[category]),
+        ]),
+        ...FEEDBACK_STATUS_ORDER.map((status): [string, string] => [
+          `Status: ${humanize(status)}`,
+          formatCount(feedback.byStatus[status]),
+        ]),
       ]
     : [["Feedback", "Unavailable for this period."]];
 
@@ -588,10 +584,7 @@ function allNumberGroups(metrics: ValidationMetrics) {
     {
       title: "Activity",
       rows: [
-        [
-          "Active providers",
-          formatCount(metrics.activity.distinctProviders),
-        ],
+        ["Active providers", formatCount(metrics.activity.distinctProviders)],
         [
           "Repeat providers (2 or more days)",
           formatCount(metrics.activity.repeatProviders),
@@ -601,10 +594,7 @@ function allNumberGroups(metrics: ValidationMetrics) {
     {
       title: "Staff",
       rows: [
-        [
-          "Active memberships (now)",
-          formatCount(metrics.staff.memberships),
-        ],
+        ["Active memberships (now)", formatCount(metrics.staff.memberships)],
         ["Shops with staff (now)", formatCount(metrics.staff.shopsWithStaff)],
       ] as [string, string][],
     },
@@ -620,17 +610,12 @@ function allNumberGroups(metrics: ValidationMetrics) {
           "Provider created",
           formatCount(metrics.repairs.created.providerCreated),
         ],
-        [
-          "Reached READY in period",
-          formatCount(metrics.repairs.readyReached),
-        ],
+        ["Reached READY in period", formatCount(metrics.repairs.readyReached)],
         ["Completed in period", formatCount(metrics.repairs.completed)],
-        ...REPAIR_STATUS_ORDER.map(
-          (status): [string, string] => [
-            `Status now: ${humanize(status)}`,
-            formatCount(metrics.repairs.statusNow[status]),
-          ],
-        ),
+        ...REPAIR_STATUS_ORDER.map((status): [string, string] => [
+          `Status now: ${humanize(status)}`,
+          formatCount(metrics.repairs.statusNow[status]),
+        ]),
       ] as [string, string][],
     },
     {
