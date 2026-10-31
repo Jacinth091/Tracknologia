@@ -63,20 +63,30 @@ Tracknologia must not implement its own password hashing or JWT system.
   pages resolve their own state deliberately; an automatic redirect would
   strand a valid recovery session on the dashboard.
 - The reset form opens only with a server-issued recovery grant. The callback
-  issues it only when the exchanged Auth user's `recovery_sent_at` is no older
-  than one hour, so the purpose comes from Supabase. The `next` parameter and
-  the `?flow=recovery` marker never prove purpose. A code routed to
-  `/reset-password` without a recent recovery request gets no grant.
-- The grant is an HMAC-signed, HttpOnly cookie scoped to `/reset-password`,
-  bound to the Auth user id, and valid for 10 minutes. Its signing key is
-  derived from the abuse secret under the label
-  `tracknologia:recovery-grant:v1`, so the raw secret is never the HMAC key.
-- `updatePasswordAction` refuses a missing, expired, tampered or other-user
-  grant without calling Supabase, so the password is unchanged. It consumes
-  the grant after a successful change, so a grant is single use. A signed-in
-  visit without a grant is redirected to the dashboard, so the page is never a
-  silent password change. The credential change only ever affects the
-  signed-in visitor's own account.
+  issues one only when the session produced by the code it just redeemed has a
+  `recovery` entry in its `amr` claim, with a recent timestamp. The `amr` is
+  read from the access token Supabase returned in that exchange. The token is
+  decoded, not signature-verified, because the server received it straight
+  from Supabase. The user's `recovery_sent_at` history never proves purpose, and
+  neither do the `next` parameter or the `?flow=recovery` marker. A valid
+  magic-link, password or OTP exchange routed to `/reset-password` gets no grant.
+- The grant is an HMAC-signed, HttpOnly cookie scoped to `/reset-password`. It
+  is bound to the Auth user id and to the session id (`session_id`), and it is
+  valid for 10 minutes. Its signing key is derived from the abuse secret under
+  the label `tracknologia:recovery-grant:v1`, so the raw secret is never the
+  HMAC key.
+- Honest lifetime: the grant is short-lived (10 minutes), user- and
+  session-bound, and cleared by the browser after a successful change. It is
+  not an atomic server-side spent token. A copied cookie stays usable from the
+  same session until it expires, and two simultaneous requests carrying the same
+  cookie can both pass the check. The credential change itself is enforced by
+  Supabase Auth.
+- `updatePasswordAction` refuses a missing, expired, tampered, other-user or
+  other-session grant without calling Supabase, so the password is unchanged.
+  A signed-in visit with `?flow=recovery` but no valid grant shows the fresh-link
+  card, not a password form. A signed-in visit without that marker is redirected
+  to the dashboard. The credential change only ever affects the signed-in
+  visitor's own account.
 - A recovery exchange replaces any existing session with the recovered
   account's session. The reset form names that account by masked email
   (`b•••@example.com`), so the change is never silent. A failed, expired or

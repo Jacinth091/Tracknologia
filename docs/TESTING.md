@@ -104,16 +104,18 @@ Mandatory release scenarios (one spec file each under `tests/e2e/`):
    screen. Each scenario seeds its own accounts; only the serial recovery flow
    shares one account. Retries stay at zero and there is one worker.
 
-Password recovery mail is read from the local stack's Inbucket capture. The
-repo default keeps capture off: `supabase/config.toml` `[local_smtp]` has
-`enabled = false`. The E2E workflow switches it on with a `sed` step before
-`supabase start`, so only the disposable E2E stack captures mail. The helper,
-`tests/e2e/helpers/mail.ts`, calls the Inbucket v1 mailbox API on
-`[local_smtp] port` (default `54324`): the list
-`/api/v1/mailbox/{mailbox}` and the detail `/api/v1/mailbox/{mailbox}/{id}`.
-The mailbox is the recipient's local part. Override the URL with
-`E2E_INBUCKET_URL` if the port moves. Like every destructive fixture, it
-refuses non-local hosts. The local app callback is
+Password recovery mail is read from the local stack's mail capture, which the
+Supabase CLI runs as Mailpit. The repo default keeps capture off:
+`supabase/config.toml` `[local_smtp]` has `enabled = false`. The E2E workflow
+switches it on with a `sed` step before `supabase start`, so only the
+disposable E2E stack captures mail. The helper, `tests/e2e/helpers/mail.ts`,
+calls the Mailpit v1 API on `[local_smtp] port` (default `54324`):
+`GET /api/v1/search?query=to:"<address>"` lists the recipient's messages, and
+`GET /api/v1/message/{ID}` reads one. The helper takes the newest matching
+message, checks its `To` list, and extracts the recovery link from its `Text`
+or `HTML`. Purging uses `DELETE /api/v1/search` with the same query. Override
+the URL with `E2E_MAILPIT_URL` if the port moves. Like every destructive
+fixture, it refuses non-local hosts. The local app callback is
 `http://localhost:3000/auth/callback`; `site_url` and
 `additional_redirect_urls` in `supabase/config.toml` allow it.
 
