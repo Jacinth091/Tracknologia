@@ -89,12 +89,23 @@ describe("hasRecentRecoveryRequest", () => {
     );
   });
 
-  it("refuses a timestamp in the future or an unreadable one", () => {
-    const future = new Date(now + 60 * 1000).toISOString();
+  it("tolerates a few seconds of clock skew ahead of the app server", () => {
+    const thirtySecondsAhead = new Date(now + 30 * 1000).toISOString();
 
-    expect(hasRecentRecoveryRequest({ recovery_sent_at: future }, now)).toBe(
-      false,
-    );
+    expect(
+      hasRecentRecoveryRequest({ recovery_sent_at: thirtySecondsAhead }, now),
+    ).toBe(true);
+  });
+
+  it("refuses a timestamp further in the future than the skew allowance", () => {
+    const twoMinutesAhead = new Date(now + 2 * 60 * 1000).toISOString();
+
+    expect(
+      hasRecentRecoveryRequest({ recovery_sent_at: twoMinutesAhead }, now),
+    ).toBe(false);
+  });
+
+  it("refuses an unreadable timestamp", () => {
     expect(
       hasRecentRecoveryRequest({ recovery_sent_at: "not-a-date" }, now),
     ).toBe(false);

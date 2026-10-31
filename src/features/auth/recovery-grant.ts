@@ -27,6 +27,12 @@ export const RECOVERY_GRANT_TTL_SECONDS = 10 * 60;
 export const RECOVERY_REQUEST_MAX_AGE_MS = 60 * 60 * 1000;
 
 /**
+ * Supabase stamps `recovery_sent_at` with its own clock, while `now` is the app
+ * server's. A few seconds of skew must not refuse a genuine, just-sent reset.
+ */
+export const RECOVERY_CLOCK_SKEW_MS = 60 * 1000;
+
+/**
  * True when the exchanged Auth user shows a recovery email sent recently.
  * Supabase records `recovery_sent_at` when it mails a recovery link, so this is
  * the verified purpose of the exchange. The `next` parameter never is.
@@ -42,7 +48,7 @@ export function hasRecentRecoveryRequest(
   const sentAt = Date.parse(user.recovery_sent_at);
   return (
     Number.isFinite(sentAt) &&
-    sentAt <= now &&
+    sentAt <= now + RECOVERY_CLOCK_SKEW_MS &&
     now - sentAt <= RECOVERY_REQUEST_MAX_AGE_MS
   );
 }
