@@ -254,7 +254,9 @@ export async function updatePasswordAction(
   try {
     await resetPassword({ newPassword: parsed.data.password });
 
-    // Single use: the grant is spent once its password change succeeded.
+    // Clear the grant cookie after a successful change. The grant is short-lived
+    // and session-bound, not an atomic spent token: a copied cookie stays usable
+    // until it expires, which is why the lifetime is ten minutes.
     await consumeRecoveryGrant();
   } catch (err: unknown) {
     return {
