@@ -1,4 +1,4 @@
-import { expect, test } from "@playwright/test";
+import { expect, test, type Response } from "@playwright/test";
 import { randomUUID } from "node:crypto";
 import { runLocalSql, sqlUuidLiteral } from "../helpers/local-postgres";
 import {
@@ -314,12 +314,15 @@ test.describe("E2E-08 Internal operator access", () => {
     const admin = createServiceClient();
     const canary = randomUUID().replaceAll("-", "").slice(0, 16);
     const upper = canary.toUpperCase();
-    const feedbackTitle = `e2e-canary-${canary}`;
+    const feedbackTitle = `CANARY-TITLE-${canary}`;
+    const reportedProblem = `CANARY-PROBLEM-${canary}`;
     const canaries = {
       requestName: `CANARY-REQNAME-${canary}`,
       customerName: `CANARY-NAME-${canary}`,
       customerPhone: `CANARY-PHONE-${canary}`,
       internalNotes: `CANARY-NOTES-${canary}`,
+      reportedProblem,
+      feedbackTitle,
       feedbackMessage: `CANARY-FEEDBACK-${canary}`,
     };
     const seededActors: TestActor[] = [];
@@ -346,7 +349,7 @@ test.describe("E2E-08 Internal operator access", () => {
           customer_name: canaries.requestName,
           customer_phone: canaries.customerPhone,
           device_type: "Laptop",
-          reported_problem: "CANARY reported problem",
+          reported_problem: reportedProblem,
           status: "ACCEPTED",
           submitted_at: submittedAt.toISOString(),
           accepted_at: decidedAt.toISOString(),
@@ -369,7 +372,7 @@ test.describe("E2E-08 Internal operator access", () => {
         customer_name: canaries.customerName,
         customer_phone: canaries.customerPhone,
         device_type: "Laptop",
-        reported_problem: "CANARY reported problem",
+        reported_problem: reportedProblem,
         internal_notes: canaries.internalNotes,
         created_by_user_id: actor.userId,
       });
@@ -417,19 +420,45 @@ test.describe("E2E-08 Internal operator access", () => {
         timeout: 20_000,
       });
 
-      // Listen only from here, so sign-in and redirect traffic is not captured.
-      // Redirects carry no body, and Playwright cannot read one. Bodies of
-      // requests the browser abandoned on navigation are unavailable and were
-      // never shown; the document reads below are what must succeed.
+      // Listen only from here, so sign-in traffic is not captured. Collect the
+      // app-origin HTML, RSC and JSON responses that are not navigations; the
+      // documents are read straight from goto. Static assets and redirects are
+      // skipped, because they carry no text the page could leak.
       const appOrigin = new URL(baseURL).origin;
-      const bodies: Promise<string | null>[] = [];
+      const collected: Response[] = [];
       operatorPage.on("response", (response) => {
         const status = response.status();
         const isRedirect = status >= 300 && status < 400;
-        if (!isRedirect && new URL(response.url()).origin === appOrigin) {
-          bodies.push(response.text().catch(() => null));
+        const contentType = response.headers()["content-type"] ?? "";
+        const isText = /text\/html|text\/x-component|application\/json/.test(
+          contentType,
+        );
+        if (
+          !isRedirect &&
+          isText &&
+          !response.request().isNavigationRequest() &&
+          new URL(response.url()).origin === appOrigin
+        ) {
+          collected.push(response);
         }
       });
+
+      // Reads what was collected since the last call. Runs before the next
+      // navigation, because a body is unavailable once its page has gone.
+      // A body that cannot be read fails the test with its URL and status.
+      const readCollectedBodies = async (): Promise<string[]> => {
+        const bodies: string[] = [];
+        for (const response of collected.splice(0)) {
+          try {
+            bodies.push(await response.text());
+          } catch (error) {
+            throw new Error(
+              `[E2E] could not read ${response.url()} (${response.status()}): ${String(error)}`,
+            );
+          }
+        }
+        return bodies;
+      };
 
       // Default window, then a wider one that includes the seeds.
       const windows = ["/internal/activity", "/internal/activity?period=30d"];
@@ -452,9 +481,7 @@ test.describe("E2E-08 Internal operator access", () => {
         // The HTML includes the inline RSC payload, so page.content() covers
         // the server-rendered data as well as the markup.
         const html = await operatorPage.content();
-        const responseBodies = (await Promise.all(bodies)).filter(
-          (body): body is string => body !== null,
-        );
+        const responseBodies = await readCollectedBodies();
         for (const value of Object.values(canaries)) {
           expect(documentBody).not.toContain(value);
           expect(html).not.toContain(value);
