@@ -1,9 +1,28 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { notFound, redirect } from "next/navigation";
-
-import { buttonVariants } from "@/components/ui/button";
-import { Card } from "@/components/ui/card";
+import type { ReactNode } from "react";
+import {
+  Message01Icon,
+  Ticket01Icon,
+  UserGroupIcon,
+  Wrench01Icon,
+} from "@hugeicons/core-free-icons";
+import { PageHeader } from "@/components/shared/page-header";
+import { Button, buttonVariants } from "@/components/ui/button";
+import {
+  Card,
+  CardContent,
+  CardDescription,
+  CardHeader,
+} from "@/components/ui/card";
+import {
+  Empty,
+  EmptyDescription,
+  EmptyHeader,
+  EmptyTitle,
+} from "@/components/ui/empty";
+import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import {
   getValidationMetrics,
@@ -11,9 +30,16 @@ import {
   requireInternalOperator,
   type ValidationMetrics,
 } from "@/features/internal-operations";
-import { cn } from "@/lib/utils";
 import { InternalServiceUnavailable } from "../_components/internal-service-unavailable";
-import { CategoryBars, DailyColumns } from "../_components/charts";
+import {
+  dailySeries,
+  dailySummary,
+  hasActivity,
+  rankedSummary,
+  type ChartRow,
+} from "../_components/chart-data";
+import { CategoryBarChart, DayBarChart } from "../_components/metric-charts";
+import { StatTile } from "../_components/stat-tile";
 
 export const metadata: Metadata = {
   title: "Validation metrics — Tracknologia",
@@ -150,75 +176,134 @@ export default async function ActivityPage({
         return <InternalServiceUnavailable />;
       }
       return (
-        <ActivityFrame period={period} start={start} end={end}>
+        <ActivityShell period={period} start={start} end={end}>
           <Card className="p-5 text-sm">
             That period isn&apos;t valid. Choose today, 7 or 30 days, or a
             custom range up to 90 days.
           </Card>
-        </ActivityFrame>
+        </ActivityShell>
       );
     }
     throw error;
   }
 
+  const daily = dailySeries(
+    metrics.activity.daily.map((day) => ({
+      date: day.date,
+      value: day.distinctProviders,
+    })),
+  );
+  const feedbackDaily = metrics.feedback
+    ? dailySeries(
+        metrics.feedback.daily.map((day) => ({
+          date: day.date,
+          value: day.count,
+        })),
+      )
+    : null;
+  const statusRows = REPAIR_STATUS_ORDER.map((status) => ({
+    key: status,
+    label: humanize(status),
+    value: metrics.repairs.statusNow[status],
+  }));
+  const categoryRows = metrics.feedback
+    ? FEEDBACK_CATEGORY_ORDER.map((category) => ({
+        key: category,
+        label: humanize(category),
+        value: metrics.feedback?.byCategory[category] ?? 0,
+      }))
+    : null;
+
   return (
-    <ActivityFrame period={period} start={start} end={end}>
-      <PeriodSummary range={metrics.window} asOf={metrics.asOf} />
+    <ActivityShell period={period} start={start} end={end}>
+      <p className="text-sm text-muted-foreground">
+        Period (Asia/Manila): {metrics.window.startDate} to{" "}
+        {metrics.window.endDateExclusive} (end exclusive), {metrics.window.days}{" "}
+        days. Generated (Asia/Manila): {formatTimestamp(metrics.asOf)}.
+      </p>
       <CoverageNotes coverage={metrics.coverage} />
 
-      <div className="grid gap-4 md:grid-cols-2">
-        <Card className="space-y-3 p-5">
-          <DailyColumns
-            title="Active providers per day"
-            days={metrics.activity.daily.map((day) => ({
-              date: day.date,
-              value: day.distinctProviders,
-            }))}
-            unit={{ singular: "active provider", plural: "active providers" }}
-          />
-        </Card>
-
-        <Card className="space-y-3 p-5">
-          {metrics.feedback ? (
-            <DailyColumns
-              title="Feedback per day"
-              days={metrics.feedback.daily.map((day) => ({
-                date: day.date,
-                value: day.count,
-              }))}
-              unit={{ singular: "submission", plural: "submissions" }}
-            />
-          ) : (
-            <UnavailableChart title="Feedback per day" />
-          )}
-        </Card>
-
-        <Card className="space-y-3 p-5">
-          <CategoryBars
-            title="Repairs by status (now)"
-            rows={REPAIR_STATUS_ORDER.map((status) => ({
-              label: humanize(status),
-              value: metrics.repairs.statusNow[status],
-            }))}
-          />
-        </Card>
-
-        <Card className="space-y-3 p-5">
-          {metrics.feedback ? (
-            <CategoryBars
-              title="Feedback by category"
-              rows={FEEDBACK_CATEGORY_ORDER.map((category) => ({
-                label: humanize(category),
-                value: metrics.feedback?.byCategory[category] ?? 0,
-              }))}
-            />
-          ) : (
-            <UnavailableChart title="Feedback by category" />
-          )}
-        </Card>
+      <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
+        <StatTile
+          label="Active providers (period)"
+          value={formatCount(metrics.activity.distinctProviders)}
+          status="ACCEPTED"
+          icon={UserGroupIcon}
+        />
+        <StatTile
+          label="Repairs created (period)"
+          value={formatCount(metrics.repairs.created.total)}
+          status="IN_PROGRESS"
+          icon={Wrench01Icon}
+        />
+        <StatTile
+          label="Requests received (period)"
+          value={formatCount(metrics.requests.received)}
+          status="SUBMITTED"
+          icon={Ticket01Icon}
+        />
+        <StatTile
+          label="Feedback submissions (period)"
+          value={
+            metrics.feedback
+              ? formatCount(metrics.feedback.total)
+              : "Unavailable"
+          }
+          status="AWAITING_APPROVAL"
+          icon={Message01Icon}
+        />
       </div>
 
-      <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+      <div className="grid gap-4 md:grid-cols-2">
+        <ChartCard
+          title="Active providers per day"
+          description="Distinct providers with activity on each Manila day"
+        >
+          <DailyChart
+            title="Active providers per day"
+            seriesLabel="Active providers"
+            rows={daily}
+          />
+        </ChartCard>
+
+        <ChartCard
+          title="Feedback per day"
+          description="Feedback submissions on each Manila day"
+        >
+          {feedbackDaily ? (
+            <DailyChart
+              title="Feedback per day"
+              seriesLabel="Submissions"
+              rows={feedbackDaily}
+            />
+          ) : (
+            <UnavailableState />
+          )}
+        </ChartCard>
+
+        <ChartCard
+          title="Repairs by status (now)"
+          description="Current Repair status, in lifecycle order"
+        >
+          <RankedChart title="Repairs by status (now)" rows={statusRows} />
+        </ChartCard>
+
+        <ChartCard
+          title="Feedback by category"
+          description="Feedback submissions in the period, by category"
+        >
+          {categoryRows ? (
+            <RankedChart title="Feedback by category" rows={categoryRows} />
+          ) : (
+            <UnavailableState />
+          )}
+        </ChartCard>
+      </div>
+
+      <section
+        aria-label="Metric details"
+        className="grid gap-4 md:grid-cols-2"
+      >
         <MetricCard title="Providers">
           <CountGroup
             title="Onboarded in period"
@@ -341,12 +426,12 @@ export default async function ActivityPage({
             </p>
           )}
         </MetricCard>
-      </div>
-    </ActivityFrame>
+      </section>
+    </ActivityShell>
   );
 }
 
-function ActivityFrame({
+function ActivityShell({
   period,
   start,
   end,
@@ -355,29 +440,25 @@ function ActivityFrame({
   period: Period;
   start?: string;
   end?: string;
-  children: React.ReactNode;
+  children: ReactNode;
 }) {
   return (
-    <div className="space-y-6">
-      <div className="flex flex-wrap items-end justify-between gap-3">
-        <div>
-          <p className="text-xs font-medium tracking-wide text-muted-foreground uppercase">
-            Operator view
-          </p>
-          <h1 className="mt-1 text-2xl font-semibold tracking-tight">
-            Validation metrics
-          </h1>
-        </div>
-        <Link
-          href={activityHref(period, start, end)}
-          className={cn(buttonVariants({ variant: "outline", size: "sm" }))}
-        >
-          Refresh
-        </Link>
-      </div>
-
-      <PeriodPicker period={period} start={start} end={end} />
-
+    <div className="space-y-8">
+      <PageHeader
+        eyebrow="Internal operations"
+        title="Validation metrics"
+        actions={
+          <>
+            <PeriodPicker period={period} start={start} end={end} />
+            <Link
+              href={activityHref(period, start, end)}
+              className={buttonVariants({ variant: "outline", size: "sm" })}
+            >
+              Refresh
+            </Link>
+          </>
+        }
+      />
       {children}
     </div>
   );
@@ -397,7 +478,7 @@ function PeriodPicker({
       method="get"
       action="/internal/activity"
       aria-label="Metrics period"
-      className="grid gap-3 rounded-xl border border-border bg-card p-4 sm:grid-cols-4 sm:items-end"
+      className="flex flex-wrap items-end gap-2"
     >
       <div className="grid gap-1.5">
         <Label htmlFor="metrics-period">Period</Label>
@@ -405,7 +486,7 @@ function PeriodPicker({
           id="metrics-period"
           name="period"
           defaultValue={period}
-          className="h-9 rounded-md border border-input bg-background px-3 text-sm"
+          className="h-9 min-w-32 rounded-lg border border-input bg-card px-3 text-sm shadow-xs outline-none focus-visible:border-ring"
         >
           {PERIOD_OPTIONS.map((option) => (
             <option key={option.value} value={option.value}>
@@ -416,60 +497,28 @@ function PeriodPicker({
       </div>
       <div className="grid gap-1.5">
         <Label htmlFor="metrics-start">Start date</Label>
-        <input
+        <Input
           id="metrics-start"
           name="start"
           type="date"
           defaultValue={start ?? ""}
-          className="h-9 rounded-md border border-input bg-background px-3 text-sm"
+          className="h-9 w-40"
         />
       </div>
       <div className="grid gap-1.5">
         <Label htmlFor="metrics-end">End date (exclusive)</Label>
-        <input
+        <Input
           id="metrics-end"
           name="end"
           type="date"
           defaultValue={end ?? ""}
-          className="h-9 rounded-md border border-input bg-background px-3 text-sm"
+          className="h-9 w-40"
         />
       </div>
-      <div>
-        <button
-          type="submit"
-          className={cn(buttonVariants({ variant: "outline", size: "sm" }))}
-        >
-          Show period
-        </button>
-      </div>
+      <Button type="submit" variant="outline" size="sm">
+        Show period
+      </Button>
     </form>
-  );
-}
-
-function PeriodSummary({
-  range,
-  asOf,
-}: {
-  range: ValidationMetrics["window"];
-  asOf: string;
-}) {
-  return (
-    <Card className="grid gap-3 p-4 text-sm sm:grid-cols-3">
-      <div>
-        <p className="text-muted-foreground">Period (Asia/Manila)</p>
-        <p className="font-medium">
-          {range.startDate} to {range.endDateExclusive} (end exclusive)
-        </p>
-      </div>
-      <div>
-        <p className="text-muted-foreground">Days</p>
-        <p className="font-medium">{range.days}</p>
-      </div>
-      <div>
-        <p className="text-muted-foreground">Generated (Asia/Manila)</p>
-        <p className="font-medium">{formatTimestamp(asOf)}</p>
-      </div>
-    </Card>
   );
 }
 
@@ -480,31 +529,112 @@ function CoverageNotes({
 }) {
   const { feedback } = coverage;
   return (
-    <Card className="space-y-2 p-4 text-sm">
-      <p className="font-medium">Coverage</p>
-      <ul className="list-disc space-y-1 pl-5 text-muted-foreground">
-        <li>
-          Domain counts: {humanize(coverage.domain.coverage)}, snapshot{" "}
-          {humanize(coverage.domain.snapshot)}. Observed up to{" "}
-          {formatTimestamp(coverage.domain.observedEndUtc)}.
-        </li>
-        <li>
-          {feedback.status === "AVAILABLE" &&
-          feedback.asOfStart &&
-          feedback.asOfEnd ? (
-            <>
-              Feedback: {humanize(feedback.coverage)}, generated{" "}
-              {formatTimestamp(feedback.asOfStart)} to{" "}
-              {formatTimestamp(feedback.asOfEnd)} in {feedback.batches}{" "}
-              {feedback.batches === 1 ? "batch" : "batches"}.
-            </>
-          ) : (
-            "Feedback: unavailable for this period."
-          )}
-        </li>
-        <li>Retention policy: Approved (#87, 2026-10-31).</li>
-      </ul>
+    <ul className="list-disc space-y-1 pl-5 text-sm text-muted-foreground">
+      <li>
+        Domain counts: {humanize(coverage.domain.coverage)}, snapshot{" "}
+        {humanize(coverage.domain.snapshot)}. Observed up to{" "}
+        {formatTimestamp(coverage.domain.observedEndUtc)}.
+      </li>
+      <li>
+        {feedback.status === "AVAILABLE" &&
+        feedback.asOfStart &&
+        feedback.asOfEnd ? (
+          <>
+            Feedback: {humanize(feedback.coverage)}, generated{" "}
+            {formatTimestamp(feedback.asOfStart)} to{" "}
+            {formatTimestamp(feedback.asOfEnd)} in {feedback.batches}{" "}
+            {feedback.batches === 1 ? "batch" : "batches"}.
+          </>
+        ) : (
+          "Feedback: unavailable for this period."
+        )}
+      </li>
+      <li>Retention policy: Approved (#87, 2026-10-31).</li>
+    </ul>
+  );
+}
+
+function ChartCard({
+  title,
+  description,
+  children,
+}: {
+  title: string;
+  description: string;
+  children: ReactNode;
+}) {
+  return (
+    <Card>
+      <CardHeader className="px-4 pt-4 pb-0 sm:px-5 sm:pt-5">
+        <h2 className="text-base leading-tight font-semibold">{title}</h2>
+        <CardDescription>{description}</CardDescription>
+      </CardHeader>
+      <CardContent className="px-2 pb-4 sm:px-3 sm:pb-5">
+        {children}
+      </CardContent>
     </Card>
+  );
+}
+
+function DailyChart({
+  title,
+  seriesLabel,
+  rows,
+}: {
+  title: string;
+  seriesLabel: string;
+  rows: ChartRow[];
+}) {
+  if (!hasActivity(rows)) {
+    return <NoActivityState />;
+  }
+
+  return (
+    <DayBarChart
+      seriesLabel={seriesLabel}
+      summary={dailySummary(title, rows)}
+      data={rows}
+    />
+  );
+}
+
+function RankedChart({
+  title,
+  rows,
+}: {
+  title: string;
+  rows: { key: string; label: string; value: number }[];
+}) {
+  if (!hasActivity(rows)) {
+    return <NoActivityState />;
+  }
+
+  return (
+    <CategoryBarChart
+      summary={rankedSummary(title, rows)}
+      data={rows.map((row) => ({ ...row, color: "var(--chart-1)" }))}
+    />
+  );
+}
+
+function NoActivityState() {
+  return (
+    <Empty className="min-h-48 p-6">
+      <EmptyHeader>
+        <EmptyTitle>No activity in this period</EmptyTitle>
+      </EmptyHeader>
+    </Empty>
+  );
+}
+
+function UnavailableState() {
+  return (
+    <Empty className="min-h-48 p-6">
+      <EmptyHeader>
+        <EmptyTitle>Unavailable</EmptyTitle>
+        <EmptyDescription>Unavailable for this period.</EmptyDescription>
+      </EmptyHeader>
+    </Empty>
   );
 }
 
@@ -513,32 +643,25 @@ function MetricCard({
   children,
 }: {
   title: string;
-  children: React.ReactNode;
+  children: ReactNode;
 }) {
   return (
-    <Card className="space-y-3 p-5">
-      <h2 className="text-sm font-semibold">{title}</h2>
-      {children}
+    <Card>
+      <CardHeader className="px-4 pt-4 pb-0 sm:px-5 sm:pt-5">
+        <h2 className="text-base leading-tight font-semibold">{title}</h2>
+      </CardHeader>
+      <CardContent className="space-y-2 px-4 pb-4 sm:px-5 sm:pb-5">
+        {children}
+      </CardContent>
     </Card>
-  );
-}
-
-function UnavailableChart({ title }: { title: string }) {
-  return (
-    <>
-      <h2 className="text-sm font-semibold">{title}</h2>
-      <p className="text-sm text-muted-foreground">
-        Unavailable for this period.
-      </p>
-    </>
   );
 }
 
 function Stat({ label, value }: { label: string; value: string }) {
   return (
-    <div className="flex items-baseline justify-between gap-3">
+    <div className="flex items-baseline justify-between gap-3 border-b border-border py-2 last:border-b-0">
       <span className="text-sm text-muted-foreground">{label}</span>
-      <span className="text-base font-semibold tabular-nums">{value}</span>
+      <span className="text-sm font-semibold tabular-nums">{value}</span>
     </div>
   );
 }
@@ -551,8 +674,8 @@ function CountGroup({
   counts: Record<string, number>;
 }) {
   return (
-    <div className="space-y-2 pt-1">
-      <p className="text-xs font-medium tracking-wide text-muted-foreground uppercase">
+    <div className="pt-2">
+      <p className="font-mono text-xs tracking-wider text-muted-foreground uppercase">
         {title}
       </p>
       {Object.entries(counts).map(([key, count]) => (
