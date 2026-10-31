@@ -269,8 +269,8 @@ Repair with status history, a Feedback submission with a review event, and an
 internal operator mapping. It then:
 
 1. dumps roles, schema and data with `supabase db dump --local`;
-2. wipes the restored scope in place (public schema, Auth users, migration
-   history);
+2. wipes the restored scope in place (public schema, every Auth table except
+   `schema_migrations`, migration history);
 3. restores with `psql --single-transaction -v ON_ERROR_STOP=1`, in the order
    schema, `session_replication_role = replica`, data;
 4. verifies with SQL and fails on the first mismatch: fixture rows and values,

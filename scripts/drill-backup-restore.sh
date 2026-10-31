@@ -8,7 +8,7 @@
 #
 # It runs only on the disposable local Supabase stack that the Database
 # integration job starts. It is destructive there by design: it wipes the
-# public schema and the Auth users before restoring them from the dump.
+# public schema and every Auth table before restoring them from the dump.
 #
 #  1. Refuses any API host other than 127.0.0.1 or localhost, and requires
 #     DRILL_DISPOSABLE=1 so a developer's shared local stack is never wiped.
@@ -19,8 +19,9 @@
 #  3. Dumps roles (--role-only), schema, and data (--data-only --use-copy,
 #     including the migration history) with `supabase db dump --local`.
 #  4. Wipes the restored scope in place: drops and recreates public with
-#     Supabase's default grants, deletes Auth users and clears the migration
-#     history.
+#     Supabase's default grants, truncates every table in the auth schema
+#     (except schema_migrations, which the dump excludes) and clears the
+#     migration history. This matches a fresh project's empty Auth schema.
 #  5. Restores with psql --single-transaction -v ON_ERROR_STOP=1: schema, then
 #     session_replication_role = replica, then data.
 #  6. Verifies with SQL and fails on the first mismatch, then prints a summary.
@@ -166,7 +167,19 @@ GRANT ALL ON SCHEMA public TO postgres, service_role;
 ALTER DEFAULT PRIVILEGES IN SCHEMA public GRANT ALL ON TABLES TO anon, authenticated, service_role;
 ALTER DEFAULT PRIVILEGES IN SCHEMA public GRANT ALL ON FUNCTIONS TO anon, authenticated, service_role;
 ALTER DEFAULT PRIVILEGES IN SCHEMA public GRANT ALL ON SEQUENCES TO anon, authenticated, service_role;
-DELETE FROM auth.users;
+DO $$
+DECLARE
+  auth_tables text;
+BEGIN
+  SELECT string_agg(format('%I.%I', schemaname, tablename), ', ')
+    INTO auth_tables
+    FROM pg_tables
+    WHERE schemaname = 'auth' AND tablename <> 'schema_migrations';
+  IF auth_tables IS NOT NULL THEN
+    EXECUTE 'TRUNCATE ' || auth_tables || ' CASCADE';
+  END IF;
+END
+$$;
 TRUNCATE supabase_migrations.schema_migrations;
 SQL
 
