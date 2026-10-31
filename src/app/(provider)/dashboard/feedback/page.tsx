@@ -16,9 +16,8 @@ export default async function ProviderFeedbackPage() {
   await requireProviderContext();
 
   return (
-    <div className="max-w-2xl space-y-6">
+    <div className="mx-auto w-full max-w-3xl space-y-6">
       <PageHeader
-        eyebrow="Provider"
         title="Send feedback"
         description="Tell the Tracknologia team what is working and what isn't. Only the team can read it."
       />
