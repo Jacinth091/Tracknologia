@@ -375,6 +375,25 @@ test.describe("E2E-10 Participant feedback forms", () => {
     }
   });
 
+  test("an anonymous visitor can open the privacy page", async ({
+    browser,
+  }) => {
+    const context = await browser.newContext();
+    const page = await context.newPage();
+    try {
+      const response = await page.goto("/privacy");
+      expect(response?.status()).toBe(200);
+      await expect(
+        page.getByRole("heading", {
+          name: "How Tracknologia handles your information",
+          level: 1,
+        }),
+      ).toBeVisible();
+    } finally {
+      await context.close();
+    }
+  });
+
   test("the public form fits a 375px phone and its submit is keyboard reachable", async ({
     browser,
   }) => {

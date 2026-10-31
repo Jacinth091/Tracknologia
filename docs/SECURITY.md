@@ -183,6 +183,12 @@ roles, not `user_metadata`, and not inferred from owning or joining a Provider:
   no Tracking Code or Request Reference. The participant copy and privacy notice
   were owner-approved on 2026-10-30 (#87). Feedback is kept with a personal
   review within 90 days, through the runbooks in `docs/OPERATIONS.md`.
+- Public privacy page (`/privacy`, owner decision on #87, decision 8 covers the
+  feedback text): static, anonymous, and read-free. Section 1 renders the same
+  `FeedbackPrivacyNotice` component as the feedback form, so the approved
+  wording cannot drift between the two. The page is linked from the public
+  feedback, Repair Request, `/track` and `/register` surfaces. The page shows
+  the project contact address (owner decision on #87, 2026-10-31).
 - Operational validation metrics (issue #93) independently require the operator
   guard and a successful access audit. The aggregate RPC rechecks the enabled
   mapping under `FOR SHARE` and is executable only by `service_role`. It returns

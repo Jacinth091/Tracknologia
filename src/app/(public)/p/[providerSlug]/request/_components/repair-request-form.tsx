@@ -529,6 +529,15 @@ export function RepairRequestForm({
           "Submit Repair Request"
         )}
       </Button>
+
+      <p className="text-sm text-muted-foreground">
+        <Link
+          href="/privacy"
+          className="font-medium text-foreground underline underline-offset-4"
+        >
+          Privacy notice
+        </Link>
+      </p>
     </form>
   );
 }
