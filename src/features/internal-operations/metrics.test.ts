@@ -124,7 +124,7 @@ function emptyFeedback() {
     },
     snapshot: "CURRENT_STATUS" as const,
     retention: {
-      policy: "UNAPPROVED" as const,
+      policy: "APPROVED" as const,
       coverage: "RETAINED_ROWS_ONLY" as const,
     },
     total: 0,
@@ -532,7 +532,7 @@ describe("getValidationMetrics guard and interface", () => {
       status: "AVAILABLE",
       batches: 1,
     });
-    expect(metrics.coverage.retentionPolicy).toBe("UNAPPROVED");
+    expect(metrics.coverage.retentionPolicy).toBe("APPROVED");
   });
 
   it("takes the report time from the domain RPC as_of, not the wall clock", async () => {

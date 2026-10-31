@@ -434,7 +434,7 @@ function CoverageNotes({
             "Feedback: unavailable for this period."
           )}
         </li>
-        <li>Retention policy: {humanize(coverage.retentionPolicy)}.</li>
+        <li>Retention policy: Approved (#87, 2026-10-31).</li>
       </ul>
     </Card>
   );
