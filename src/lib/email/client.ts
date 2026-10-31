@@ -12,7 +12,7 @@ export interface SendEmailParams {
 
 export type EmailDeliveryResult =
   | { success: true; id?: string }
-  | { success: false; reason: "provider_error" | "unavailable" };
+  | { success: false; reason: "provider_error" | "EMAIL_DISABLED" };
 
 export async function sendEmail(
   params: SendEmailParams,
@@ -32,11 +32,10 @@ export async function sendEmail(
     return { success: true, id: "dev-mock-id" };
   }
 
+  // Production without RESEND_API_KEY: the pilot shares invite links by Copy
+  // Link. Log nothing here, because the message may carry an invite URL or code.
   if (!config.resend.apiKey) {
-    console.error(
-      "[Email Error]: RESEND_API_KEY is missing in non-development environment.",
-    );
-    return { success: false, reason: "unavailable" };
+    return { success: false, reason: "EMAIL_DISABLED" };
   }
 
   try {

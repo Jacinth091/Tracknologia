@@ -155,17 +155,16 @@ export function parseServerConfig(
   const resendFromEmail =
     env.RESEND_FROM_EMAIL?.trim() || "Tracknologia <onboarding@resend.dev>";
 
-  if (runtime === "production") {
-    if (!resendApiKey) {
-      throw new Error(
-        "Configuration error: RESEND_API_KEY is required in production.",
-      );
-    }
-    if (resendFromEmail.includes("onboarding@resend.dev")) {
-      throw new Error(
-        "Configuration error: RESEND_FROM_EMAIL cannot use default onboarding@resend.dev address in production.",
-      );
-    }
+  // Production may run without a Resend key: email is then disabled and
+  // invitations are shared with Copy Link. A key still needs a real sender.
+  if (
+    runtime === "production" &&
+    resendApiKey &&
+    resendFromEmail.includes("onboarding@resend.dev")
+  ) {
+    throw new Error(
+      "Configuration error: RESEND_FROM_EMAIL cannot use default onboarding@resend.dev address in production.",
+    );
   }
 
   const isDevLogger =
