@@ -307,6 +307,160 @@ test.describe("E2E-08 Internal operator access", () => {
     }
   });
 
+  test("the activity page renders no customer or feedback canary", async ({
+    browser,
+  }) => {
+    const admin = createServiceClient();
+    const canary = randomUUID().replaceAll("-", "").slice(0, 16);
+    const upper = canary.toUpperCase();
+    const feedbackTitle = `e2e-canary-${canary}`;
+    const canaries = {
+      requestName: `CANARY-REQNAME-${canary}`,
+      customerName: `CANARY-NAME-${canary}`,
+      customerPhone: `CANARY-PHONE-${canary}`,
+      internalNotes: `CANARY-NOTES-${canary}`,
+      feedbackMessage: `CANARY-FEEDBACK-${canary}`,
+    };
+    const seededActors: TestActor[] = [];
+
+    const operator = await seedInternalOperator(admin);
+    const actor = await seedActor(admin, {
+      providerType: "SHOP",
+      role: "OWNER",
+    });
+    seededActors.push(actor);
+
+    try {
+      // Customer and Repair data seeded as the Provider's own rows, so the
+      // activity page has real records that must stay out of its output.
+      const { data: request, error: requestError } = await admin
+        .from("repair_requests")
+        .insert({
+          provider_id: actor.providerId,
+          reference_code: `REQ-${upper}`,
+          customer_name: canaries.requestName,
+          customer_phone: canaries.customerPhone,
+          device_type: "Laptop",
+          reported_problem: "CANARY reported problem",
+          status: "ACCEPTED",
+          accepted_at: new Date().toISOString(),
+          accepted_by_user_id: actor.userId,
+        })
+        .select("id")
+        .single();
+      if (requestError) {
+        throw new Error(
+          `[E2E fixture] request seed failed: ${requestError.message}`,
+        );
+      }
+
+      const { error: repairError } = await admin.from("repairs").insert({
+        provider_id: actor.providerId,
+        repair_request_id: request.id,
+        origin: "CUSTOMER_REQUEST",
+        ticket_number: `TN-2026-${upper.slice(0, 10)}`,
+        tracking_code: `TRK-${upper}${upper.slice(0, 8)}`,
+        customer_name: canaries.customerName,
+        customer_phone: canaries.customerPhone,
+        device_type: "Laptop",
+        reported_problem: "CANARY reported problem",
+        internal_notes: canaries.internalNotes,
+        created_by_user_id: actor.userId,
+      });
+      if (repairError) {
+        throw new Error(
+          `[E2E fixture] repair seed failed: ${repairError.message}`,
+        );
+      }
+
+      const feedback = await admin.rpc("submit_feedback", {
+        p_submission_nonce: randomUUID(),
+        p_category: "BUG",
+        p_source: "PUBLIC_TRACKING",
+        p_participant_class: "PUBLIC_SELF_REPORTED_CUSTOMER",
+        p_title: feedbackTitle,
+        p_message: canaries.feedbackMessage,
+      });
+      if (feedback.error) {
+        throw new Error(
+          `[E2E fixture] feedback seed failed: ${feedback.error.message}`,
+        );
+      }
+      const { data: feedbackRow, error: feedbackReadError } = await admin
+        .from("feedback_submissions")
+        .select("id")
+        .eq("title", feedbackTitle)
+        .single();
+      if (feedbackReadError) {
+        throw new Error(
+          `[E2E fixture] feedback read failed: ${feedbackReadError.message}`,
+        );
+      }
+
+      const operatorContext = await browser.newContext();
+      const operatorPage = await operatorContext.newPage();
+      const appOrigin = new URL(baseURL).origin;
+      const bodies: Promise<string>[] = [];
+      operatorPage.on("response", (response) => {
+        if (new URL(response.url()).origin === appOrigin) {
+          bodies.push(response.text());
+        }
+      });
+
+      await operatorPage.goto("/login?redirectTo=%2Finternal%2Factivity");
+      await operatorPage.locator('input[name="email"]').fill(operator.email);
+      await operatorPage
+        .locator('input[name="password"]')
+        .fill(operator.password);
+      await operatorPage
+        .getByRole("button", { name: "Sign in", exact: true })
+        .click();
+      await expect(operatorPage).toHaveURL(/\/internal\/activity$/, {
+        timeout: 20_000,
+      });
+
+      // Default window, then a wider one that includes the seeds.
+      const windows = ["/internal/activity", "/internal/activity?period=30d"];
+      for (const path of windows) {
+        await operatorPage.goto(path);
+        await expect(
+          operatorPage.getByRole("heading", {
+            name: "Validation metrics",
+            exact: true,
+          }),
+        ).toBeVisible();
+        await operatorPage.waitForLoadState("networkidle");
+
+        // The HTML includes the inline RSC payload, so page.content() covers
+        // the server-rendered data as well as the markup.
+        const html = await operatorPage.content();
+        const responseBodies = await Promise.all(bodies);
+        for (const value of Object.values(canaries)) {
+          expect(html).not.toContain(value);
+          for (const body of responseBodies) {
+            expect(body).not.toContain(value);
+          }
+        }
+      }
+
+      // The same feedback canary must be visible on the authorized detail
+      // page, which proves the seed is real and the absence check means
+      // something.
+      await operatorPage.goto(`/internal/feedback/${feedbackRow.id}`);
+      await expect(
+        operatorPage.getByText(canaries.feedbackMessage, { exact: true }),
+      ).toBeVisible();
+      await operatorContext.close();
+    } finally {
+      await runLocalSql(
+        supabaseUrl,
+        `delete from public.feedback_submissions where title = '${feedbackTitle}';`,
+      );
+      await cleanupInternalOperator(admin, operator.userId);
+      await cleanupActors(admin, seededActors);
+    }
+  });
+
   test("the health endpoint answers anonymous probes with no cache or cookie", async ({
     request,
   }) => {
