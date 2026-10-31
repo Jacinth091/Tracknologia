@@ -258,8 +258,9 @@ describe("updatePasswordAction", () => {
     const cookie = createRecoveryGrantCookie(userId);
     mocks.getCookie.mockImplementation(
       (name: string) =>
-        (name === RECOVERY_GRANT_COOKIE ? { value: cookie.value } : undefined) ??
-        undefined,
+        (name === RECOVERY_GRANT_COOKIE
+          ? { value: cookie.value }
+          : undefined) ?? undefined,
     );
     return cookie;
   }

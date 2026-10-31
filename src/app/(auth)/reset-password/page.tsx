@@ -33,7 +33,11 @@ function RecoveryCardIcon() {
   );
 }
 
-function RecoveryLinkRequiredCard({ callbackFailed }: { callbackFailed: boolean }) {
+function RecoveryLinkRequiredCard({
+  callbackFailed,
+}: {
+  callbackFailed: boolean;
+}) {
   return (
     <Card>
       <CardHeader>
@@ -52,9 +56,9 @@ function RecoveryLinkRequiredCard({ callbackFailed }: { callbackFailed: boolean 
       <CardContent className="text-sm leading-relaxed text-muted-foreground">
         <p>
           Each recovery email carries a single-use link. Open the newest
-          recovery email in this browser and follow its link, or request a
-          fresh one below. Recovery emails always go to your sign-in email —
-          each person recovers their own account.
+          recovery email in this browser and follow its link, or request a fresh
+          one below. Recovery emails always go to your sign-in email — each
+          person recovers their own account.
         </p>
       </CardContent>
       <CardFooter className="justify-center gap-3 border-t border-border/50 pt-4 text-xs text-muted-foreground">
@@ -91,9 +95,7 @@ function PasswordFormCard({ recoveredEmail }: { recoveredEmail: string }) {
             show it so a recovered link never changes a password silently. */}
         <p className="rounded-md border border-border bg-muted/60 px-3 py-2 text-sm text-muted-foreground">
           Setting a new password for{" "}
-          <span className="font-medium text-foreground">
-            {recoveredEmail}
-          </span>
+          <span className="font-medium text-foreground">{recoveredEmail}</span>
         </p>
         <div className="mt-4">
           <ResetPasswordForm />
@@ -128,9 +130,7 @@ export default async function ResetPasswordPage({
 
   if (!user) {
     // Missing, expired, reused, or not-yet-exchanged recovery credentials.
-    return (
-      <RecoveryLinkRequiredCard callbackFailed={Boolean(callbackError)} />
-    );
+    return <RecoveryLinkRequiredCard callbackFailed={Boolean(callbackError)} />;
   }
 
   if (callbackError) {

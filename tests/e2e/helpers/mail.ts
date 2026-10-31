@@ -80,9 +80,7 @@ export async function findRecoveryLink(
   while (Date.now() < deadline) {
     let summaries: InbucketSummary[];
     try {
-      const response = await fetch(
-        `${INBUCKET_URL}/api/v1/mailbox/${mailbox}`,
-      );
+      const response = await fetch(`${INBUCKET_URL}/api/v1/mailbox/${mailbox}`);
       if (!response.ok) {
         summaries = [];
       } else {
@@ -106,7 +104,9 @@ export async function findRecoveryLink(
       }
 
       // When the detail names recipients, the address must be this one.
-      const recipients = (detail.to ?? []).map((to) => to.address.toLowerCase());
+      const recipients = (detail.to ?? []).map((to) =>
+        to.address.toLowerCase(),
+      );
       if (recipients.length > 0 && !recipients.includes(email.toLowerCase())) {
         continue;
       }

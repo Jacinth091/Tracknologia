@@ -157,9 +157,7 @@ export async function hasRecoveryGrant(
       sub: unknown;
       exp: unknown;
     };
-    return (
-      sub === userId && typeof exp === "number" && exp > Date.now() / 1000
-    );
+    return sub === userId && typeof exp === "number" && exp > Date.now() / 1000;
   } catch {
     // Malformed payloads are invalid grants; the caller fails closed.
     return false;
