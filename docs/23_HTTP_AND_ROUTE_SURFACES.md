@@ -52,6 +52,19 @@ records the `PUBLIC_FEEDBACK` source. The browser supplies no identity, source,
 or participant class. The copy and the inline privacy notice were owner-approved
 on 2026-10-30 (#87).
 
+### `/privacy`
+
+Public, anonymous, static content: no reads, no writes, no data, no Server
+Actions. It explains what Tracknologia keeps for feedback, repair requests,
+tracking and Provider accounts, and who can see it. Section 1 renders the same
+`FeedbackPrivacyNotice` component as the feedback form, so the approved text
+exists once. The contact address is a single placeholder constant in the page
+file until the owner's team address is set. Linked from the feedback form, the
+Repair Request form, `/track` and `/register`.
+
+Implemented as a Server Component with no client JavaScript and no
+`connection()` call; it is safe to prerender.
+
 ## Operational routes
 
 ### `/api/health`
