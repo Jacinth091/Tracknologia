@@ -1,5 +1,5 @@
 import "server-only";
-import { Resend } from "resend";
+import { createTransport } from "nodemailer";
 import { getServerConfig } from "@/lib/config/server";
 
 export interface SendEmailParams {
@@ -18,11 +18,11 @@ export async function sendEmail(
   params: SendEmailParams,
 ): Promise<EmailDeliveryResult> {
   const config = getServerConfig();
-  const from = params.from || config.resend.fromEmail;
+  const from = params.from || config.email.from;
 
-  if (config.resend.isDevLogger) {
+  if (config.email.isDevLogger) {
     console.log("----------------------------------------");
-    console.log("[DEV EMAIL LOGGER] (No RESEND_API_KEY configured)");
+    console.log("[DEV EMAIL LOGGER] (No SMTP_HOST configured)");
     console.log(
       `To: ${Array.isArray(params.to) ? params.to.join(", ") : params.to}`,
     );
@@ -32,15 +32,21 @@ export async function sendEmail(
     return { success: true, id: "dev-mock-id" };
   }
 
-  // Production without RESEND_API_KEY: the pilot shares invite links by Copy
+  // Production without SMTP settings: the pilot shares invite links by Copy
   // Link. Log nothing here, because the message may carry an invite URL or code.
-  if (!config.resend.apiKey) {
+  const smtp = config.email.smtp;
+  if (!smtp) {
     return { success: false, reason: "EMAIL_DISABLED" };
   }
 
   try {
-    const resend = new Resend(config.resend.apiKey);
-    const { data, error } = await resend.emails.send({
+    const transport = createTransport({
+      host: smtp.host,
+      port: smtp.port,
+      secure: smtp.secure,
+      auth: { user: smtp.user, pass: smtp.password },
+    });
+    const info = await transport.sendMail({
       from,
       to: params.to,
       subject: params.subject,
@@ -48,16 +54,19 @@ export async function sendEmail(
       text: params.text,
     });
 
-    if (error) {
-      console.error("[Resend Error]: Email delivery failed");
-      return { success: false, reason: "provider_error" };
-    }
-
-    return { success: true, id: data?.id };
-  } catch {
-    console.error("[Email Exception]: Email delivery failed");
+    return { success: true, id: info.messageId };
+  } catch (error) {
+    // Only the SMTP error code: the message can carry the recipient or invite.
+    console.error(
+      `[Email Error]: SMTP delivery failed (${smtpErrorCode(error)})`,
+    );
     return { success: false, reason: "provider_error" };
   }
+}
+
+function smtpErrorCode(error: unknown): string {
+  const code = (error as { code?: unknown } | null)?.code;
+  return typeof code === "string" ? code : "UNKNOWN";
 }
 
 function escapeHtml(unsafe: string): string {
