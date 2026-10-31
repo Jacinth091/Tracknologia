@@ -25,6 +25,17 @@ tracking_events
 
 Short-lived operational security state:
 public_operation_rate_limits
+
+Private internal operations (issue #88):
+internal_operators
+internal_access_audit
+
+Private Feedback (issue #89):
+feedback_submissions
+feedback_review_events
+
+Owner-only Feedback privacy audit (PR #105 review):
+feedback_privacy_audit
 ```
 
 Authentication identities live in Supabase-managed `auth.users`.
@@ -242,7 +253,181 @@ Minimal internal validation telemetry for successful public Tracking views.
 - no Tracking Code, customer/Provider snapshot, contact, network, browser,
   fingerprint, Auth, or arbitrary metadata is stored
 
-### Public Tracking projection
+### 12. `internal_operators`
+
+Private allow-list mapping for internal operators. It is **not** a Provider role,
+not an Auth-metadata flag, and not derived from `provider_memberships`.
+
+- `user_id` (uuid, PK, FK $\to$ `auth.users.id`, cascading delete)
+- `enabled` (boolean, not null, default `false`)
+- `created_at` (timestamptz, server default)
+- `provisioned_at`, `revoked_at` (timestamptz, nullable)
+- `reason` (bounded 3–200 characters after trimming)
+- actor identity is intentionally **not** duplicated here; it lives only in the
+  append-only audit event
+- one mapping per Auth user; deleting the Auth identity removes live permission
+  immediately
+- no seed rows, no signup trigger, no Provider/owner automatic grant
+
+### 13. `internal_access_audit`
+
+Append-only audit for internal-operator grants, revocations, and sensitive
+internal access events.
+
+- `event_id` (uuid, PK)
+- `operator_user_id`, `actor_user_id` (uuid, nullable FKs $\to$ `auth.users.id`,
+  `ON DELETE SET NULL`; the FK action runs as the table owner, so nulling the
+  direct references does not require client grants)
+- `operation` (text, fixed check: `OPERATOR_PROVISIONED`, `OPERATOR_REVOKED`,
+  `INTERNAL_ACCESS_VIEW`)
+- `reason` (bounded 3–200 characters when present; null for application access
+  events)
+- `created_at` (timestamptz, server default)
+- Auth deletion nulls only the direct user references; `operation`, `reason`,
+  and `created_at` remain and may stay linkable through external approval
+  records. This is not full anonymization.
+- stores no Provider, Repair, Repair Request, Customer, email, path, or payload
+  data
+- `service_role` can read but cannot insert, update, or delete rows directly;
+  writes happen only through the owner-executed functions below
+- retention/purge policy remains deliberately undefined pending owner approval
+  (issue #87)
+
+### 14. `feedback_submissions`
+
+Private submitted feedback (issue #89). Written only by the service-role
+`submit_feedback(...)` RPC, which the public Feedback adapter may call, and
+reviewed only by `record_feedback_review(...)`, which the internal operator
+adapter calls with a server-resolved operator UUID. The SQL function itself
+trusts only the service-role caller.
+
+- `id` (uuid, PK, database-generated; never a public lookup token)
+- `submission_nonce` (uuid, unique): client retry key, not identity or
+  authorization
+- `category` (fixed: `BUG`, `USABILITY`, `FEATURE_REQUEST`, `GENERAL`)
+- `source` (fixed: `PUBLIC_TRACKING`, `PUBLIC_REQUEST`, `PUBLIC_FEEDBACK`,
+  `PROVIDER_WORKSPACE`) and `participant_class` (fixed: `PUBLIC_SELF_REPORTED_CUSTOMER`,
+  `SHOP_OWNER`, `SHOP_STAFF`, `INDEPENDENT_REPAIRER`); public sources may store
+  only the public class, and the Provider source may store only the Provider
+  classes
+- `title` (nullable, trimmed, 1–120 characters) and `message` (required,
+  trimmed, 1–2,000 characters)
+- `status` (default `NEW`: `NEW`, `REVIEWING`, `PLANNED`, `RESOLVED`,
+  `DISMISSED`) and `priority` (default `NORMAL`: `NORMAL`, `HIGH`, `CRITICAL`)
+- `internal_notes` (nullable, trimmed, 1–2,000 characters) and
+  `linked_issue_url` (nullable; only `https://github.com/Jacinth091/Tracknologia/issues/<positive integer>`,
+  at most 2,000 characters)
+- `created_at`, `reviewed_at`, `reviewed_by` (nullable FK to `auth.users`,
+  `ON DELETE RESTRICT`), `row_version` (starts at `1`, increases on each
+  review mutation)
+- `privacy_reviewed_at` (nullable `TIMESTAMPTZ`, migration
+  `20261102000000_add_feedback_privacy_review_mark.sql`): when an owner-run
+  privacy review completed, by the redaction block or the "Mark privacy review
+  done (kept)" block. Null means pending. It is set only by those runbooks, never
+  by triage or a client role, and it does not change `row_version`. The
+  due-for-review queue excludes non-null rows. A migration backfill sets it from
+  each existing submission's earliest `FEEDBACK_REDACTED` audit row.
+- Text is trimmed of ASCII edge whitespace only (space, tab, LF, CR, FF, VT);
+  lengths count PostgreSQL characters, not bytes. Control characters
+  U+0001–U+0008, U+000E–U+001F and U+007F are rejected inside `title` and
+  `message`; TAB, LF, VT, FF and CR are permitted as content, and only the
+  ASCII edge set is trimmed. Original `title` and `message` are not changed
+  after insert under normal submission and triage. The one exception is an
+  owner-approved privacy redaction run from the trusted SQL runbook in
+  `docs/OPERATIONS.md`, which replaces them with `[redacted]` (issue #87 policy
+  gate).
+- The review-stamp CHECK ties `row_version = 1` to no review and any later
+  version to a recorded `reviewed_at`/`reviewed_by`.
+- Schema semantics for a privacy touch on a never-reviewed row: the owner
+  redaction raises `row_version` to `2` and fills `reviewed_at`/`reviewed_by`
+  only where they are null, to satisfy the existing CHECK. Those stamps are
+  administrative metadata. They do not mean triage occurred. The row keeps
+  `status` `NEW`, `priority` `NORMAL`, and an empty review history. Existing
+  stamps are kept when present. Triage is shown by review events and status.
+  The redaction also sets `privacy_reviewed_at`.
+- Indexes: `(created_at DESC, id DESC)` and `(status, created_at DESC, id DESC)`.
+- No participant identity, Provider ID, IP, browser metadata, Repair IDs,
+  tracking codes, or device fields are stored.
+
+### 15. `feedback_review_events`
+
+Append-only per-feedback review history (issue #89). It is separate from
+`internal_access_audit`, which deliberately carries no feedback identifiers.
+
+- `event_id` (uuid, PK), `feedback_id` (FK, `ON DELETE RESTRICT`),
+  `operator_user_id` (FK to `auth.users`, `ON DELETE RESTRICT`)
+- `from_status`, `to_status`, `priority_before`, `priority_after` (fixed
+  values), `row_version` (version after this event; greater than `1`)
+- `reason` (nullable, trimmed, 3–500 characters; required for reopening from
+  `RESOLVED` or `DISMISSED`)
+- `occurred_at` (server default); index `(feedback_id, occurred_at, event_id)`
+- Never copies `title`, `message`, or `internal_notes` text. The owner-run
+  redaction runbook sets prohibited free-text `reason` values to null; it adds
+  no event and bumps only `feedback_submissions.row_version`.
+- Referenced feedback and reviewer identities cannot be deleted while history
+  exists, so the audit trail is not removed by accident. The owner-run purge
+  runbook is the only path that deletes this history, and it records itself in
+  `feedback_privacy_audit`. Feedback is kept. Within 90 days an operator reviews
+  it and redacts personal details or deletes it through the owner-run runbooks in
+  `docs/OPERATIONS.md`. Retention for the other data classes is still open in
+  issue #87.
+
+`get_feedback_count_summary(p_operator_user_id, p_window_start, p_window_end)`
+(issue #90) is a service-role-only, set-based aggregate. It returns `(dimension,
+bucket, row_count)` rows for categories, sources, current statuses, and Asia/Manila days
+in a window of at most 31 days, with no row content or identifiers. It adds no
+table and no column.
+
+### 15a. `feedback_privacy_audit`
+
+Append-only audit of owner-run Feedback redaction and purge (PR #105 review).
+It is separate from `internal_access_audit`, which stays access-only.
+
+- `event_id` (uuid, PK), `operation` (fixed: `FEEDBACK_REDACTED`,
+  `FEEDBACK_PURGED`, `FEEDBACK_PRIVACY_REVIEWED`), `target_feedback_id` (uuid, **no** foreign key, so it
+  survives a purge), `actor_user_id` (FK to `auth.users`, `ON DELETE SET NULL`),
+  `approval_ref` (3–80 characters of letters, digits and `#._/:-`), `created_at`
+- RLS enabled with no policies. `service_role` has `SELECT` only; `PUBLIC`,
+  `anon`, and `authenticated` have no privilege.
+- Written only inside the owner-run runbook transaction in `docs/OPERATIONS.md`,
+  in the same transaction as the redaction, purge or privacy-review mark. Never
+  holds participant text.
+- Retention is part of the open issue #87 policy decision and is not defined.
+
+### 16. `get_internal_validation_metrics`
+
+`get_internal_validation_metrics(p_operator_user_id, p_window_start, p_window_end)`
+(issue #93) is a service-role-only, set-based aggregate over the authoritative
+domain tables for internal operator dashboards. It returns fixed
+`(dimension, bucket, row_count, interval_seconds, as_of)` groups only, where
+`interval_seconds` is the mean request decision lag (seconds) for the decision
+measures. No table and no column is added. It adds no provider series and no row
+identifiers, and identifiers may only enter `COUNT` or `COUNT(DISTINCT ...)`
+groupings inside the function.
+
+- Window: inclusive start, exclusive end, at most 90 Asia/Manila days; finite
+  bounds must align with Manila midnight. Future starts and ends beyond the
+  next Manila midnight are rejected. The application derives the UTC bounds.
+- Every row shares one database-generated `as_of`, captured after the operator
+  mapping lock. Period event observations stop at `min(window_end, as_of)`;
+  snapshots are current retained state, not reconstructed historical state.
+- Measures return `(dimension, bucket, row_count)`: onboarding by type and
+  all-time, active/repeat Provider activity, `ACTIVE_DAY` series buckets, staff
+  snapshot, current Repair statuses, Repair created/completed/READY/maintenance,
+  request received/decided/pending/cohort measures, mean decision seconds, and
+  Tracking observations/adoption.
+- Request cohort measures use `repair_requests.submitted_at` inside the window;
+  decision measures use `accepted_at`/`declined_at` inside the window, so the
+  cohort never shifts when a later decision lands.
+- Operator mapping is rechecked under `FOR SHARE` so a concurrent revocation
+  serializes against this read; the function fails closed on a missing or
+  disabled mapping.
+- It adds no table, no column, and no table policy. The Feedback trend is not
+  duplicated here; it is read through the Feedback summary interface
+  (`get_feedback_count_summary`) in disjoint windows of at most 31 days. The
+  application records their separate freshness, not a common atomic snapshot.
+
+### 17. Public Tracking projection
 
 `lookup_public_repair(text)` is a read-only `SECURITY DEFINER` function rather
 than a table or unrestricted view. It normalizes a bounded Tracking Code and
@@ -341,9 +526,31 @@ npx supabase db push
   `submit_repair_request` is revoked from `anon`/`authenticated` and granted to
   `service_role` only, so the publishable key cannot invoke them directly. The
   application server calls them through the server-only service client.
+- **Internal operator tables are private**: RLS is enabled on
+  `internal_operators` and `internal_access_audit` with no policies. Supabase
+  default table privileges already include `service_role`, so the migration
+  explicitly revokes `PUBLIC`, `anon`, `authenticated`, and `service_role` from
+  both tables and then grants `service_role` `SELECT` only. Direct
+  `INSERT`/`UPDATE`/`DELETE` by any client role, including `service_role`, is
+  denied.
+- **Internal operator functions are narrow and authenticated by grant**:
+  `change_internal_operator_access(...)` (service-role-only) atomically changes
+  the enabled mapping and appends the provision/revoke audit event; an invalid
+  actor fails the audit FK after the mapping write and rolls the whole
+  transaction back. `record_internal_operation_access(operator_user_id,
+category)` is also service-role-only, accepts only the fixed
+  `INTERNAL_ACCESS_VIEW` category, and rechecks the enabled mapping under
+  `FOR SHARE`, which conflicts with the revocation `UPDATE`. Ordinary clients
+  cannot execute either function, so there is no publishable-key write surface.
+- **Audit is append-only**: audit writes occur only inside the
+  `SECURITY DEFINER` owner functions; `service_role` has no direct
+  mutation privilege, and Auth deletion nulls the direct user references on
+  retained events through the FK `ON DELETE SET NULL`.
 - **Durable public-operation abuse control**:
   `check_public_operation_rate_limit(...)` atomically increments one fixed
   window keyed by operation and a server-generated opaque HMAC actor digest.
+  The allowed operations are `tracking_lookup`, `repair_request_submit`, and
+  `feedback_submit` (issue #89, forward migration; existing rows are preserved).
   Its short-lived table stores no raw IP, Tracking Code, or customer data. Each
   later invocation deletes at most 100 expired rows. Expired rows are logically
   inactive immediately but may remain physically while there is no traffic;
@@ -375,5 +582,8 @@ npx supabase db push
 Do not add without a validated requirement:
 
 - `customers`, `devices`, `technicians`, `branches`, `inventory`, `parts`, `payments`, `invoices`, `appointments`, `ratings/reviews`.
+- Internal access audit retention/purge windows, archive targets, and reporting
+  projections: these need explicit owner approval (issue #87) and a retention
+  policy decision before any table, job, or query surface is added.
 
 Customer and device details remain point-in-time snapshots attached to a Repair or Repair Request.

@@ -7,7 +7,7 @@ import { getProviderServiceModes } from "@/features/providers";
 import { cn } from "@/lib/utils";
 import { createClient } from "@/lib/supabase/server";
 
-import { PageHeader } from "../../_components/page-header";
+import { PageHeader } from "@/components/shared/page-header";
 import { CreateRepairForm } from "./_components/create-repair-form";
 
 export const metadata: Metadata = {

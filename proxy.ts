@@ -1,6 +1,7 @@
 ﻿import { createServerClient } from "@supabase/ssr";
 import { NextResponse, type NextRequest } from "next/server";
 import { isUnauthenticatedAuthError } from "@/features/auth/types";
+import { getSafeInternalRedirectUrl } from "@/lib/utils";
 
 export async function proxy(request: NextRequest) {
   let supabaseResponse = NextResponse.next({
@@ -11,14 +12,28 @@ export async function proxy(request: NextRequest) {
 
   const isDashboardRoute = pathname.startsWith("/dashboard");
   const isOnboardingRoute = pathname.startsWith("/onboarding");
+  // Coarse internal-operator prefix only: "/internal" and "/internal/...",
+  // never lookalikes such as "/internally". Authorization is not decided here.
+  const isInternalRoute =
+    pathname === "/internal" || pathname.startsWith("/internal/");
   const isAuthRoute =
-    pathname.startsWith("/login") ||
-    pathname.startsWith("/register") ||
+    pathname.startsWith("/login") || pathname.startsWith("/register");
+
+  // Recovery entry routes keep proxy-time session refresh (the proxy is the
+  // only layer that can write refreshed Auth cookies) but hand resolution to
+  // the pages themselves: a recovery exchange establishes a session, so an
+  // automatic authenticated redirect here would push the person off the
+  // password form. /reset-password resolves the recovery `flow` marker, and
+  // /forgot-password stays usable for signed-in account holders.
+  const isRecoveryRoute =
     pathname.startsWith("/forgot-password") ||
     pathname.startsWith("/reset-password");
 
+  const isProtectedRoute =
+    isDashboardRoute || isOnboardingRoute || isInternalRoute;
+
   // Bypass Auth check entirely for accountless public routes
-  if (!isDashboardRoute && !isOnboardingRoute && !isAuthRoute) {
+  if (!isProtectedRoute && !isAuthRoute && !isRecoveryRoute) {
     return supabaseResponse;
   }
 
@@ -61,20 +76,24 @@ export async function proxy(request: NextRequest) {
     !user && (!error || isUnauthenticatedAuthError(error));
 
   // Coarse route redirects (defense in depth is still in feature interfaces + RLS)
-  if (isDefinitelyUnauthenticated && (isDashboardRoute || isOnboardingRoute)) {
-    const redirectUrl = request.nextUrl.clone();
-    redirectUrl.pathname = "/login";
-    redirectUrl.searchParams.set("redirectTo", request.nextUrl.pathname);
+  if (isDefinitelyUnauthenticated && isProtectedRoute) {
+    const redirectUrl = new URL("/login", request.url);
+    // Preserve the requested path and its query so login can return there.
+    redirectUrl.searchParams.set(
+      "redirectTo",
+      `${pathname}${request.nextUrl.search}`,
+    );
     return NextResponse.redirect(redirectUrl);
   }
 
   if (user && isAuthRoute) {
-    const redirectTo = request.nextUrl.searchParams.get("redirectTo");
-    const redirectUrl = request.nextUrl.clone();
-    redirectUrl.pathname =
-      redirectTo && redirectTo.startsWith("/") ? redirectTo : "/dashboard";
-    redirectUrl.searchParams.delete("redirectTo");
-    return NextResponse.redirect(redirectUrl);
+    const target = getSafeInternalRedirectUrl(
+      request.nextUrl.searchParams.get("redirectTo"),
+      "/dashboard",
+    );
+    // Resolve against the request origin only; the login request's own query
+    // (including its untrusted redirectTo) is not carried into the destination.
+    return NextResponse.redirect(new URL(target, request.url));
   }
 
   return supabaseResponse;

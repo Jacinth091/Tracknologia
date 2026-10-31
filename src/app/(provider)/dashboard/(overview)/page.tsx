@@ -40,7 +40,7 @@ import {
   EmptyTitle,
 } from "@/components/ui/empty";
 import { cn } from "@/lib/utils";
-import { PageHeader } from "../_components/page-header";
+import { PageHeader } from "@/components/shared/page-header";
 import { RequestLinkCard } from "../_components/request-link-card";
 import { repairStatusLabel } from "../_components/repair-status-badge";
 
@@ -169,7 +169,6 @@ export default async function DashboardPage() {
   return (
     <div className="space-y-8">
       <PageHeader
-        eyebrow="Dashboard"
         title={context.providerName}
         description={
           <span className="flex flex-wrap items-center gap-2">
@@ -190,17 +189,21 @@ export default async function DashboardPage() {
 
       <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
         {tiles.map((tile) => (
-          <Link key={tile.label} href={tile.href} className="group">
+          <Link
+            key={tile.label}
+            href={tile.href}
+            className="group rounded-xl outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background"
+          >
             <Card className="relative h-full overflow-hidden transition-colors group-hover:border-input">
               <span
                 aria-hidden="true"
                 data-status={tile.status}
                 className="status-badge absolute inset-x-0 top-0 h-1 bg-current"
               />
-              <CardHeader className="gap-3 p-4 sm:p-5">
+              <CardHeader className="flex-row items-center gap-3 space-y-0 p-4 sm:p-5">
                 <span
                   data-status={tile.status}
-                  className="status-badge flex size-9 items-center justify-center rounded-lg"
+                  className="status-badge flex size-9 shrink-0 items-center justify-center rounded-lg"
                 >
                   <HugeiconsIcon
                     icon={tile.icon}
@@ -208,10 +211,14 @@ export default async function DashboardPage() {
                     className="size-4"
                   />
                 </span>
-                <CardDescription>{tile.label} Repairs</CardDescription>
-                <CardTitle className="text-3xl tabular-nums">
-                  {tile.count}
-                </CardTitle>
+                <div className="min-w-0">
+                  <CardTitle className="text-2xl tabular-nums">
+                    {tile.count}
+                  </CardTitle>
+                  <CardDescription className="mt-1 text-xs sm:text-sm">
+                    {tile.label} Repairs
+                  </CardDescription>
+                </div>
               </CardHeader>
             </Card>
           </Link>
@@ -292,10 +299,10 @@ export default async function DashboardPage() {
                           className="size-5 shrink-0"
                         />
                         <div className="min-w-0 flex-1">
-                          <p className="truncate text-sm font-bold text-foreground">
+                          <p className="line-clamp-2 text-sm font-semibold leading-snug text-foreground wrap-anywhere">
                             {row.title}
                           </p>
-                          <p className="truncate font-mono text-xs text-muted-foreground">
+                          <p className="mt-1 text-xs leading-relaxed text-muted-foreground wrap-anywhere">
                             {row.meta}
                           </p>
                         </div>

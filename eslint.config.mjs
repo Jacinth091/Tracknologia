@@ -12,6 +12,8 @@ const eslintConfig = defineConfig([
     "out/**",
     "build/**",
     "next-env.d.ts",
+    // Local agent/session tool artifacts; CI never has them.
+    ".herdr-loop/**",
   ]),
 ]);
 

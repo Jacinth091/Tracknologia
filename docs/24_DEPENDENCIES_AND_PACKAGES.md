@@ -59,6 +59,13 @@ sonner
 
 shadcn-generated primitives belong under `src/components/ui/`.
 
+## Charts
+
+`recharts@3.8.0` is the chart library, added through shadcn's chart component
+(`src/components/ui/chart.tsx`). The owner asked for shadcn charts, and recharts
+is the library that component wraps. Only the internal metrics client components
+use it. It is pinned exact, like React, and lands in `pnpm-lock.yaml`.
+
 ## Testing dependencies
 
 Suggested:

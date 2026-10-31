@@ -1,7 +1,7 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { HugeiconsIcon } from "@hugeicons/react";
-import { Login03Icon } from "@hugeicons/core-free-icons";
+import { AlertCircleIcon } from "@hugeicons/core-free-icons";
 import {
   Card,
   CardContent,
@@ -10,43 +10,81 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
+import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { LoginForm } from "../_components/login-form";
+import { getSafeInternalRedirectUrl } from "@/lib/utils";
 
 export const metadata: Metadata = {
   title: "Sign In — Tracknologia",
-  description: "Sign in to your Tracknologia Provider account",
+  description: "Sign in to your Tracknologia account",
 };
 
-export default function LoginPage() {
+const CALLBACK_ERROR_PARAM = "auth_callback_failed";
+
+export default async function LoginPage({
+  searchParams,
+}: {
+  searchParams: Promise<{
+    redirectTo?: string | string[];
+    error?: string | string[];
+  }>;
+}) {
+  const { redirectTo, error } = await searchParams;
+  // Only a scalar target is trusted; repeated/lookup values fall back.
+  const safeRedirectTo = getSafeInternalRedirectUrl(
+    typeof redirectTo === "string" ? redirectTo : undefined,
+    "/dashboard",
+  );
+  // Only the deliberate callback-failure signal is rendered; every other
+  // error value is ignored instead of echoed back.
+  const callbackFailed = error === CALLBACK_ERROR_PARAM;
+
   return (
     <Card>
-      <CardHeader>
-        <CardTitle className="flex items-center gap-2.5">
-          <span className="inline-flex size-8 shrink-0 items-center justify-center rounded-lg border border-border bg-muted">
+      <CardHeader className="space-y-1 text-center">
+        <CardTitle>
+          <h1 className="text-2xl font-bold tracking-tight">Sign in</h1>
+        </CardTitle>
+        <CardDescription>
+          Enter the email and password for your account.
+        </CardDescription>
+      </CardHeader>
+      <CardContent className="space-y-4">
+        {callbackFailed && (
+          <Alert variant="destructive">
             <HugeiconsIcon
-              icon={Login03Icon}
+              icon={AlertCircleIcon}
               strokeWidth={1.8}
               className="size-4"
               aria-hidden="true"
             />
-          </span>
-          Welcome back
-        </CardTitle>
-        <CardDescription>
-          Sign in with your email and password to access your dashboard
-        </CardDescription>
-      </CardHeader>
-      <CardContent>
-        <LoginForm />
+            <AlertTitle>That link could not be verified</AlertTitle>
+            <AlertDescription>
+              The link may have expired or already been used. Sign in below, or
+              use &ldquo;Forgot password?&rdquo; to request a fresh link if you
+              cannot remember your password.
+            </AlertDescription>
+          </Alert>
+        )}
+        <LoginForm redirectTo={safeRedirectTo} />
       </CardContent>
-      <CardFooter className="justify-center border-t border-border/50 pt-4 text-xs text-muted-foreground">
-        Don&apos;t have an account?{" "}
-        <Link
-          href="/register"
-          className="ml-1 font-medium text-foreground underline-offset-4 hover:underline"
-        >
-          Register as a Provider
-        </Link>
+      <CardFooter className="justify-center border-t border-border/50 pt-4 text-sm text-muted-foreground">
+        <span>
+          New here?{" "}
+          <Link
+            href="/register"
+            className="font-medium text-foreground underline-offset-4 hover:underline"
+          >
+            Create an account
+          </Link>
+          {" · "}
+          <Link
+            href="/privacy"
+            className="font-medium text-foreground underline-offset-4 hover:underline"
+          >
+            Privacy
+          </Link>
+        </span>
       </CardFooter>
     </Card>
   );

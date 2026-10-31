@@ -24,9 +24,11 @@ The application centralizes runtime environment parsing in `src/lib/config/serve
 Key invariants:
 
 - **Central Seam**: Server environment validation is decoupled from route invocation and executed on Node.js startup via `src/instrumentation.ts` when `APP_ENV=production` or `APP_ENV=staging`.
-- **Fail-Fast**: Production configurations missing required secrets (`NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY`, `SUPABASE_SERVICE_ROLE_KEY`, `RESEND_API_KEY`, `PUBLIC_ABUSE_HMAC_SECRET`, `PUBLIC_ABUSE_TRUSTED_PROXY_SECRET`) or with invalid app origins fail immediately at boot.
+- **Fail-Fast**: Production configurations missing required secrets (`NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY`, `SUPABASE_SERVICE_ROLE_KEY`, `PUBLIC_ABUSE_HMAC_SECRET`, and `PUBLIC_ABUSE_TRUSTED_PROXY_SECRET` unless `PUBLIC_ABUSE_CLIENT_IP_SOURCE=vercel` on Vercel) or with invalid app origins fail immediately at boot. `SMTP_HOST`, `SMTP_USER` and `SMTP_PASSWORD` are optional but all-or-none: a partial set fails at boot. Without them, invitation email is disabled and the production app sends nothing and logs no email content.
 - **Forbidden Ingress Bypasses**: `PUBLIC_ABUSE_SHARED_DEV_BUCKET=true` and `NEXT_PUBLIC_REQUIRE_EMAIL_CONFIRMATION=false` are explicitly rejected in production to prevent silent security degradation.
-- **Secret Privacy**: Configuration validation errors and email client error logs MUST NEVER leak API keys, HMAC secrets, bearer tokens, or email message bodies. Dev email logging executes ONLY when `RESEND_API_KEY` is omitted in local/development mode, printing only safe non-sensitive metadata (recipient address, sender address, subject line).
+- **Secret Privacy**: Configuration validation errors and email client error logs MUST NEVER leak API keys, HMAC secrets, bearer tokens, or email message bodies. Dev email logging executes ONLY when no SMTP settings are configured in local/development mode, printing only safe non-sensitive metadata (recipient address, sender address, subject line).
+- **Browser Bundle Scan**: Server secrets are read only in the `server-only` config seam and are never `NEXT_PUBLIC_*`. The CI `Verify` build then searches `.next/static` for the build's placeholder values of `SUPABASE_SERVICE_ROLE_KEY`, `SMTP_PASSWORD`, `PUBLIC_ABUSE_HMAC_SECRET` and `PUBLIC_ABUSE_TRUSTED_PROXY_SECRET`, and fails if any appears or the directory is empty.
+- **SMTP TLS**: App SMTP requires TLS before any login or message data. Port 465 uses implicit TLS, and every other port requires STARTTLS. Certificates are always verified.
 
 ## Authentication
 
@@ -39,6 +41,62 @@ Supabase Auth owns authentication/session mechanics:
 - authenticated user identity.
 
 Tracknologia must not implement its own password hashing or JWT system.
+
+### Login return paths
+
+`/login?redirectTo=` targets are untrusted input. One helper, `getSafeInternalRedirectUrl`, is shared by the login page, `loginAction`, the auth callback, and `proxy`: it accepts only single-leading-slash local paths of at most 2048 characters, trims boundary whitespace, preserves safe query/fragment values, and falls back to `/dashboard` for absolute, protocol-relative, backslash, control-character, or oversized targets. The login form re-posts only the sanitized target and the Server Action re-sanitizes it, so a forged form field cannot redirect off-site. `proxy` treats `/internal` and `/internal/...` (not lookalikes such as `/internally`) as coarse authenticated destinations only; that redirect is not operator authorization, which is enforced by the `/internal` guard and the service-role-only internal seams described below.
+
+### Password recovery routing
+
+- Supabase Auth owns every recovery token: its single-use recovery link is
+  exchanged only by `/auth/callback`; the application keeps no reset-token
+  table and never derives account state from link text.
+- The reset-request response is neutral. It never reveals whether an email
+  is registered (Supabase silently skips unknown addresses), and production
+  Auth failures are surfaced as generic messages only. The recovery email
+  goes to the account's sign-in email — never to a Provider's customer
+  contact email, and never to another person's account on request of a
+  third party.
+- `proxy.ts` keeps `/forgot-password` and `/reset-password` reachable for
+  signed-in visitors (it still refreshes their session) but redirects
+  signed-in visitors only from `/login` and `/register`. Recovery entry
+  pages resolve their own state deliberately; an automatic redirect would
+  strand a valid recovery session on the dashboard.
+- The reset form opens only with a server-issued recovery grant. The callback
+  issues one only when the session produced by the code it just redeemed has a
+  `recovery` entry in its `amr` claim, with a recent timestamp. The `amr` is
+  read from the access token Supabase returned in that exchange. The token is
+  decoded, not signature-verified, because the server received it straight
+  from Supabase. The user's `recovery_sent_at` history never proves purpose, and
+  neither do the `next` parameter or the `?flow=recovery` marker. A valid
+  magic-link, password or OTP exchange routed to `/reset-password` gets no grant.
+- The grant is an HMAC-signed, HttpOnly cookie scoped to `/reset-password`. It
+  is bound to the Auth user id and to the session id (`session_id`), and it is
+  valid for 10 minutes. Its signing key is derived from the abuse secret under
+  the label `tracknologia:recovery-grant:v1`, so the raw secret is never the
+  HMAC key.
+- Honest lifetime: the grant is short-lived (10 minutes), user- and
+  session-bound, and cleared by the browser after a successful change. It is
+  not an atomic server-side spent token. A copied cookie stays usable from the
+  same session until it expires, and two simultaneous requests carrying the same
+  cookie can both pass the check. The credential change itself is enforced by
+  Supabase Auth.
+- `updatePasswordAction` refuses a missing, expired, tampered, other-user or
+  other-session grant without calling Supabase, so the password is unchanged.
+  A signed-in visit with `?flow=recovery` but no valid grant shows the fresh-link
+  card, not a password form. A signed-in visit without that marker is redirected
+  to the dashboard. The credential change only ever affects the signed-in
+  visitor's own account.
+- A recovery exchange replaces any existing session with the recovered
+  account's session. The reset form names that account by masked email
+  (`b•••@example.com`), so the change is never silent. A failed, expired or
+  reused recovery link lands on `/reset-password?callback_error=auth_callback_failed`,
+  which shows the recovery error state with a path to request a new email,
+  even when the browser already has a session. Unknown `error` values are not
+  echoed.
+- Production credential updates fail closed: Auth internals such as
+  missing or expired recovery sessions surface as one deliberate message
+  directing the person to request a fresh recovery email.
 
 ## Authorization
 
@@ -95,6 +153,106 @@ hidden as not found. Customer Updates are Provider-scoped and append-only;
 authenticated users cannot edit/delete them, and anonymous roles cannot read
 the raw table.
 
+## Internal operator access
+
+Internal operators are a separate private privilege layer. They are not Provider
+roles, not `user_metadata`, and not inferred from owning or joining a Provider:
+
+- `internal_operators` is a private allow-list keyed by Auth user with an
+  `enabled` flag. It is provisioned only by a deliberate, owner-approved
+  service-role runbook operation (see `docs/OPERATIONS.md`); there is no seed
+  identity, signup trigger, metadata flag, or self-service grant.
+- `src/features/internal-operations` owns the guard.
+  `requireInternalOperator()` derives the user only from the authenticated
+  session, performs an exact-user lookup with no process/global cache, and
+  returns `ALLOWED`, `UNAUTHENTICATED`, `FORBIDDEN`, or `UNAVAILABLE`.
+  Missing/disabled mappings and Provider-backed users without a mapping are
+  `FORBIDDEN`; Auth/database faults are `UNAVAILABLE`.
+- The `/internal` layout and every sensitive internal page operation run the
+  guard. Anonymous visitors return to login with the sanitized `/internal`
+  destination; `FORBIDDEN` renders a 404 without internal data; `UNAVAILABLE`
+  renders a safe unavailable state without signing the user out.
+- Sensitive internal renders require `recordSensitiveInternalAccess(...)` to
+  succeed first. It re-runs the guard itself, refuses every non-`ALLOWED`
+  outcome, and then appends the audit event through a service-role-only
+  `SECURITY DEFINER` function. That function accepts only fixed operation
+  categories and rechecks the enabled mapping under `FOR SHARE` at write time,
+  so a revocation wins over a delayed append. Audit failure denies the render.
+- `internal_access_audit` is append-only. `service_role` may read but cannot
+  insert, update, or delete directly; no ordinary client can execute the audit
+  or admin functions, so operator access is not a publishable-key write
+  surface. Auth deletion removes the live mapping and nulls the direct user
+  references on retained audit rows through `ON DELETE SET NULL`; operation,
+  reason and timestamp remain and may stay linkable to external approval
+  records, so this is not full anonymization.
+- Internal audit retention/purge remains unapproved and is deliberately not
+  implemented (issue #87).
+- Private Feedback (issue #89): `feedback_submissions` and
+  `feedback_review_events` have RLS enabled, no policies, and no client grants.
+  `service_role` may only `SELECT`; direct writes bypassing the RPCs are denied.
+  `submit_feedback(...)` (service-role only) accepts a nonce retry without
+  changing the original and returns the same generic `ACCEPTED` receipt, so it
+  never discloses earlier content or whether a nonce existed.
+  `record_feedback_review(...)` (service-role only) accepts an operator UUID
+  that the server resolves from the verified internal session before it calls
+  the function. The SQL function does not read any session itself; it trusts
+  only the service-role caller. It rechecks the enabled mapping under
+  `FOR SHARE` before locking the feedback row, and commits the row update and
+  its history event together. `submit_feedback` is reserved for the public and Provider Feedback
+  adapters; review stays on the internal operator adapter. Reviewers and submissions referenced by
+  history are `ON DELETE RESTRICT`, so deleting an Auth identity cannot erase
+  review history.
+- Feedback privacy (PR #105 review): redaction and purge are owner-run SQL only,
+  never a browser, Provider, or service-role path. Each runs in one transaction
+  that ends with `rollback;` by default. The privacy audit
+  (`feedback_privacy_audit`) is append-only, with no client privilege and
+  `service_role` `SELECT` only. The audit operations are `FEEDBACK_REDACTED`,
+  `FEEDBACK_PURGED` and `FEEDBACK_PRIVACY_REVIEWED` (the kept mark, which changes
+  no text). A redaction bumps `row_version` and fills the
+  review stamp without overwriting it, so a triage form loaded before the
+  redaction is rejected with `FEEDBACK_VERSION_CONFLICT` and cannot restore
+  erased notes; the linked issue URL is retained. Routine access views stay `INTERNAL_ACCESS_VIEW` events
+  with a null reason. Policy approval for redaction and purge is issue #87 and
+  is not implied by this implementation.
+- Feedback abuse budget: the durable limiter gains a `feedback_submit`
+  operation (default 20 requests per 600 seconds), with its own
+  `PUBLIC_ABUSE_FEEDBACK_*` overrides. Its counter is independent of the
+  tracking and Repair Request counters.
+- Feedback summary (issue #90): `get_feedback_count_summary(...)` is service-role
+  only and rechecks the enabled operator mapping under `FOR SHARE`. It returns
+  fixed count groups for a bounded Asia/Manila calendar window and never message, notes, nonce,
+  identity, or row identifiers. Every internal Feedback read passes the operator
+  guard and the required access audit before its privileged query.
+- The current NEW feedback backlog uses the same operator guard and required
+  audit, then a service-role exact-count HEAD query over retained `NEW` rows.
+  It returns no row payload or identifiers and does not widen table grants.
+  Missing counts and query failures are unavailable, not zero.
+- The Feedback `feedback_submit` budget covers both public and Provider
+  submissions. Provider membership is resolved before the budget, and the budget
+  runs before any input is parsed.
+- Participant feedback surfaces (issue #91): `/feedback` (anonymous) and
+  `/dashboard/feedback` (Provider) read only `category`, `title`, `message`, and
+  the submission nonce from the form. `source` and participant class come from
+  the server (`PUBLIC_FEEDBACK` on the public page, derived from membership on the
+  Provider page), so a forged value never reaches storage. Entry links from
+  Tracking, the Request receipt, and the Provider nav carry no query string and
+  no Tracking Code or Request Reference. The participant copy and privacy notice
+  were owner-approved on 2026-10-30 (#87). Feedback is kept with a personal
+  review within 90 days, through the runbooks in `docs/OPERATIONS.md`.
+- Public privacy page (`/privacy`, owner decision on #87, decision 8 covers the
+  feedback text): static, anonymous, and read-free. Section 1 renders the same
+  `FeedbackPrivacyNotice` component as the feedback form, so the approved
+  wording cannot drift between the two. The page is linked from the public
+  feedback, Repair Request, `/track` and `/register` surfaces. The page shows
+  the project contact address (owner decision on #87, 2026-10-31).
+- Operational validation metrics (issue #93) independently require the operator
+  guard and a successful access audit. The aggregate RPC rechecks the enabled
+  mapping under `FOR SHARE` and is executable only by `service_role`. It returns
+  fixed count/mean/date groups and a database read timestamp, never raw records
+  or identifiers. The feature rejects unknown, duplicate or incomplete groups
+  instead of turning failed reads into zero activity. Feedback unavailability
+  is explicit; a Feedback authorization denial still denies the whole report.
+
 ## Public Provider and invitation projections
 
 Anonymous users cannot read raw Provider rows. `public_provider_profiles`
@@ -105,6 +263,12 @@ contact fields and update timestamps.
 Possessing a Staff invitation token permits a restricted lookup of the invited
 email and public Shop identity. The lookup does not return the Provider's
 private contact email or phone.
+
+Choosing Staff at registration creates an Auth identity only; no invitation code
+is required until onboarding. Membership and Provider access are granted only
+after Providers verifies and atomically accepts a valid invitation for that user.
+Codes supplied through shared registration links remain in the temporary
+HttpOnly onboarding cookie, never in Auth metadata.
 
 At most one active pending Staff invitation exists per Shop and normalized
 recipient email: `create_staff_invitation` reuses an existing active pending
@@ -133,6 +297,17 @@ membership is established every other currently-active pending invitation for
 that normalized email — including invitations held by other Shops while the
 recipient was still eligible — is superseded. Cross-Shop invitations remain
 independent only while the recipient has no membership.
+
+## Public health check
+
+`GET /api/health` is a deliberate public exception for the uptime monitor. It
+answers `{"status":"healthy"}` (200) or `{"status":"unavailable"}` (503) with
+`Cache-Control: no-store`. It has no cookies, auth, redirects or other fields.
+The probe is a deliberate, bounded exception to the service-role public-operation
+client (`createPublicOperationClient`) scope: a read-only, head-only, single-row
+query on `providers` with no table content, used only by `checkReadiness`,
+bounded by a 3-second timeout. Its failure logs carry only a fixed message and
+a SQLSTATE-shaped code.
 
 ## Server Actions and Route Handlers
 
@@ -273,6 +448,42 @@ opt-in is explicit and environment-based, so a staging or production deployment
 that forgets its ingress configuration fails closed instead of silently sharing
 one bucket. Arbitrary forwarded values cannot create additional buckets.
 
+### Vercel visitor IP source
+
+On Vercel, `PUBLIC_ABUSE_CLIENT_IP_SOURCE=vercel` replaces the trusted-ingress
+contract above. Vercel overwrites `X-Forwarded-For` and does not forward
+external visitor IPs, which is why that header is never read in this mode
+([Vercel request headers](https://vercel.com/docs/headers/request-headers)).
+The application instead trusts only `x-vercel-forwarded-for`. Vercel documents
+it as identical to `X-Forwarded-For`, but unlike that header it is not
+overwritten when a proxy sits in front of Vercel. The first entry must be a
+valid IP; otherwise the operation fails closed. The application ignores
+`x-tracknologia-proxy-secret`, `x-tracknologia-client-ip`, `x-forwarded-for`
+and `x-real-ip` in this mode, and `PUBLIC_ABUSE_TRUSTED_PROXY_SECRET` is not
+required. `PUBLIC_ABUSE_HMAC_SECRET` is still required, and the visitor IP is
+still stored only as the keyed HMAC actor key.
+
+The explicit setting keeps the trusted-ingress contract as the default. The
+`VERCEL=1` check is only a configuration sanity check. It makes the
+configuration throw at startup when the setting is copied to a host that does
+not set `VERCEL`. It is not proof of origin: anyone who controls a process's
+environment can set that variable, so it cannot establish where a request came
+from.
+
+Vercel mode is safe only when the application is actually served by Vercel's
+managed edge. There, Vercel overwrites `X-Forwarded-For` and does not forward
+external IPs, so `x-vercel-forwarded-for` carries the visitor IP. Never copy
+`PUBLIC_ABUSE_CLIENT_IP_SOURCE=vercel` together with `VERCEL=1` to a
+self-hosted or other host. A caller there could send arbitrary
+`x-vercel-forwarded-for` values, obtain a fresh abuse-control bucket on each
+request and bypass throttling. Other hosts must use the trusted-proxy mode,
+with its ingress proof.
+
+Residual risk: a proxy placed in front of Vercel would make every visitor that
+reaches the application through it appear with that proxy's IP, so they would
+share one bucket. This over-throttles rather than bypasses the limit, but the
+IP source must be revisited before such a proxy is introduced.
+
 The public Server Actions deliberately consume their budget before validating
 form input, so hostile traffic cannot obtain free schema validation probes from
 the application.
@@ -361,4 +572,14 @@ At minimum test:
   valid outcome;
 - Customer Updates are Provider-scoped, append-only, and independent of status;
 - concurrent lifecycle changes leave one consistent status/event outcome;
-- completed Repairs cannot be reopened and have a matching completion time.
+- completed Repairs cannot be reopened and have a matching completion time;
+- internal access is denied to anonymous, Provider OWNER/STAFF, and any user
+  without an enabled mapping, and the denial renders no internal data;
+- ordinary clients cannot execute the internal admin or audit functions, and
+  `service_role` can only read the private tables (no direct mutation);
+- revoking an internal mapping denies the next guarded request and the next
+  required audit append even for an existing session;
+- an invalid audit actor rolls back the mapping change and the required audit
+  event together;
+- Auth identity deletion removes the live mapping and nulls the direct user
+  references on retained audit events, leaving operation, reason and timestamp.

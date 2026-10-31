@@ -13,11 +13,12 @@ import { PasswordInput } from "@/components/ui/password-input";
 import { Label } from "@/components/ui/label";
 import { LoadingSpinner } from "@/components/ui/loading-spinner";
 
-export function LoginForm() {
+export function LoginForm({ redirectTo }: { redirectTo: string }) {
   const [state, formAction, isPending] = useActionState(loginAction, null);
 
   return (
     <form action={formAction} aria-busy={isPending} className="space-y-4">
+      <input type="hidden" name="redirectTo" value={redirectTo} />
       {state?.error && !state.fieldErrors && (
         <Alert variant="destructive">
           <HugeiconsIcon
@@ -79,7 +80,7 @@ export function LoginForm() {
             Signing in...
           </span>
         ) : (
-          "Sign in to Dashboard"
+          "Sign in"
         )}
       </Button>
     </form>

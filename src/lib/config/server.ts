@@ -13,15 +13,22 @@ export interface ServerConfig {
     url: string;
     origin: string;
   };
-  resend: {
-    apiKey: string | null;
-    fromEmail: string;
+  email: {
+    smtp: {
+      host: string;
+      port: number;
+      secure: boolean;
+      user: string;
+      password: string;
+    } | null;
+    from: string;
     isDevLogger: boolean;
   };
   publicAbuse: {
     hmacSecret: string;
     trustedProxySecret: string;
     sharedDevBucket: boolean;
+    clientIpSource: "trusted-proxy" | "vercel";
   };
   auth: {
     requireEmailConfirmation: boolean;
@@ -149,26 +156,38 @@ export function parseServerConfig(
     );
   }
 
-  // 3. Resend Configuration
-  const resendApiKey = env.RESEND_API_KEY?.trim() || null;
-  const resendFromEmail =
-    env.RESEND_FROM_EMAIL?.trim() || "Tracknologia <onboarding@resend.dev>";
-
-  if (runtime === "production") {
-    if (!resendApiKey) {
-      throw new Error(
-        "Configuration error: RESEND_API_KEY is required in production.",
-      );
-    }
-    if (resendFromEmail.includes("onboarding@resend.dev")) {
-      throw new Error(
-        "Configuration error: RESEND_FROM_EMAIL cannot use default onboarding@resend.dev address in production.",
-      );
-    }
+  // 3. Email Configuration (SMTP through nodemailer)
+  const smtpHost = env.SMTP_HOST?.trim() || "";
+  const smtpUser = env.SMTP_USER?.trim() || "";
+  const smtpPassword = env.SMTP_PASSWORD?.trim() || "";
+  const smtpConfigured = Boolean(smtpHost && smtpUser && smtpPassword);
+  if (!smtpConfigured && (smtpHost || smtpUser || smtpPassword)) {
+    throw new Error(
+      "Configuration error: SMTP_HOST, SMTP_USER and SMTP_PASSWORD must all be set, or all left unset.",
+    );
   }
 
-  const isDevLogger =
-    !resendApiKey && (runtime === "local" || runtime === "test");
+  const smtpPort = Number(env.SMTP_PORT?.trim() || "587");
+  if (
+    smtpConfigured &&
+    (!Number.isInteger(smtpPort) || smtpPort < 1 || smtpPort > 65535)
+  ) {
+    throw new Error(
+      "Configuration error: SMTP_PORT must be a whole number from 1 to 65535.",
+    );
+  }
+
+  const smtp = smtpConfigured
+    ? {
+        host: smtpHost,
+        port: smtpPort,
+        secure: smtpPort === 465,
+        user: smtpUser,
+        password: smtpPassword,
+      }
+    : null;
+  const emailFrom = env.EMAIL_FROM?.trim() || smtpUser;
+  const isDevLogger = !smtp && (runtime === "local" || runtime === "test");
 
   // 4. Public-Abuse & Ingress Secrets
   const hmacSecret = env.PUBLIC_ABUSE_HMAC_SECRET?.trim() || "";
@@ -178,13 +197,33 @@ export function parseServerConfig(
     env.PUBLIC_ABUSE_SHARED_DEV_BUCKET?.trim().toLowerCase();
   const sharedDevBucket = sharedDevBucketRaw === "true";
 
+  const clientIpSourceRaw =
+    env.PUBLIC_ABUSE_CLIENT_IP_SOURCE?.trim().toLowerCase();
+  if (
+    clientIpSourceRaw &&
+    clientIpSourceRaw !== "trusted-proxy" &&
+    clientIpSourceRaw !== "vercel"
+  ) {
+    throw new Error(
+      'Configuration error: PUBLIC_ABUSE_CLIENT_IP_SOURCE must be "trusted-proxy" or "vercel".',
+    );
+  }
+  const clientIpSource =
+    clientIpSourceRaw === "vercel" ? "vercel" : "trusted-proxy";
+  if (clientIpSource === "vercel" && env.VERCEL?.trim() !== "1") {
+    throw new Error(
+      "Configuration error: PUBLIC_ABUSE_CLIENT_IP_SOURCE=vercel requires running on Vercel (VERCEL=1).",
+    );
+  }
+
   if (hmacSecret.length < 32) {
     throw new Error(
       "Configuration error: PUBLIC_ABUSE_HMAC_SECRET must be at least 32 characters long.",
     );
   }
   const requiresTrustedProxySecret =
-    runtime === "production" || !sharedDevBucket;
+    clientIpSource === "trusted-proxy" &&
+    (runtime === "production" || !sharedDevBucket);
   if (requiresTrustedProxySecret && trustedProxySecret.length < 32) {
     throw new Error(
       "Configuration error: PUBLIC_ABUSE_TRUSTED_PROXY_SECRET must be at least 32 characters long.",
@@ -228,15 +267,16 @@ export function parseServerConfig(
       url: rawAppUrl,
       origin,
     },
-    resend: {
-      apiKey: resendApiKey,
-      fromEmail: resendFromEmail,
+    email: {
+      smtp,
+      from: emailFrom,
       isDevLogger,
     },
     publicAbuse: {
       hmacSecret,
       trustedProxySecret,
       sharedDevBucket,
+      clientIpSource,
     },
     auth: {
       requireEmailConfirmation,

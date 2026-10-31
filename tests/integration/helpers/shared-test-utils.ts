@@ -57,7 +57,7 @@ export function expectRpcPermissionDenied(result: {
 export async function checkPublicOperationLimit(
   client: SupabaseClient,
   params: {
-    operation: "tracking_lookup" | "repair_request_submit";
+    operation: "tracking_lookup" | "repair_request_submit" | "feedback_submit";
     actorKey: string;
     windowSeconds: number;
     maxRequests: number;

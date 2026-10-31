@@ -42,6 +42,7 @@ export function ProviderNav({
     { href: "/dashboard/requests", label: "Requests" },
     { href: "/dashboard/repairs", label: "Repairs" },
     ...(isShop ? [{ href: "/dashboard/team", label: "Team & Staff" }] : []),
+    { href: "/dashboard/feedback", label: "Feedback" },
     { href: "/dashboard/settings", label: "Settings" },
   ].map((link) => ({
     ...link,
@@ -150,8 +151,12 @@ export function ProviderNav({
             <DropdownMenuItem render={<Link href="/dashboard/settings" />}>
               Settings
             </DropdownMenuItem>
+            <DropdownMenuItem render={<Link href="/privacy" />}>
+              Privacy notice
+            </DropdownMenuItem>
             <DropdownMenuSeparator />
             <DropdownMenuItem
+              nativeButton
               render={<button type="submit" form="provider-sign-out" />}
             >
               Sign Out

@@ -37,6 +37,8 @@ beforeEach(() => {
   delete process.env.PUBLIC_ABUSE_TRACKING_LOOKUP_WINDOW_SECONDS;
   delete process.env.PUBLIC_ABUSE_REPAIR_REQUEST_MAX;
   delete process.env.PUBLIC_ABUSE_REPAIR_REQUEST_WINDOW_SECONDS;
+  delete process.env.PUBLIC_ABUSE_FEEDBACK_MAX;
+  delete process.env.PUBLIC_ABUSE_FEEDBACK_WINDOW_SECONDS;
   mocks.createPublicOperationClient.mockResolvedValue({ rpc: mocks.rpc });
 });
 
@@ -49,7 +51,22 @@ describe("durable public-operation abuse control", () => {
     expect(getRateLimitConfig().operations).toEqual({
       tracking_lookup: { max: 30, windowSeconds: 60 },
       repair_request_submit: { max: 5, windowSeconds: 600 },
+      feedback_submit: { max: 20, windowSeconds: 600 },
     });
+  });
+
+  it("accepts bounded feedback overrides independently of other operations", () => {
+    process.env.PUBLIC_ABUSE_FEEDBACK_MAX = "3";
+    process.env.PUBLIC_ABUSE_FEEDBACK_WINDOW_SECONDS = "120";
+    const operations = getRateLimitConfig().operations;
+    expect(operations.feedback_submit).toEqual({ max: 3, windowSeconds: 120 });
+    expect(operations.repair_request_submit).toEqual({
+      max: 5,
+      windowSeconds: 600,
+    });
+
+    process.env.PUBLIC_ABUSE_FEEDBACK_WINDOW_SECONDS = "86401";
+    expect(() => getRateLimitConfig()).toThrow();
   });
 
   it("rejects a missing or weak keyed-digest secret", () => {
@@ -187,5 +204,76 @@ describe("durable public-operation abuse control", () => {
     });
 
     await expect(resolveClientIdentifier()).rejects.toThrow();
+  });
+});
+
+describe("Vercel visitor IP source", () => {
+  function visitorHeaders(values: Record<string, string>) {
+    return { get: vi.fn((name: string) => values[name] ?? null) };
+  }
+
+  beforeEach(() => {
+    vi.stubEnv("VERCEL", "1");
+    vi.stubEnv("PUBLIC_ABUSE_CLIENT_IP_SOURCE", "vercel");
+  });
+
+  it("keys on the first x-vercel-forwarded-for entry without a proxy secret", async () => {
+    delete process.env.PUBLIC_ABUSE_TRUSTED_PROXY_SECRET;
+    mocks.headers.mockResolvedValue(
+      visitorHeaders({ "x-vercel-forwarded-for": "198.51.100.7, 10.0.0.1" }),
+    );
+
+    await expect(resolveClientIdentifier()).resolves.toBe("198.51.100.7");
+  });
+
+  it("accepts an IPv6 visitor", async () => {
+    mocks.headers.mockResolvedValue(
+      visitorHeaders({ "x-vercel-forwarded-for": "2001:db8::1, 10.0.0.1" }),
+    );
+
+    await expect(resolveClientIdentifier()).resolves.toBe("2001:db8::1");
+  });
+
+  it.each([[undefined], [""], ["not-an-ip"], [", 198.51.100.7"]])(
+    "fails closed when x-vercel-forwarded-for is %s",
+    async (value) => {
+      mocks.headers.mockResolvedValue(
+        visitorHeaders(
+          value === undefined ? {} : { "x-vercel-forwarded-for": value },
+        ),
+      );
+
+      await expect(resolveClientIdentifier()).rejects.toThrow(
+        "trusted ingress metadata is invalid",
+      );
+    },
+  );
+
+  it("ignores forged proof and forwarding headers, reading only x-vercel-forwarded-for", async () => {
+    const headerList = visitorHeaders({
+      "x-vercel-forwarded-for": "198.51.100.7",
+      "x-tracknologia-proxy-secret": PROXY_SECRET,
+      "x-tracknologia-client-ip": "192.0.2.1",
+      "x-forwarded-for": "192.0.2.2",
+      "x-real-ip": "192.0.2.3",
+    });
+    mocks.headers.mockResolvedValue(headerList);
+
+    await expect(resolveClientIdentifier()).resolves.toBe("198.51.100.7");
+    expect(headerList.get.mock.calls).toEqual([["x-vercel-forwarded-for"]]);
+  });
+
+  it("does not fall back to forged forwarding headers when Vercel's header is absent", async () => {
+    mocks.headers.mockResolvedValue(
+      visitorHeaders({
+        "x-tracknologia-client-ip": "192.0.2.1",
+        "x-forwarded-for": "192.0.2.2",
+        "x-real-ip": "192.0.2.3",
+      }),
+    );
+
+    await expect(resolveClientIdentifier()).rejects.toThrow(
+      "trusted ingress metadata is invalid",
+    );
   });
 });

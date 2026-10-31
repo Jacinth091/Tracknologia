@@ -52,6 +52,7 @@ supabase/.branches/
 
 # local agent/session tool artifacts
 .headroom/
+.herdr-loop/
 
 # UAT data-pack run manifests (credentials for local testers)
 /scripts/uat/outputs/

@@ -144,6 +144,16 @@ function RequestReceiptCard({
             Back to home
           </Link>
         </div>
+
+        <p className="text-sm text-muted-foreground">
+          How was sending this request?{" "}
+          <Link
+            href="/feedback"
+            className="font-medium text-foreground underline underline-offset-4"
+          >
+            Send feedback
+          </Link>
+        </p>
       </CardContent>
     </Card>
   );
@@ -519,6 +529,15 @@ export function RepairRequestForm({
           "Submit Repair Request"
         )}
       </Button>
+
+      <p className="text-sm text-muted-foreground">
+        <Link
+          href="/privacy"
+          className="font-medium text-foreground underline underline-offset-4"
+        >
+          Privacy notice
+        </Link>
+      </p>
     </form>
   );
 }

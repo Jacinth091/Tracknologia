@@ -1,4 +1,4 @@
-import { beforeEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 const mocks = vi.hoisted(() => ({
   after: vi.fn(),
@@ -66,8 +66,9 @@ beforeEach(() => {
   process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY =
     "sb_publishable_production_test_key";
   process.env.SUPABASE_SERVICE_ROLE_KEY = "service-role-production-test-key";
-  process.env.RESEND_API_KEY = "re_production_test_key";
-  process.env.RESEND_FROM_EMAIL = "Tracknologia <support@example.com>";
+  process.env.SMTP_HOST = "smtp.gmail.com";
+  process.env.SMTP_USER = "project@gmail.com";
+  process.env.SMTP_PASSWORD = "smtp-production-test-password";
   process.env.PUBLIC_ABUSE_HMAC_SECRET = HMAC_SECRET;
   process.env.PUBLIC_ABUSE_TRUSTED_PROXY_SECRET = PROXY_SECRET;
   process.env.NEXT_PUBLIC_REQUIRE_EMAIL_CONFIRMATION = "true";
@@ -155,6 +156,10 @@ beforeEach(() => {
   });
 });
 
+afterEach(() => {
+  vi.unstubAllEnvs();
+});
+
 describe("public actions under validated production ingress", () => {
   it("looks up Tracking through trusted ingress and durable abuse control", async () => {
     await expect(trackRepairAction(null, trackingFormData())).resolves.toEqual({
@@ -225,5 +230,27 @@ describe("public actions under validated production ingress", () => {
 
     expect(mocks.rpc).not.toHaveBeenCalled();
     expect(mocks.from).not.toHaveBeenCalled();
+  });
+
+  it("looks up Tracking through Vercel's visitor IP without a proxy secret", async () => {
+    vi.stubEnv("VERCEL", "1");
+    vi.stubEnv("PUBLIC_ABUSE_CLIENT_IP_SOURCE", "vercel");
+    delete process.env.PUBLIC_ABUSE_TRUSTED_PROXY_SECRET;
+    mocks.headerGet.mockImplementation((name: string) =>
+      name === "x-vercel-forwarded-for" ? `${CLIENT_IP}, 10.0.0.1` : null,
+    );
+
+    await expect(trackRepairAction(null, trackingFormData())).resolves.toEqual({
+      outcome: "found",
+      view: expect.objectContaining({
+        trackingCode: TRACKING_CODE,
+        providerDisplayName: "Downtown Repair",
+      }),
+    });
+
+    expectOpaqueRateLimitCall("tracking_lookup", {
+      max: 30,
+      windowSeconds: 60,
+    });
   });
 });

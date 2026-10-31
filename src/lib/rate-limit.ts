@@ -19,12 +19,18 @@ const rateLimitOverridesSchema = z.object({
   PUBLIC_ABUSE_REPAIR_REQUEST_WINDOW_SECONDS: positiveInteger
     .max(86_400)
     .default(600),
+  PUBLIC_ABUSE_FEEDBACK_MAX: positiveInteger.max(10_000).default(20),
+  PUBLIC_ABUSE_FEEDBACK_WINDOW_SECONDS: positiveInteger
+    .max(86_400)
+    .default(600),
 });
 
 const TRUSTED_PROXY_PROOF_HEADER = "x-tracknologia-proxy-secret";
 const TRUSTED_CLIENT_IP_HEADER = "x-tracknologia-client-ip";
+const VERCEL_FORWARDED_FOR_HEADER = "x-vercel-forwarded-for";
 const LOCAL_DEVELOPMENT_IDENTIFIER = "local-development-shared";
-export type RateLimitOperation = "tracking_lookup" | "repair_request_submit";
+export type RateLimitOperation =
+  "tracking_lookup" | "repair_request_submit" | "feedback_submit";
 
 export interface RateLimitResult {
   allowed: boolean;
@@ -45,6 +51,10 @@ export function getRateLimitConfig() {
       repair_request_submit: {
         windowSeconds: overrides.PUBLIC_ABUSE_REPAIR_REQUEST_WINDOW_SECONDS,
         max: overrides.PUBLIC_ABUSE_REPAIR_REQUEST_MAX,
+      },
+      feedback_submit: {
+        windowSeconds: overrides.PUBLIC_ABUSE_FEEDBACK_WINDOW_SECONDS,
+        max: overrides.PUBLIC_ABUSE_FEEDBACK_MAX,
       },
     },
   } as const;
@@ -70,6 +80,17 @@ export async function resolveClientIdentifier(): Promise<string> {
   }
 
   const headerList = await headers();
+  if (config.publicAbuse.clientIpSource === "vercel") {
+    // Vercel overwrites X-Forwarded-For and does not forward external IPs, but
+    // x-vercel-forwarded-for survives an outer proxy (see docs/SECURITY.md).
+    const visitorIp =
+      headerList.get(VERCEL_FORWARDED_FOR_HEADER)?.split(",")[0].trim() ?? "";
+    if (!isIP(visitorIp)) {
+      throw new Error("Public operation trusted ingress metadata is invalid");
+    }
+    return visitorIp;
+  }
+
   const suppliedProof = headerList.get(TRUSTED_PROXY_PROOF_HEADER) ?? "";
   if (
     !constantTimeSecretMatch(

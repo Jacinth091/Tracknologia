@@ -1,7 +1,8 @@
 "use client";
 
-import { useActionState } from "react";
+import { useActionState, useState, useSyncExternalStore } from "react";
 import { HugeiconsIcon } from "@hugeicons/react";
+import Link from "next/link";
 import {
   AlertCircleIcon,
   CheckmarkCircle02Icon,
@@ -10,6 +11,7 @@ import {
   Home01Icon,
   MoreHorizontalCircle01Icon,
   Package01Icon,
+  SquareLock02Icon,
   Store01Icon,
   Tick02Icon,
   UserIcon,
@@ -17,6 +19,7 @@ import {
 
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
+import { buttonVariants } from "@/components/ui/button";
 import {
   Card,
   CardContent,
@@ -30,6 +33,7 @@ import { LoadingSpinner } from "@/components/ui/loading-spinner";
 import { Switch } from "@/components/ui/switch";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Textarea } from "@/components/ui/textarea";
+import { DeviceCategoryFields } from "@/features/providers/ui/device-category-fields";
 import type {
   Provider,
   ProviderServiceMode,
@@ -71,6 +75,18 @@ const SERVICE_MODE_OPTIONS = [
   },
 ] as const;
 
+const DESKTOP_LAYOUT_QUERY = "(min-width: 1024px)";
+
+function subscribeToDesktopLayout(onChange: () => void) {
+  const query = window.matchMedia(DESKTOP_LAYOUT_QUERY);
+  query.addEventListener("change", onChange);
+  return () => query.removeEventListener("change", onChange);
+}
+
+function getDesktopLayout() {
+  return window.matchMedia(DESKTOP_LAYOUT_QUERY).matches;
+}
+
 function ActionMessage({ state }: { state: SettingsActionState | null }) {
   if (state?.error) {
     return (
@@ -110,6 +126,7 @@ interface SettingsClientProps {
   personalProfile: ProviderUserProfile;
   serviceModes: ProviderServiceMode[];
   canManageProvider: boolean;
+  accountEmail: string | null;
   requestLinkUrl: string;
 }
 
@@ -118,8 +135,17 @@ export function SettingsClient({
   personalProfile,
   serviceModes,
   canManageProvider,
+  accountEmail,
   requestLinkUrl,
 }: SettingsClientProps) {
+  const [acceptingRequests, setAcceptingRequests] = useState(
+    provider.acceptingRequests,
+  );
+  const desktopLayout = useSyncExternalStore(
+    subscribeToDesktopLayout,
+    getDesktopLayout,
+    () => false,
+  );
   const [personalState, personalAction, personalPending] = useActionState(
     updatePersonalProfileAction,
     null,
@@ -223,150 +249,180 @@ export function SettingsClient({
         </CardDescription>
       </CardHeader>
       <CardContent>
-        <form action={providerAction} className="space-y-4">
+        <form action={providerAction} className="space-y-6">
           <ActionMessage state={providerState} />
-          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-            <div className="space-y-2">
-              <Label htmlFor="provider-type">Provider Type</Label>
-              <Input
-                id="provider-type"
-                value={
-                  provider.providerType === "SHOP"
-                    ? "Repair Shop"
-                    : "Independent Repairer"
-                }
-                disabled
-                readOnly
-              />
-            </div>
-            <div className="space-y-2">
-              <Label htmlFor="provider-slug">Public Slug</Label>
-              <Input
-                id="provider-slug"
-                value={provider.slug}
-                disabled
-                readOnly
-              />
-            </div>
-          </div>
-          <div className="space-y-2">
-            <Label htmlFor="provider-displayName">Provider Name</Label>
-            <Input
-              id="provider-displayName"
-              name="displayName"
-              defaultValue={provider.displayName}
-              required
-              disabled={providerPending}
-            />
-          </div>
-          <div className="space-y-2">
-            <Label htmlFor="provider-description">Description</Label>
-            <Textarea
-              id="provider-description"
-              name="description"
-              defaultValue={provider.description ?? ""}
-              maxLength={1000}
-              disabled={providerPending}
-            />
-          </div>
-          <div className="space-y-2">
-            <Label htmlFor="provider-image">Profile Image URL</Label>
-            <Input
-              id="provider-image"
-              name="profileImageUrl"
-              type="url"
-              defaultValue={provider.profileImageUrl ?? ""}
-              placeholder="https://example.com/provider.jpg"
-              disabled={providerPending}
-            />
-          </div>
-          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-            <div className="space-y-2">
-              <Label htmlFor="provider-email">Contact Email</Label>
-              <Input
-                id="provider-email"
-                name="contactEmail"
-                type="email"
-                defaultValue={provider.contactEmail ?? ""}
-                disabled={providerPending}
-              />
-            </div>
-            <div className="space-y-2">
-              <Label htmlFor="provider-phone">Contact Phone</Label>
-              <Input
-                id="provider-phone"
-                name="contactPhone"
-                type="tel"
-                defaultValue={provider.contactPhone ?? ""}
-                disabled={providerPending}
-              />
-            </div>
-            <div className="space-y-2">
-              <Label htmlFor="provider-address">Public Address</Label>
-              <Input
-                id="provider-address"
-                name="publicAddress"
-                defaultValue={provider.publicAddress ?? ""}
-                disabled={providerPending}
-              />
-            </div>
-            <div className="space-y-2">
-              <Label htmlFor="provider-area">Service Area</Label>
-              <Input
-                id="provider-area"
-                name="serviceArea"
-                defaultValue={provider.serviceArea ?? ""}
-                disabled={providerPending}
-              />
-            </div>
-          </div>
-          <div className="space-y-2">
-            <Label htmlFor="provider-devices">Supported Devices</Label>
-            <Input
-              id="provider-devices"
-              name="supportedDevices"
-              defaultValue={provider.supportedDevices.join(", ")}
-              placeholder="Smartphones, Laptops, Tablets"
-              disabled={providerPending}
-            />
-            <p className="text-xs text-muted-foreground">
-              Separate device categories with commas.
-            </p>
-          </div>
-          <div className="flex items-start justify-between gap-4 rounded-lg border border-input bg-card p-3">
-            <div className="space-y-1">
-              <p
-                id="accepting-requests-label"
-                className="text-sm font-medium text-foreground"
-              >
-                Accept new Repair Requests
-              </p>
-              <p className="text-xs text-muted-foreground">
-                Let customers submit requests through your Provider link.
-              </p>
-            </div>
-            <Switch
-              name="acceptingRequests"
-              aria-labelledby="accepting-requests-label"
-              size="lg"
-              defaultChecked={provider.acceptingRequests}
-              disabled={providerPending}
-              className="mt-0.5"
-            />
-          </div>
-          <Button
-            type="submit"
-            disabled={providerPending}
-            className="w-full sm:w-auto"
+          <section
+            className="space-y-4"
+            aria-labelledby="business-identity-heading"
           >
-            {providerPending ? (
-              <span className="flex items-center gap-2">
-                <LoadingSpinner size="sm" /> Saving Provider...
-              </span>
-            ) : (
-              "Save Provider Profile"
-            )}
-          </Button>
+            <h3
+              id="business-identity-heading"
+              className="text-sm font-semibold"
+            >
+              Business identity
+            </h3>
+            <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+              <div className="space-y-2">
+                <Label htmlFor="provider-type">Provider Type</Label>
+                <Input
+                  id="provider-type"
+                  value={
+                    provider.providerType === "SHOP"
+                      ? "Repair Shop"
+                      : "Independent Repairer"
+                  }
+                  disabled
+                  readOnly
+                />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="provider-slug">Public Slug</Label>
+                <Input
+                  id="provider-slug"
+                  value={provider.slug}
+                  disabled
+                  readOnly
+                />
+              </div>
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="provider-displayName">Provider Name</Label>
+              <Input
+                id="provider-displayName"
+                name="displayName"
+                defaultValue={provider.displayName}
+                required
+                disabled={providerPending}
+              />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="provider-description">Description</Label>
+              <Textarea
+                id="provider-description"
+                name="description"
+                defaultValue={provider.description ?? ""}
+                maxLength={1000}
+                disabled={providerPending}
+              />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="provider-image">Profile Image URL</Label>
+              <Input
+                id="provider-image"
+                name="profileImageUrl"
+                type="url"
+                defaultValue={provider.profileImageUrl ?? ""}
+                placeholder="https://example.com/provider.jpg"
+                disabled={providerPending}
+              />
+            </div>
+          </section>
+          <section
+            className="space-y-4 border-t border-border pt-6"
+            aria-labelledby="business-contact-heading"
+          >
+            <h3 id="business-contact-heading" className="text-sm font-semibold">
+              Contact &amp; location
+            </h3>
+            <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+              <div className="space-y-2">
+                <Label htmlFor="provider-email">Customer Contact Email</Label>
+                <Input
+                  id="provider-email"
+                  name="contactEmail"
+                  type="email"
+                  defaultValue={provider.contactEmail ?? ""}
+                  disabled={providerPending}
+                />
+                <p className="text-xs leading-relaxed text-muted-foreground">
+                  Shown publicly for repair inquiries. This is not your sign-in
+                  email; editing it never changes sign-in credentials or
+                  recovery delivery.
+                </p>
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="provider-phone">Contact Phone</Label>
+                <Input
+                  id="provider-phone"
+                  name="contactPhone"
+                  type="tel"
+                  defaultValue={provider.contactPhone ?? ""}
+                  disabled={providerPending}
+                />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="provider-address">Public Address</Label>
+                <Input
+                  id="provider-address"
+                  name="publicAddress"
+                  defaultValue={provider.publicAddress ?? ""}
+                  disabled={providerPending}
+                />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="provider-area">Service Area</Label>
+                <Input
+                  id="provider-area"
+                  name="serviceArea"
+                  defaultValue={provider.serviceArea ?? ""}
+                  disabled={providerPending}
+                />
+              </div>
+            </div>
+          </section>
+          <section
+            className="space-y-4 border-t border-border pt-6"
+            aria-labelledby="business-services-heading"
+          >
+            <h3
+              id="business-services-heading"
+              className="text-sm font-semibold"
+            >
+              Services offered
+            </h3>
+            <DeviceCategoryFields
+              selected={provider.supportedDevices}
+              disabled={providerPending}
+              error={providerState?.fieldErrors?.supportedDevices}
+            />
+            <div className="flex items-start justify-between gap-4 rounded-lg border border-input bg-card p-3">
+              <div className="space-y-1">
+                <p
+                  id="accepting-requests-label"
+                  className="text-sm font-medium text-foreground"
+                >
+                  Accept new Repair Requests
+                </p>
+                <p className="text-xs text-muted-foreground">
+                  Let customers submit requests through your Provider link.
+                </p>
+              </div>
+              <Switch
+                name="acceptingRequests"
+                aria-labelledby="accepting-requests-label"
+                size="lg"
+                checked={acceptingRequests}
+                onCheckedChange={setAcceptingRequests}
+                disabled={providerPending}
+                className="mt-0.5"
+              />
+            </div>
+          </section>
+          <div className="border-t border-border pt-6">
+            <Button
+              type="submit"
+              disabled={providerPending}
+              className="w-full sm:w-auto"
+            >
+              {providerPending ? (
+                <span className="flex items-center gap-2">
+                  <LoadingSpinner size="sm" /> Saving Provider...
+                </span>
+              ) : (
+                "Save Provider Profile"
+              )}
+            </Button>
+          </div>
         </form>
       </CardContent>
     </Card>
@@ -389,7 +445,7 @@ export function SettingsClient({
         </CardDescription>
       </CardHeader>
       <CardContent>
-        <form action={modeAction} className="space-y-4">
+        <form action={modeAction} className="group/service-modes space-y-4">
           <ActionMessage state={modeState} />
           <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-4">
             {SERVICE_MODE_OPTIONS.map((option) => (
@@ -432,7 +488,7 @@ export function SettingsClient({
               </label>
             ))}
           </div>
-          <div className="space-y-2">
+          <div className="hidden space-y-2 group-has-[input[value=OTHER]:checked]/service-modes:block">
             <Label htmlFor="mode-other-details">
               Other Arrangement Details
             </Label>
@@ -462,9 +518,66 @@ export function SettingsClient({
     </Card>
   );
 
+  const accountPanel = (
+    <Card>
+      <CardHeader>
+        <CardTitle className="flex items-center gap-2.5 text-lg">
+          <HugeiconsIcon
+            icon={SquareLock02Icon}
+            strokeWidth={1.8}
+            className="size-4 text-muted-foreground"
+            aria-hidden="true"
+          />
+          Account &amp; Security
+        </CardTitle>
+        <CardDescription>
+          The sign-in identity for this person&apos;s Tracknologia account.
+        </CardDescription>
+      </CardHeader>
+      <CardContent className="space-y-6">
+        <div className="space-y-2">
+          <Label htmlFor="account-signin-email">Sign-in email</Label>
+          <Input
+            id="account-signin-email"
+            value={accountEmail ?? ""}
+            disabled
+            readOnly
+          />
+          <p className="text-xs leading-relaxed text-muted-foreground">
+            This is the email you sign in with. Password recovery emails are
+            sent here, never to the customer contact email. It is separate from
+            your Provider&apos;s public contact email and cannot be changed
+            here.
+          </p>
+        </div>
+        <section
+          className="space-y-2 border-t border-border pt-5"
+          aria-labelledby="account-password-heading"
+        >
+          <h3 id="account-password-heading" className="text-sm font-semibold">
+            Password
+          </h3>
+          <p className="text-xs leading-relaxed text-muted-foreground">
+            Forgot your password, or want to change it? Request a password
+            recovery email from your sign-in email&apos;s recovery form; each
+            person recovers their own account, and Staff never use the Shop
+            Owner&apos;s credentials.
+          </p>
+          <Link
+            href="/forgot-password"
+            className={buttonVariants({ variant: "outline" })}
+          >
+            Open password recovery
+          </Link>
+        </section>
+      </CardContent>
+    </Card>
+  );
+
   if (!canManageProvider) {
     return (
       <div className="space-y-6">
+        {accountPanel}
         {personalPanel}
         <RequestLinkCard
           url={requestLinkUrl}
@@ -494,48 +607,82 @@ export function SettingsClient({
   return (
     <Tabs
       defaultValue="profile"
-      className="w-full flex-col gap-5 lg:flex-row lg:items-start"
+      orientation={desktopLayout ? "vertical" : "horizontal"}
+      className="grid w-full gap-6 lg:grid-cols-[12rem_minmax(0,1fr)] lg:items-start"
     >
-      <TabsList className="w-full justify-start sm:w-fit lg:h-auto lg:w-56 lg:shrink-0 lg:flex-col lg:items-stretch lg:justify-start lg:rounded-xl">
-        <TabsTrigger value="profile" className="lg:w-full lg:justify-start">
-          <HugeiconsIcon icon={UserIcon} strokeWidth={1.8} aria-hidden="true" />
+      <TabsList
+        aria-label="Settings sections"
+        className="w-full gap-1 group-data-horizontal/tabs:h-auto lg:sticky lg:top-6 lg:items-stretch"
+      >
+        <TabsTrigger
+          value="profile"
+          className="min-h-11 px-2 text-xs sm:text-sm"
+        >
+          <HugeiconsIcon
+            icon={UserIcon}
+            strokeWidth={1.8}
+            aria-hidden="true"
+            className="hidden sm:block"
+          />
           Profile
         </TabsTrigger>
-        <TabsTrigger value="business" className="lg:w-full lg:justify-start">
+        <TabsTrigger
+          value="business"
+          className="min-h-11 px-2 text-xs sm:text-sm"
+        >
           <HugeiconsIcon
             icon={Store01Icon}
             strokeWidth={1.8}
             aria-hidden="true"
+            className="hidden sm:block"
           />
           Business
         </TabsTrigger>
         <TabsTrigger
+          value="account"
+          className="min-h-11 px-2 text-xs sm:text-sm"
+        >
+          <HugeiconsIcon
+            icon={SquareLock02Icon}
+            strokeWidth={1.8}
+            aria-hidden="true"
+            className="hidden sm:block"
+          />
+          Account
+        </TabsTrigger>
+        <TabsTrigger
           value="service-modes"
-          className="lg:w-full lg:justify-start"
+          className="min-h-11 px-2 text-xs sm:text-sm"
         >
           <HugeiconsIcon
             icon={DeliveryTruck01Icon}
             strokeWidth={1.8}
             aria-hidden="true"
+            className="hidden sm:block"
           />
           Service modes
         </TabsTrigger>
       </TabsList>
-      <TabsContent value="profile" className="min-w-0 flex-1">
-        {personalPanel}
-      </TabsContent>
-      <TabsContent value="business" className="min-w-0 flex-1">
-        <div className="space-y-6">
-          <RequestLinkCard
-            url={requestLinkUrl}
-            acceptingRequests={provider.acceptingRequests}
-          />
-          {providerPanel}
-        </div>
-      </TabsContent>
-      <TabsContent value="service-modes" className="min-w-0 flex-1">
-        {serviceModesPanel}
-      </TabsContent>
+      <div className="min-w-0 w-full">
+        <TabsContent value="profile" className="w-full">
+          {personalPanel}
+        </TabsContent>
+        <TabsContent value="business" className="w-full">
+          <div className="space-y-6">
+            <RequestLinkCard
+              url={requestLinkUrl}
+              acceptingRequests={provider.acceptingRequests}
+            />
+            {providerPanel}
+          </div>
+        </TabsContent>
+        <TabsContent value="service-modes" className="w-full">
+          {serviceModesPanel}
+        </TabsContent>
+        <TabsContent value="account" className="w-full">
+          {accountPanel}
+        </TabsContent>
+      </div>
     </Tabs>
   );
 }

@@ -7,7 +7,7 @@ import {
 } from "@/features/providers";
 import { getAppOrigin } from "@/lib/config/server";
 import { createClient } from "@/lib/supabase/server";
-import { PageHeader } from "../_components/page-header";
+import { PageHeader } from "@/components/shared/page-header";
 import { RequestLinkCard } from "../_components/request-link-card";
 import { TeamClient } from "./_components/team-client";
 
@@ -34,7 +34,6 @@ export default async function TeamPage() {
   return (
     <div className="space-y-6">
       <PageHeader
-        eyebrow="Team"
         title="Team & Staff Management"
         description={`Manage staff members, invitations, and workshop access for ${context.providerName}`}
       />

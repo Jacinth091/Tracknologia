@@ -48,7 +48,7 @@ export async function inviteStaffAction(
 
     if (!result.emailDeliverySuccess) {
       return {
-        success: `Invitation created for ${result.invitation.email}, but email delivery failed. Copy this link now, or revoke the invitation and invite again to generate and deliver a new link.`,
+        success: `Invitation created for ${result.invitation.email}, but the email was not sent. Copy this link now and share it directly, or revoke the invitation and invite again to create a new link.`,
         token: result.rawToken,
         inviteUrl: result.inviteUrl,
         emailDeliveryFailed: true,

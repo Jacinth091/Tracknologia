@@ -1,4 +1,4 @@
-import { renderToStaticMarkup } from "react-dom/server";
+import { renderToReadableStream, renderToStaticMarkup } from "react-dom/server";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import { StatusGauge } from "@/components/shared/status-gauge";
@@ -23,6 +23,9 @@ vi.mock("react", async (importOriginal) => ({
   useActionState: actionState,
 }));
 vi.mock("next/navigation", () => ({ usePathname: pathname }));
+vi.mock("next/headers", () => ({
+  cookies: vi.fn(async () => ({ getAll: () => [] })),
+}));
 vi.mock("@/app/(auth)/actions", () => ({
   registerAction: vi.fn(),
   signOutAction: vi.fn(),
@@ -95,6 +98,7 @@ describe("Provider navigation", () => {
     ["/dashboard", "Dashboard"],
     ["/dashboard/repairs/repair-1", "Repairs"],
     ["/dashboard/requests/request-1", "Requests"],
+    ["/dashboard/feedback", "Feedback"],
     ["/dashboard/settings", "Settings"],
   ])("marks only the current section for %s", (route, label) => {
     pathname.mockReturnValue(route);
@@ -141,12 +145,14 @@ describe("Provider navigation", () => {
       "Requests",
       "Repairs",
       "Team &amp; Staff",
+      "Feedback",
       "Settings",
     ]);
     expect(linkLabels(false)).toEqual([
       "Dashboard",
       "Requests",
       "Repairs",
+      "Feedback",
       "Settings",
     ]);
   });
@@ -225,9 +231,11 @@ describe("customer tracking", () => {
   ])(
     "only accepts valid Request references from URL prefill: %s",
     async (code, expected) => {
-      const html = renderToStaticMarkup(
-        await TrackRepairPage({ searchParams: Promise.resolve({ code }) }),
-      );
+      const html = await new Response(
+        await renderToReadableStream(
+          await TrackRepairPage({ searchParams: Promise.resolve({ code }) }),
+        ),
+      ).text();
       expect(html).toMatch(
         new RegExp(`<input[^>]*name="trackingCode"[^>]*value="${expected}"`),
       );

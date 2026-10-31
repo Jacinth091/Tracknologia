@@ -18,7 +18,11 @@ High-value examples:
 - public tracking projection excludes private fields;
 - successful Tracking records one minimal analytics observation;
 - the Tracking action returns before an unresolved deferred Analytics task;
-- Analytics failure does not log the credential/database detail.
+- Analytics failure does not log the credential/database detail;
+- the internal-operator guard denies missing/disabled mappings and Provider
+  roles, fails closed on Auth/database/audit faults, and the sensitive audit
+  path re-runs the guard and appends only the fixed category for the verified
+  operator.
 
 ### Rendered UI contracts — Vitest
 
@@ -27,6 +31,24 @@ renderer to check status illustrations, accessible names, current navigation,
 tracking outcomes and URL prefill, Request receipts, and native account radios.
 It supplies action results at the rendering seam; it does not exercise browser
 events, real Server Action transport, responsive layout, or computed styles.
+
+Page trees containing async Server Components (such as `PublicHeader`) use
+`renderToReadableStream` and consume the stream before asserting on the HTML.
+`renderToStaticMarkup` remains suitable for synchronous component trees.
+
+`tests/contracts/feedback-ui.contract.test.tsx` applies the same method to the
+participant feedback form: category radios and prompts, field-error wiring,
+pending, alert and receipt states, the plain `/feedback` links from Tracking and
+the Request receipt, the Provider nav Feedback item, and the public and Provider
+page nonce and context wiring.
+
+`src/app/(internal)/internal/activity/page.test.tsx` renders the operator
+validation metrics page with `getValidationMetrics` and the access guard mocked
+at the feature seam. It checks that values render, that `null` ratios and
+unavailable Feedback show as N/A and Unavailable rather than 0, that each
+`MetricsError` code and the unauthenticated redirect map to their outcome, that
+URL params map to the window input with a 7-day default, and that no raw
+identifiers appear in the HTML. It needs no database.
 
 Avoid testing implementation details or Tailwind class strings unless they are functionally significant.
 
@@ -67,9 +89,56 @@ Mandatory release scenarios (one spec file each under `tests/e2e/`):
    shop address, then operates a normal non-shop-mode Repair.
 5. `cross-tenant.spec.ts` — Provider A cannot read **or mutate** Provider B's
    protected data; B's durable Repair state is unchanged after A's attempts.
-6. `staff-lifecycle.spec.ts` — OWNER invites, Staff accepts, gets permitted
+6. `staff-lifecycle.spec.ts` — OWNER invites, Staff registers via an invitation
+   link or enters the code during onboarding, accepts, gets permitted
    access, owner-only controls are denied, OWNER removes Staff, access is
    denied.
+7. `password-recovery.spec.ts` (#126) — real forgot-password request with the
+   full neutral copy → captured recovery email → callback exchange → reset form
+   naming the account by masked email → new password. A reused link lands on
+   the recovery error state, and the old password is refused while the new one
+   signs in. Account & Security keeps the read-only sign-in email separate from
+   the customer contact email, using its own account. A recovery link opened
+   while signed in as another account recovers that account and ends signed in
+   as it. An unauthenticated bare `/reset-password` visit shows the recovery
+   screen. Each scenario seeds its own accounts; only the serial recovery flow
+   shares one account. Retries stay at zero and there is one worker.
+
+Password recovery mail is read from the local stack's mail capture, which the
+Supabase CLI runs as Mailpit. The repo default keeps capture off:
+`supabase/config.toml` `[local_smtp]` has `enabled = false`. The E2E workflow
+switches it on with a `sed` step before `supabase start`, so only the
+disposable E2E stack captures mail. The helper, `tests/e2e/helpers/mail.ts`,
+calls the Mailpit v1 API on `[local_smtp] port` (default `54324`):
+`GET /api/v1/search?query=to:"<address>"` lists the recipient's messages, and
+`GET /api/v1/message/{ID}` reads one. The helper takes the newest matching
+message, checks its `To` list, and extracts the recovery link from its `Text`
+or `HTML`. Purging uses `DELETE /api/v1/search` with the same query. Override
+the URL with `E2E_MAILPIT_URL` if the port moves. Like every destructive
+fixture, it refuses non-local hosts. The local app callback is
+`http://localhost:3000/auth/callback`; `site_url` and
+`additional_redirect_urls` in `supabase/config.toml` allow it.
+
+Participant feedback has its own spec, `tests/e2e/feedback.spec.ts` (E2E-10),
+outside the numbered release list. It drives the real public and Provider forms
+and asserts stored rows through the service client. The `feedback_submit` limiter
+is one shared dev bucket (20 per 600 seconds across public and Provider
+submissions), so every scenario deletes that limiter row through trusted SQL
+before and after it runs. The throttle scenario sends 20 accepted submissions,
+then a 21st that is refused. Each scenario also writes titles with a per-run marker,
+scopes its reads to that marker, and deletes its rows through `runLocalSql` before
+its actors are removed.
+
+`provider-settings.spec.ts` checks the settings layout at desktop and phone
+widths, consistent panel widths, orientation-appropriate arrow-key navigation,
+and the conditional Other arrangement field. It uses the same local-only
+Provider fixtures as the release scenarios.
+
+It also saves device checkbox selections and the request-acceptance switch,
+checks persistence after reload, and checks for the uncontrolled Switch warning.
+`public-recovery.spec.ts` checks that an unknown route retains HTTP 404 and offers
+working navigation back home. Rendered contracts cover the unavailable-request
+copy and the available Provider form path.
 
 Reliability rules:
 
@@ -93,6 +162,10 @@ Before merging a substantial change also run:
 docker compose run --rm web npm run lint
 docker compose run --rm web npm run build
 ```
+
+In CI the `Verify` build step also scans the browser bundle (`.next/static`)
+for its placeholder server secrets and fails on any match; see
+`docs/SECURITY.md`.
 
 ## UAT pilot data pack (Plan 11)
 
@@ -127,10 +200,20 @@ tests/integration/
   repair-requests.db.test.ts   — RepairRequest lifecycle & Provider isolation
   repairs.db.test.ts           — Repair lifecycle & Provider isolation
   tracking.db.test.ts          — Public tracking & observation
+  internal-operations.db.test.ts — Internal operator grants, audit, denials
+  internal-operations-overlap.db.test.ts — Overlapping audit/revoke and grant sessions
+  internal-metrics.db.test.ts  — Aggregate grants, fixed past-window snapshot/deltas, nonempty baselines, database as_of, future bounds and representative EXPLAIN timing
+  feedback.db.test.ts          — Private Feedback grants, constraints, nonce retry, reviews, feedback budget, old-state upgrade check, count-summary grants, denials, windows, and exact counts
+  feedback-projection.db.test.ts — Feedback persistence through PostgREST: keyset paging, detail/history bounds, null clearing
+  feedback-summary-manila.db.test.ts — Manila-aligned summary bounds and day buckets, one REPEATABLE READ snapshot, rolled back
+  feedback-review-flow.db.test.ts — Feedback review keeps stored notes and link; explicit null clears
+  readiness.db.test.ts         — Public readiness probe healthy on the real database and unavailable on an unreachable URL
   load-stress.db.test.ts       — Burst invariants (Plan 10)
   helpers/
     supabase-test-context.ts   — client setup, user/fixture lifecycle
     shared-test-utils.ts       — reusable DB fixture helpers
+tests/helpers/
+  local-postgres.ts            — loopback-guarded local psql via Docker (test-only)
 ```
 
 Any shared fixture logic lives in `tests/integration/helpers/` as a small test-only
@@ -152,6 +235,122 @@ exact concurrent threshold, shared state across separate service clients,
 operation isolation, expiry reset, bounded cleanup, opaque stored actor keys,
 and denial of limiter/public-operation RPC execution to both `anon` and
 authenticated roles.
+
+Issue #88 database coverage verifies that `anon`, authenticated, and
+`service_role` clients cannot directly insert/update/delete the private internal
+tables (service_role reads only), that the admin and audit functions are not
+executable by ordinary clients, that grant/revoke is atomic and idempotent,
+that an invalid actor rolls back the mapping plus required audit, that the audit
+RPC rechecks the enabled mapping so revocation wins over a delayed append, and
+that Auth deletion removes the mapping while nulling the direct user references
+on retained audit rows (not full anonymization).
+
+`src/features/feedback/feedback.test.ts` mocks the real auth, limiter, Supabase, and
+audit seams to prove limiter-first ordering, forged-field rejection, Provider class
+derivation, no-query denials, audit-failure withholding, review preconditions, and
+schema bounds. It needs no database.
+
+Current feedback-backlog coverage checks exact HEAD counts, zero, malformed or
+failed counts, operator denial, and audit failure. The overview rendering tests
+separate a current backlog of two from a period NEW count of one, and exercise
+unavailable and revoked-access outcomes.
+
+`tests/e2e/internal-feedback-inbox.spec.ts` also seeds older NEW, recent NEW, and
+older RESOLVED feedback through the disposable database. It checks that the
+Overview count grows by two, the seven-day NEW metric by one, and the NEW inbox
+contains both unresolved fixtures. It verifies that count pages expose no
+fixture content and that revoked operators lose access. Baseline-relative
+assertions use the existing single-worker E2E configuration.
+
+`src/features/feedback/form.test.ts` calls `submitFeedbackForm` directly with a
+real `FormData` and a fake submit function, with no mocks of the adapter. It
+proves acceptance and nonce rotation, that only the four form fields reach
+submit, the field-error copy, malformed-nonce replacement, the fixed
+rate-limit, forbidden, and unavailable copy, and that unexpected errors never
+reveal their text. It needs no database.
+
+`src/features/feedback/contact-details.test.ts` checks the pure personal-details
+hint: emails, Philippine mobile numbers and `+` numbers are flagged, while device
+names, years, quantities and 15-digit IMEIs are not. It needs no database.
+
+`tests/integration/feedback.db.test.ts` uses the same live psql sessions for
+same-nonce submissions and same-version reviews, the review/revocation overlap,
+and a rolled-back history-trigger fault. The fault exists only inside an open
+transaction and is removed by its `ROLLBACK`.
+
+`tests/integration/internal-operations-overlap.db.test.ts` uses live psql
+sessions through the running local Supabase database container (matched by the
+host port bound to the API container, after loopback and local Docker endpoint
+checks). It holds an audit append open while a
+revoke waits on the observed `pg_blocking_pids` state, and it overlaps two
+first grants for one operator. Both assert one consistent outcome. Sessions
+carry lock, statement, and idle-transaction timeouts and close in `finally`.
+
+`tests/e2e/internal-operations.spec.ts` covers anonymous return-to-login,
+successful auth-only operator login to `/internal`, non-indexable rendering, a
+real `/internal` visit that persists a new `INTERNAL_ACCESS_VIEW` event, responsive
+navigation-drawer selection and account-menu sign-out, a
+temporary actor-scoped audit failure that shows only the unavailable state and
+persists no view event (the fault is dropped in `finally`), immediate denial
+after revocation, and 404 for Provider OWNER/STAFF/INDEPENDENT accounts that
+have no internal mapping. The E2E fixture reaches the local database through
+`tests/helpers/local-postgres.ts`, which refuses non-loopback Supabase URLs and
+non-local Docker endpoints before any SQL runs.
+
+The same spec also covers the `/internal/activity` surface: anonymous return to
+login; 404 for Provider OWNER, STAFF and INDEPENDENT accounts and for a revoked
+operator; and an enabled operator who sees the period picker and round-trips a
+chosen period through the GET form, resets the filters, and expands grouped
+reference numbers without phone overflow. The feedback inbox E2E also checks
+side-by-side desktop submission/triage panels, phone stacking, and review saving
+from the phone layout. A `/api/health` test checks the anonymous
+contract: 200, body exactly `{"status":"healthy"}`, `no-store`, and no
+`set-cookie`. A privacy test seeds canary customer name, phone and internal
+notes on a Repair Request and Repair, plus a canary Feedback message. It asserts
+that no canary appears in the rendered `/internal/activity` HTML or in any
+app-origin response body, for the default window and a 30-day window. It then
+confirms the feedback canary is shown on the authorized
+`/internal/feedback/<id>` page, so the absence check is meaningful. The test
+deletes its rows and operator through the fixtures and `runLocalSql`.
+
+## Backup and restore drill
+
+`scripts/drill-backup-restore.sh` (`pnpm drill:backup-restore`) is the CI proof
+for the manual backup routine in
+[OPERATIONS.md](OPERATIONS.md#manual-backups-free-plan). The Database integration
+job runs it only in GitHub Actions, after the DB suite passes, on the same
+disposable local Supabase stack, with `DRILL_DISPOSABLE=1`.
+
+It seeds a fixed fixture: a Provider with an OWNER, an accepted Request, a
+Repair with status history, a Feedback submission with a review event, and an
+internal operator mapping. It then:
+
+1. dumps roles, schema and data with `supabase db dump --local`;
+2. wipes the restored scope in place (public schema, every Auth table except
+   `schema_migrations`, the whole `supabase_migrations` schema);
+3. removes the default privileges for `anon`, `authenticated` and
+   `service_role` before the restore. Without this, restored tables silently
+   regain the grants that the migrations revoked, because `pg_dump` does not
+   record revocations. It then restores in one transaction with
+   `psql --single-transaction` (stopping on the first error), in the order
+   schema, replica mode, data, and puts the default privileges back afterwards;
+4. verifies with SQL and fails on the first mismatch: fixture rows and values,
+   RLS on the Provider-owned and feedback tables, `anon` denial on
+   `feedback_submissions` and `repairs`, `authenticated` denial on
+   `feedback_submissions`, RPC EXECUTE grants unchanged, the migration history
+   count equal to the number of files in `supabase/migrations/`, and the
+   operator mapping.
+
+The script refuses any API host other than `127.0.0.1` or `localhost`. It
+refuses to run without `DRILL_DISPOSABLE=1`, and it refuses outside GitHub
+Actions (`GITHUB_ACTIONS=true`), so a local run stops before it touches
+anything. There is no manual override. Dumps go to a temporary directory that
+is deleted on exit. They never enter the repository or CI artifacts.
+
+Scope: the drill proves the dump-and-restore mechanics on the local stack. It
+does not replay `roles.sql`, because the roles already exist in that cluster.
+Restoring into a fresh Supabase project is covered by the runbook steps in
+OPERATIONS.md, not by this drill.
 
 ## Load & resilience harness
 
