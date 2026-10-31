@@ -14,6 +14,12 @@ export type EmailDeliveryResult =
   | { success: true; id?: string }
   | { success: false; reason: "provider_error" | "EMAIL_DISABLED" };
 
+// Bounds the invite Server Action, so the one-time Copy Link still returns when SMTP stalls.
+const SMTP_CONNECTION_TIMEOUT_MS = 5_000;
+const SMTP_GREETING_TIMEOUT_MS = 5_000;
+const SMTP_SOCKET_TIMEOUT_MS = 5_000;
+const SMTP_SEND_DEADLINE_MS = 8_000;
+
 export async function sendEmail(
   params: SendEmailParams,
 ): Promise<EmailDeliveryResult> {
@@ -39,21 +45,41 @@ export async function sendEmail(
     return { success: false, reason: "EMAIL_DISABLED" };
   }
 
+  // Port 465 is implicit TLS. Every other port must upgrade with STARTTLS
+  // before AUTH, so the App Password never crosses an unencrypted connection.
+  const transport = createTransport({
+    host: smtp.host,
+    port: smtp.port,
+    secure: smtp.secure,
+    requireTLS: !smtp.secure,
+    connectionTimeout: SMTP_CONNECTION_TIMEOUT_MS,
+    greetingTimeout: SMTP_GREETING_TIMEOUT_MS,
+    socketTimeout: SMTP_SOCKET_TIMEOUT_MS,
+    auth: { user: smtp.user, pass: smtp.password },
+  });
+
+  let timer: ReturnType<typeof setTimeout> | undefined;
+  const deadline = new Promise<never>((_, reject) => {
+    timer = setTimeout(() => {
+      reject(
+        Object.assign(new Error("SMTP send deadline exceeded"), {
+          code: "ETIMEDOUT",
+        }),
+      );
+    }, SMTP_SEND_DEADLINE_MS);
+  });
+
   try {
-    const transport = createTransport({
-      host: smtp.host,
-      port: smtp.port,
-      secure: smtp.secure,
-      requireTLS: !smtp.secure,
-      auth: { user: smtp.user, pass: smtp.password },
-    });
-    const info = await transport.sendMail({
-      from,
-      to: params.to,
-      subject: params.subject,
-      html: params.html,
-      text: params.text,
-    });
+    const info = await Promise.race([
+      transport.sendMail({
+        from,
+        to: params.to,
+        subject: params.subject,
+        html: params.html,
+        text: params.text,
+      }),
+      deadline,
+    ]);
 
     return { success: true, id: info.messageId };
   } catch (error) {
@@ -62,6 +88,9 @@ export async function sendEmail(
       `[Email Error]: SMTP delivery failed (${smtpErrorCode(error)})`,
     );
     return { success: false, reason: "provider_error" };
+  } finally {
+    clearTimeout(timer);
+    transport.close();
   }
 }
 
