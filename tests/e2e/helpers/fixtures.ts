@@ -192,7 +192,7 @@ export async function loginAndCaptureState(
   await page.goto("/login");
   await page.locator('input[name="email"]').fill(actor.email);
   await page.locator('input[name="password"]').fill(actor.password);
-  await page.getByRole("button", { name: "Sign in to Dashboard" }).click();
+  await page.getByRole("button", { name: "Sign in", exact: true }).click();
   await expect(page).toHaveURL(/\/dashboard/, { timeout: 15_000 });
   const statePath = `/tmp/tracknologia-state-${randomUUID()}.json`;
   await page.context().storageState({ path: statePath });

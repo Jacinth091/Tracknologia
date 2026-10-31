@@ -52,7 +52,7 @@ test.describe("E2E-06 Staff lifecycle", () => {
         .locator('input[name="confirmPassword"]')
         .fill(staffPassword);
       await staffPage
-        .getByRole("button", { name: "Verify Invite & Create Staff Account" })
+        .getByRole("button", { name: "Join shop", exact: true })
         .click();
 
       // 3. STAFF completes the invited-profile step and lands in the dashboard.
@@ -108,7 +108,7 @@ test.describe("E2E-06 Staff lifecycle", () => {
       await removedPage.locator('input[name="email"]').fill(staffEmail);
       await removedPage.locator('input[name="password"]').fill(staffPassword);
       await removedPage
-        .getByRole("button", { name: "Sign in to Dashboard" })
+        .getByRole("button", { name: "Sign in", exact: true })
         .click();
 
       await removedPage.waitForURL(/\/(login|onboarding)/, {

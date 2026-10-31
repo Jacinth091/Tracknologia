@@ -28,7 +28,7 @@ test.describe("E2E-04 Independent Repairer", () => {
       await page.locator('input[name="password"]').fill(indPassword);
       await page.locator('input[name="confirmPassword"]').fill(indPassword);
       await page
-        .getByRole("button", { name: "Create Account & Continue" })
+        .getByRole("button", { name: "Create account", exact: true })
         .click();
 
       // Registration redirects into onboarding because no Provider exists yet.
