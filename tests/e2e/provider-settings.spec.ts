@@ -122,6 +122,18 @@ test("settings keeps desktop navigation beside panels and stacks it on phones", 
         () => document.documentElement.scrollWidth <= window.innerWidth,
       ),
     ).toBe(true);
+
+    await page.getByRole("button", { name: "Account menu" }).click();
+    const menuItems = page.getByRole("menuitem");
+    await expect(menuItems).toHaveCount(3);
+    await expect(
+      page.getByRole("menuitem", { name: "Sign Out", exact: true }),
+    ).toBeVisible();
+    const menuWidths = await menuItems.evaluateAll((items) =>
+      items.map((item) => item.getBoundingClientRect().width),
+    );
+    expect(Math.max(...menuWidths) - Math.min(...menuWidths)).toBeLessThan(1);
+    await page.keyboard.press("Escape");
   } finally {
     await context.close();
     await cleanupActors(admin, [owner]);
