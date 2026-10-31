@@ -231,6 +231,29 @@ test.describe("E2E-08 Internal operator access", () => {
     }
   });
 
+  test("an enabled operator signing in at plain /login lands on /internal", async ({
+    browser,
+  }) => {
+    const admin = createServiceClient();
+    const operator = await seedInternalOperator(admin);
+
+    try {
+      const context = await browser.newContext();
+      const page = await context.newPage();
+      await page.goto("/login");
+      await page.locator('input[name="email"]').fill(operator.email);
+      await page.locator('input[name="password"]').fill(operator.password);
+      await page.getByRole("button", { name: "Sign in", exact: true }).click();
+      await expect(page).toHaveURL(/\/internal$/, { timeout: 20_000 });
+      await expect(
+        page.getByRole("heading", { name: "Internal operations" }).first(),
+      ).toBeVisible();
+      await context.close();
+    } finally {
+      await cleanupInternalOperator(admin, operator.userId);
+    }
+  });
+
   test("the activity page admits only enabled operators", async ({
     browser,
   }) => {
