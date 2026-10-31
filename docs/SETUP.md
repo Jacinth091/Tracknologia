@@ -101,7 +101,7 @@ In `production` (when `APP_ENV=production` or `APP_ENV=staging`):
 
 - `NEXT_PUBLIC_APP_URL` must use `https://` and cannot use `localhost` or loopback IP addresses.
 - `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY` and `SUPABASE_SERVICE_ROLE_KEY` are mandatory.
-- `RESEND_API_KEY` is optional. Without it, invitation email is disabled and invitations are shared with Copy Link. If it is set, `RESEND_FROM_EMAIL` cannot use default `onboarding@resend.dev`.
+- `SMTP_HOST`, `SMTP_USER` and `SMTP_PASSWORD` are optional, but set all three or none: a partial set stops startup. With none, invitation email is disabled and invitations are shared with Copy Link.
 - `PUBLIC_ABUSE_SHARED_DEV_BUCKET=true` and `NEXT_PUBLIC_REQUIRE_EMAIL_CONFIRMATION=false` throw validation errors at startup via Next.js `instrumentation.ts`.
 
 `.env.local` must be ignored by Git.
@@ -122,7 +122,7 @@ Each environment needs these variables, scoped to that environment:
 - `NEXT_PUBLIC_SUPABASE_URL`, `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY` and `SUPABASE_SERVICE_ROLE_KEY` for that environment's Supabase project
 - `PUBLIC_ABUSE_HMAC_SECRET`: at least 32 random characters, unique to that environment
 - `PUBLIC_ABUSE_CLIENT_IP_SOURCE=vercel`: reads each visitor's IP from Vercel's `x-vercel-forwarded-for` header. It is a configuration check, not proof of origin. Set it only on Vercel-served deployments, never on a self-hosted or other host; see the trust limit in `docs/SECURITY.md`.
-- `RESEND_API_KEY` and `RESEND_FROM_EMAIL` are optional. Leave both unset for the pilot: invitations are shared with Copy Link. If you set `RESEND_API_KEY`, set `RESEND_FROM_EMAIL` to a verified sender address, not `onboarding@resend.dev`.
+- `SMTP_HOST=smtp.gmail.com`, `SMTP_PORT=587`, `SMTP_USER` (the project Gmail address), `SMTP_PASSWORD` (the Google App Password from the steps below) and `EMAIL_FROM` (the sender, for example `Tracknologia <project@gmail.com>`; it defaults to `SMTP_USER`). `SMTP_PASSWORD` is a secret: never set it as `NEXT_PUBLIC_*`. Set `SMTP_HOST`, `SMTP_USER` and `SMTP_PASSWORD` together or not at all. Leave all of them unset to keep invitations on Copy Link only.
 
 Do not set `PUBLIC_ABUSE_TRUSTED_PROXY_SECRET`; this mode does not use it.
 Never set `PUBLIC_ABUSE_SHARED_DEV_BUCKET` or
@@ -139,15 +139,16 @@ Supabase project, and set `NEXT_PUBLIC_APP_URL` to the production URL. In the
 pilot project's Supabase Authentication → URL Configuration, set the Site URL
 to the production URL, and add `<app-url>/auth/callback` to the redirect URLs.
 
-Leave `RESEND_API_KEY` and `RESEND_FROM_EMAIL` unset. The pilot has no domain,
-so the app sends no invitation email: the owner shares each invitation with
-Copy Link on the Team page.
+The pilot has no domain. Invitation email is optional: while the SMTP variables
+are unset, the owner shares each invitation with Copy Link on the Team page.
+Set them as described above to send invitation email through the project Gmail.
 
 ### Supabase Auth email via Gmail SMTP
 
 Supabase Auth sends sign-up confirmation and password reset emails. Send them
-through the pilot's project Gmail account. This is dashboard configuration only;
-the app does not use these settings.
+through the pilot's project Gmail account. The app's invitation email uses the
+same Google App Password, as `SMTP_PASSWORD`. The Supabase setting is dashboard
+configuration only.
 
 1. Turn on 2-Step Verification for the project Gmail account, then create a Google App Password for it.
 2. In the Supabase dashboard, open Authentication → SMTP Settings and set:
@@ -156,7 +157,7 @@ the app does not use these settings.
    - Username: the project Gmail address
    - Password: the Google App Password, not the account password
    - Sender email: the project Gmail address
-3. Gmail limits how many messages an account can send each day. Keep pilot sign-ups and password resets within that limit. Google sets the limit and can change it.
+3. Gmail limits how many messages an account can send each day. That limit covers both Supabase Auth email and invitation email, so keep pilot volume within it. Google sets the limit and can change it.
 
 ### Production: pre-launch acceptance check
 
@@ -173,8 +174,19 @@ launch. The owner approved running the check here (#109, 2026-10-30).
    - **Throttle:** from one device, the 21st feedback submission within 10 minutes is throttled (default `PUBLIC_ABUSE_FEEDBACK_MAX=20`).
    - **Spoof:** repeat the throttle check with a browser header extension, such as ModHeader, adding forged `x-vercel-forwarded-for`, `x-forwarded-for`, `x-real-ip` and `x-tracknologia-client-ip` values. It must still throttle at the 21st submission.
    - **Isolation:** from a second device on a different network, such as a phone on mobile data, a submission still succeeds while the first device is throttled.
-4. Record pass or fail, the deployed SHA and the date only. Do not record IP
-   addresses, tracking codes or personal data.
+4. Check hosted Auth email (Supabase Auth through the Gmail SMTP settings above):
+   - Confirm the Supabase custom SMTP settings are saved and enabled.
+   - Sign up with a test address **not** on the Supabase organization team. Confirm the confirmation email arrives and its link opens the app.
+   - Request a password reset for that address. Confirm the reset email arrives and its link works.
+   - Note the Supabase Auth email rate limit and Gmail's daily sending limit. If either blocks a flow, record that flow as failed.
+   - **A failure is NO-GO for the pilot.** Do not fix it by turning off email confirmation in production; the app rejects `NEXT_PUBLIC_REQUIRE_EMAIL_CONFIRMATION=false` at startup.
+   - If Google offers no App Password for the project account (some Google Workspace policies block them), use another SMTP provider the owner has approved, then repeat this step.
+5. Check app staff-invitation email. This uses the app's own `SMTP_*` settings, separate from Supabase Auth:
+   - If `SMTP_HOST`, `SMTP_USER` and `SMTP_PASSWORD` are set on Vercel for this deployment, a test Shop OWNER invites a **non-team** test mailbox from the Team page. Confirm the invitation email arrives and its link opens the registration page.
+   - If the SMTP settings are intentionally unset, do not claim email invitations work. Confirm the Team page shows "Invitation created" with a Copy Link button, and record that the pilot runs on Copy Link only.
+   - If delivery fails, the invitation must still show its Copy Link. Record the failure, and do not advertise email invitations until this check passes.
+6. Record pass or fail for each check, including both hosted Auth flows and the app invitation check, the deployed SHA and the date only. Do not record IP
+   addresses, tracking codes, message bodies, links or credentials.
 
 ### Test data cleanup
 
