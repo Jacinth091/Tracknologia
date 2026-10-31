@@ -3,7 +3,7 @@ import type { Metadata } from "next";
 import { requireProviderContext } from "@/features/auth";
 import { FeedbackForm } from "@/features/feedback/ui/feedback-form";
 
-import { PageHeader } from "../_components/page-header";
+import { PageHeader } from "@/components/shared/page-header";
 import { submitProviderFeedbackAction } from "./actions";
 
 export const metadata: Metadata = {

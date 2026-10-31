@@ -28,7 +28,7 @@ import {
 } from "@/features/repairs";
 import { cn } from "@/lib/utils";
 
-import { PageHeader } from "../_components/page-header";
+import { PageHeader } from "@/components/shared/page-header";
 import { RepairStatusPill } from "../_components/repair-status-badge";
 
 export const metadata: Metadata = {
