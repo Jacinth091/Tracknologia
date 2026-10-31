@@ -101,8 +101,8 @@ export function TeamClient({
   const staffMembers = members.filter((member) => member.role === "STAFF");
 
   return (
-    <div className="flex flex-col gap-6 lg:flex-row lg:items-start">
-      <div className="w-full space-y-6 empty:hidden lg:w-1/3 lg:shrink-0">
+    <div className="grid items-start gap-6 lg:grid-cols-[minmax(0,1fr)_minmax(0,1.8fr)]">
+      <div className="min-w-0 space-y-6 empty:hidden">
         {/* 1. Invite Staff Member Card (Owners Only) */}
         {isOwner && (
           <Card>
@@ -117,38 +117,39 @@ export function TeamClient({
                 Invite Staff
               </CardTitle>
               <CardDescription>
-                Generate an invitation link or email an invitation to staff to
-                join your repair shop
+                Invite a teammate to join your repair shop.
               </CardDescription>
             </CardHeader>
             <CardContent className="space-y-4">
-              <form
-                action={formAction}
-                className="flex flex-col gap-3 sm:flex-row"
-              >
+              <form action={formAction} className="space-y-3">
                 <div className="flex-1 space-y-1">
-                  <Label htmlFor="staff-email" className="sr-only">
-                    Staff Email
-                  </Label>
+                  <Label htmlFor="staff-email">Staff Email</Label>
                   <Input
                     id="staff-email"
                     name="email"
                     type="email"
+                    autoComplete="email"
                     placeholder="staff@example.com"
                     disabled={isPending}
                     required
+                    aria-invalid={Boolean(state?.fieldErrors?.email)}
+                    aria-describedby={
+                      state?.fieldErrors?.email
+                        ? "staff-email-error"
+                        : undefined
+                    }
                   />
                   {state?.fieldErrors?.email && (
-                    <p className="text-xs text-destructive">
+                    <p
+                      id="staff-email-error"
+                      role="alert"
+                      className="text-xs text-destructive"
+                    >
                       {state.fieldErrors.email}
                     </p>
                   )}
                 </div>
-                <Button
-                  type="submit"
-                  disabled={isPending}
-                  className="w-full sm:w-auto"
-                >
+                <Button type="submit" disabled={isPending} className="w-full">
                   {isPending ? (
                     <span className="flex items-center gap-2">
                       <LoadingSpinner size="sm" />
@@ -189,7 +190,7 @@ export function TeamClient({
               {/* Generated Invite Box (Displayed strictly once at creation time) */}
               {state?.token && state.inviteUrl && (
                 <div className="space-y-3 rounded-lg border border-foreground/15 bg-primary/10 p-4">
-                  <div className="flex items-center justify-between gap-2">
+                  <div className="flex flex-wrap items-center justify-between gap-2">
                     <span className="text-xs font-semibold text-foreground">
                       {state.emailDeliveryFailed
                         ? "Invitation created"
@@ -230,9 +231,9 @@ export function TeamClient({
                     />
                   </div>
 
-                  <div className="flex items-center gap-2 text-xs text-muted-foreground">
+                  <div className="flex flex-wrap items-center gap-2 text-xs text-muted-foreground">
                     <span>Invite Code:</span>
-                    <code className="rounded border border-border bg-background px-2 py-0.5 font-mono font-medium text-foreground">
+                    <code className="min-w-0 rounded border border-border bg-background px-2 py-0.5 font-mono font-medium break-all text-foreground">
                       {state.token}
                     </code>
                   </div>
@@ -315,13 +316,13 @@ export function TeamClient({
                 {invitations.map((inv) => (
                   <div
                     key={inv.id}
-                    className="flex items-center justify-between gap-4 py-3"
+                    className="flex flex-wrap items-center justify-between gap-3 py-3"
                   >
                     <div className="min-w-0 space-y-0.5 wrap-anywhere">
                       <p className="text-sm font-medium text-foreground">
                         {inv.email}
                       </p>
-                      <p className="font-mono text-[11px] text-muted-foreground">
+                      <p className="text-xs leading-relaxed tabular-nums text-muted-foreground">
                         Created {new Date(inv.createdAt).toLocaleDateString()} •
                         Expires {new Date(inv.expiresAt).toLocaleDateString()}
                       </p>
@@ -353,7 +354,7 @@ export function TeamClient({
         {requestLink}
       </div>
 
-      <div className="min-w-0 flex-1">
+      <div className="min-w-0">
         {/* 3. Active Team Members */}
         <Card>
           <CardHeader>
@@ -367,7 +368,7 @@ export function TeamClient({
               Team Members ({members.length})
             </CardTitle>
             <CardDescription>
-              Active staff belonging to this repair shop
+              People with active access to this repair shop
             </CardDescription>
           </CardHeader>
           <CardContent>
@@ -388,8 +389,8 @@ export function TeamClient({
                         </AvatarFallback>
                       </Avatar>
                       <div className="min-w-0 space-y-1">
-                        <div className="flex items-center gap-2">
-                          <span className="truncate text-sm font-semibold text-foreground">
+                        <div className="flex flex-wrap items-center gap-2">
+                          <span className="text-sm font-semibold text-foreground wrap-anywhere">
                             {displayName}
                           </span>
                           <Badge
@@ -400,7 +401,7 @@ export function TeamClient({
                             {member.role === "OWNER" ? "Shop Owner" : "Staff"}
                           </Badge>
                         </div>
-                        <div className="flex flex-wrap items-center gap-2 font-mono text-[11px] text-muted-foreground">
+                        <div className="flex flex-wrap items-center gap-2 text-xs leading-relaxed tabular-nums text-muted-foreground">
                           {member.contactPhone && (
                             <>
                               <span>{member.contactPhone}</span>

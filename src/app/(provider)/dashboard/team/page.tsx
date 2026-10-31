@@ -34,7 +34,6 @@ export default async function TeamPage() {
   return (
     <div className="space-y-6">
       <PageHeader
-        eyebrow="Team"
         title="Team & Staff Management"
         description={`Manage staff members, invitations, and workshop access for ${context.providerName}`}
       />
