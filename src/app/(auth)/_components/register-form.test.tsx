@@ -1,9 +1,20 @@
 import { renderToStaticMarkup } from "react-dom/server";
-import { describe, expect, it, vi } from "vitest";
+import { beforeEach, describe, expect, it, vi } from "vitest";
 
+// The form's action state is set per test; the default is no state yet.
+const { useActionState } = vi.hoisted(() => ({ useActionState: vi.fn() }));
+
+vi.mock("react", async (importOriginal) => ({
+  ...(await importOriginal<typeof import("react")>()),
+  useActionState,
+}));
 vi.mock("../actions", () => ({ registerAction: vi.fn() }));
 
 import { RegisterForm } from "./register-form";
+
+beforeEach(() => {
+  useActionState.mockReturnValue([null, vi.fn(), false]);
+});
 
 describe("RegisterForm initial state", () => {
   it("preselects Shop Staff and collapses the code when an invite arrives", () => {
@@ -39,5 +50,23 @@ describe("RegisterForm initial state", () => {
     expect(html).toContain('id="intent-SHOP-title"');
     expect(html).toContain("Shop Owner");
     expect(html).toContain("Shop Staff");
+  });
+});
+
+describe("RegisterForm invite errors", () => {
+  it("shows the code field and its error when the server rejects a prefilled invite", () => {
+    useActionState.mockReturnValue([
+      { fieldErrors: { inviteToken: "This invite has expired." } },
+      vi.fn(),
+      false,
+    ]);
+
+    const html = renderToStaticMarkup(<RegisterForm initialInvite="tok_old" />);
+
+    expect(html).toContain("This invite has expired.");
+    expect(html).toMatch(/<input[^>]*name="inviteToken"[^>]*value="tok_old"/);
+    expect(html).not.toContain("Invite code added");
+    // Nothing in the form is hidden, so the field and its error are visible.
+    expect(html).not.toContain('hidden=""');
   });
 });
