@@ -6,6 +6,7 @@ const mocks = vi.hoisted(() => ({
   resetPasswordForEmail: vi.fn(),
   updateUser: vi.fn(),
   getAuthUser: vi.fn(),
+  getSession: vi.fn(),
   createClient: vi.fn(),
   redirect: vi.fn(),
   cookies: vi.fn(),
@@ -76,9 +77,24 @@ beforeEach(() => {
       resetPasswordForEmail: mocks.resetPasswordForEmail,
       updateUser: mocks.updateUser,
       getUser: mocks.getAuthUser,
+      getSession: mocks.getSession,
     },
   });
 });
+
+/** The current session, as the action reads it: an access token with a sid. */
+function currentSession(sessionId: string) {
+  const encode = (value: object) =>
+    Buffer.from(JSON.stringify(value)).toString("base64url");
+  mocks.getSession.mockResolvedValue({
+    data: {
+      session: {
+        access_token: `${encode({ alg: "HS256" })}.${encode({ session_id: sessionId })}.sig`,
+      },
+    },
+    error: null,
+  });
+}
 
 describe("loginAction", () => {
   beforeEach(() => {
@@ -258,8 +274,9 @@ describe("updatePasswordAction", () => {
     return formData;
   }
 
-  function grantRecoverySession(userId: string) {
-    const cookie = createRecoveryGrantCookie(userId);
+  function grantRecoverySession(userId: string, sessionId = "session-1") {
+    const cookie = createRecoveryGrantCookie(userId, sessionId);
+    currentSession(sessionId);
     mocks.getCookie.mockImplementation(
       (name: string) =>
         (name === RECOVERY_GRANT_COOKIE
@@ -341,6 +358,23 @@ describe("updatePasswordAction", () => {
     const result = await updatePasswordAction(null, resetFormData());
 
     expect(result.error).toContain("grant is missing or expired");
+    expect(mocks.updateUser).not.toHaveBeenCalled();
+    expect(mocks.redirect).not.toHaveBeenCalled();
+  });
+
+  it("refuses a grant issued in session A when session B presents it", async () => {
+    mocks.getAuthUser.mockResolvedValue({
+      data: { user: { id: "user-1", email: "owner@shop.com" } },
+      error: null,
+    });
+    mocks.updateUser.mockResolvedValue({ data: {}, error: null });
+    // The grant belongs to session A; the browser now runs session B.
+    grantRecoverySession("user-1", "session-A");
+    currentSession("session-B");
+
+    const result = await updatePasswordAction(null, resetFormData());
+
+    expect(result?.error).toContain("grant is missing or expired");
     expect(mocks.updateUser).not.toHaveBeenCalled();
     expect(mocks.redirect).not.toHaveBeenCalled();
   });

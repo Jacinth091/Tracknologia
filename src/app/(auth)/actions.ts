@@ -9,6 +9,7 @@ import {
   registerProviderAccount,
   requestPasswordReset,
   resetPassword,
+  getCurrentSessionId,
   getUser,
   signOutUser,
   consumeRecoveryGrant,
@@ -240,7 +241,10 @@ export async function updatePasswordAction(
     };
   }
 
-  if (!(await hasRecoveryGrant(recoveryUser.id))) {
+  // The grant must match this user and this session, so a cookie copied from
+  // another session is refused.
+  const sessionId = await getCurrentSessionId();
+  if (!(await hasRecoveryGrant(recoveryUser.id, sessionId))) {
     return {
       error:
         "Your password reset grant is missing or expired. Open a fresh recovery email link in this browser, then set your new password again.",
