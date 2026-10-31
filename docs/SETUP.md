@@ -174,8 +174,15 @@ launch. The owner approved running the check here (#109, 2026-10-30).
    - **Throttle:** from one device, the 21st feedback submission within 10 minutes is throttled (default `PUBLIC_ABUSE_FEEDBACK_MAX=20`).
    - **Spoof:** repeat the throttle check with a browser header extension, such as ModHeader, adding forged `x-vercel-forwarded-for`, `x-forwarded-for`, `x-real-ip` and `x-tracknologia-client-ip` values. It must still throttle at the 21st submission.
    - **Isolation:** from a second device on a different network, such as a phone on mobile data, a submission still succeeds while the first device is throttled.
-4. Record pass or fail, the deployed SHA and the date only. Do not record IP
-   addresses, tracking codes or personal data.
+4. Check hosted Auth email (Supabase Auth through the Gmail SMTP settings above):
+   - Confirm the Supabase custom SMTP settings are saved and enabled.
+   - Sign up with a test address **not** on the Supabase organization team. Confirm the confirmation email arrives and its link opens the app.
+   - Request a password reset for that address. Confirm the reset email arrives and its link works.
+   - Note the Supabase Auth email rate limit and Gmail's daily sending limit. If either blocks a flow, record that flow as failed.
+   - **A failure is NO-GO for the pilot.** Do not fix it by turning off email confirmation in production; the app rejects `NEXT_PUBLIC_REQUIRE_EMAIL_CONFIRMATION=false` at startup.
+   - If Google offers no App Password for the project account (some Google Workspace policies block them), use another SMTP provider the owner has approved, then repeat this step.
+5. Record pass or fail for each check, including both hosted Auth flows, the deployed SHA and the date only. Do not record IP
+   addresses, tracking codes, message bodies, links or credentials.
 
 ### Test data cleanup
 
