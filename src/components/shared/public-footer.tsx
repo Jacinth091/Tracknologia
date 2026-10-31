@@ -13,7 +13,10 @@ export function PublicFooter() {
             Tracknologia &copy; {new Date().getFullYear()}
           </p>
         </div>
-        <nav aria-label="Footer navigation" className="flex gap-6 text-sm">
+        <nav
+          aria-label="Footer navigation"
+          className="flex flex-wrap gap-x-6 gap-y-2 text-sm"
+        >
           <Link href="/track" className="underline-offset-4 hover:underline">
             Track
           </Link>
