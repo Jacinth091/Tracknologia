@@ -21,12 +21,14 @@ export function StatTile({
   href,
   label,
   value,
+  detail,
   status,
   icon,
 }: {
   href?: string;
   label: string;
   value: ReactNode;
+  detail?: string;
   status: StatusToken;
   icon: ComponentProps<typeof HugeiconsIcon>["icon"];
 }) {
@@ -46,6 +48,9 @@ export function StatTile({
         </span>
         <CardDescription>{label}</CardDescription>
         <CardTitle className="text-3xl tabular-nums">{value}</CardTitle>
+        {detail ? (
+          <p className="text-xs text-muted-foreground">{detail}</p>
+        ) : null}
       </CardHeader>
     </Card>
   );

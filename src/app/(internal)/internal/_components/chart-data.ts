@@ -42,3 +42,26 @@ export function rankedSummary(title: string, rows: ChartRow[]) {
 function largestRow(rows: ChartRow[]) {
   return rows.reduce((best, row) => (row.value > best.value ? row : best));
 }
+
+// Categorical slots are assigned in the order given and never cycled.
+export function categorical(
+  rows: { key: string; label: string; value: number }[],
+) {
+  return rows.map((row, index) => ({
+    ...row,
+    color: `var(--chart-cat-${index + 1})`,
+  }));
+}
+
+export function breakdownSummary(title: string, rows: ChartRow[]) {
+  if (!hasActivity(rows)) {
+    return `${title}, no activity in this period`;
+  }
+
+  const parts = rows.map((row) => `${row.label} ${row.value}`).join(", ");
+  return `${title}, ${parts}`;
+}
+
+export function percentSummary(title: string, percent: number | null) {
+  return percent === null ? `${title}, N/A` : `${title}, ${percent}%`;
+}

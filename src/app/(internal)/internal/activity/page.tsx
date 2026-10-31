@@ -3,9 +3,15 @@ import Link from "next/link";
 import { notFound, redirect } from "next/navigation";
 import type { ReactNode } from "react";
 import {
+  CheckmarkCircle02Icon,
+  Clock01Icon,
   Message01Icon,
+  Search01Icon,
+  Store01Icon,
+  Tick02Icon,
   Ticket01Icon,
   UserGroupIcon,
+  UserIcon,
   Wrench01Icon,
 } from "@hugeicons/core-free-icons";
 import { PageHeader } from "@/components/shared/page-header";
@@ -32,13 +38,21 @@ import {
 } from "@/features/internal-operations";
 import { InternalServiceUnavailable } from "../_components/internal-service-unavailable";
 import {
+  breakdownSummary,
+  categorical,
   dailySeries,
   dailySummary,
   hasActivity,
+  percentSummary,
   rankedSummary,
   type ChartRow,
 } from "../_components/chart-data";
-import { CategoryBarChart, DayBarChart } from "../_components/metric-charts";
+import {
+  CategoryBarChart,
+  DayBarChart,
+  DonutChart,
+  GaugeChart,
+} from "../_components/metric-charts";
 import { StatTile } from "../_components/stat-tile";
 
 export const metadata: Metadata = {
@@ -66,6 +80,14 @@ const FEEDBACK_CATEGORY_ORDER = [
   "USABILITY",
   "FEATURE_REQUEST",
   "GENERAL",
+] as const;
+
+const FEEDBACK_STATUS_ORDER = [
+  "NEW",
+  "REVIEWING",
+  "PLANNED",
+  "RESOLVED",
+  "DISMISSED",
 ] as const;
 
 type Period = (typeof PERIOD_OPTIONS)[number]["value"];
@@ -213,6 +235,60 @@ export default async function ActivityPage({
         value: metrics.feedback?.byCategory[category] ?? 0,
       }))
     : null;
+  const statusDonut = metrics.feedback
+    ? FEEDBACK_STATUS_ORDER.map((status) => ({
+        key: status,
+        label: humanize(status),
+        value: metrics.feedback?.byStatus[status] ?? 0,
+      }))
+    : null;
+  const providerDonut = [
+    {
+      key: "SHOP",
+      label: "Shop",
+      value: metrics.providers.allTime.shop,
+    },
+    {
+      key: "INDEPENDENT",
+      label: "Independent",
+      value: metrics.providers.allTime.independent,
+    },
+  ];
+  const originDonut = [
+    {
+      key: "CUSTOMER_REQUEST",
+      label: "From customer request",
+      value: metrics.repairs.created.customerRequest,
+    },
+    {
+      key: "PROVIDER_CREATED",
+      label: "Provider created",
+      value: metrics.repairs.created.providerCreated,
+    },
+  ];
+  const requestFunnel = [
+    { key: "RECEIVED", label: "Received", value: metrics.requests.received },
+    {
+      key: "DECIDED",
+      label: "Decided",
+      value: metrics.requests.decided.total,
+    },
+    {
+      key: "ACCEPTED",
+      label: "Accepted",
+      value: metrics.requests.decided.accepted,
+    },
+    {
+      key: "DECLINED",
+      label: "Declined",
+      value: metrics.requests.decided.declined,
+    },
+  ];
+  const active = metrics.activity.distinctProviders;
+  const repeatShare =
+    active > 0
+      ? Math.round((metrics.activity.repeatProviders / active) * 100)
+      : null;
 
   return (
     <ActivityShell period={period} start={start} end={end}>
@@ -254,7 +330,27 @@ export default async function ActivityPage({
         />
       </div>
 
-      <div className="grid gap-4 md:grid-cols-2">
+      <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
+        <ChartCard
+          title="Providers"
+          description="All-time Provider accounts by type"
+        >
+          <div className="grid gap-3">
+            <StatTile
+              label="Providers (all time)"
+              value={formatCount(metrics.providers.allTime.total)}
+              detail={`+${metrics.providers.onboardedInPeriod.total} this period`}
+              status="ACCEPTED"
+              icon={Store01Icon}
+            />
+          </div>
+          <Donut
+            title="Providers by type"
+            rows={providerDonut}
+            emptyMessage="No providers yet"
+          />
+        </ChartCard>
+
         <ChartCard
           title="Active providers per day"
           description="Distinct providers with activity on each Manila day"
@@ -264,6 +360,127 @@ export default async function ActivityPage({
             seriesLabel="Active providers"
             rows={daily}
           />
+        </ChartCard>
+
+        <ChartCard
+          title="Activity"
+          description="Providers active in the period and how many came back"
+        >
+          <div className="grid grid-cols-2 gap-3">
+            <StatTile
+              label="Active providers"
+              value={formatCount(metrics.activity.distinctProviders)}
+              status="IN_PROGRESS"
+              icon={UserGroupIcon}
+            />
+            <StatTile
+              label="Repeat providers (2 or more days)"
+              value={formatCount(metrics.activity.repeatProviders)}
+              status="SUBMITTED"
+              icon={UserGroupIcon}
+            />
+          </div>
+          <RepeatShare percent={repeatShare} />
+        </ChartCard>
+
+        <ChartCard
+          title="Staff"
+          description="Current memberships, not windowed"
+        >
+          <div className="grid grid-cols-2 gap-3">
+            <StatTile
+              label="Active memberships (now)"
+              value={formatCount(metrics.staff.memberships)}
+              status="COMPLETED"
+              icon={UserIcon}
+            />
+            <StatTile
+              label="Shops with staff (now)"
+              value={formatCount(metrics.staff.shopsWithStaff)}
+              status="COMPLETED"
+              icon={UserIcon}
+            />
+          </div>
+        </ChartCard>
+
+        <ChartCard
+          title="Repairs by status (now)"
+          description="Current Repair status, in lifecycle order"
+        >
+          <RankedChart title="Repairs by status (now)" rows={statusRows} />
+        </ChartCard>
+
+        <ChartCard
+          title="Repairs"
+          description="Repairs created, ready and completed in the period"
+        >
+          <div className="grid grid-cols-2 gap-3">
+            <StatTile
+              label="Created"
+              value={formatCount(metrics.repairs.created.total)}
+              status="IN_PROGRESS"
+              icon={Wrench01Icon}
+            />
+            <StatTile
+              label="Reached READY"
+              value={formatCount(metrics.repairs.readyReached)}
+              status="READY"
+              icon={CheckmarkCircle02Icon}
+            />
+            <StatTile
+              label="Completed"
+              value={formatCount(metrics.repairs.completed)}
+              status="COMPLETED"
+              icon={Tick02Icon}
+            />
+          </div>
+          <Donut
+            title="Repairs by origin, in period"
+            rows={originDonut}
+            emptyMessage="No repairs in this period"
+          />
+        </ChartCard>
+
+        <ChartCard
+          title="Requests"
+          description="Submitted requests, decisions and conversion"
+        >
+          <RankedChart title="Requests funnel" rows={requestFunnel} />
+          <div className="grid grid-cols-2 gap-3">
+            <StatTile
+              label="Conversion (submission cohort)"
+              value={formatPercent(metrics.requests.conversionPercent)}
+              status="SUBMITTED"
+              icon={Ticket01Icon}
+            />
+            <StatTile
+              label="Mean decision time"
+              value={formatDuration(metrics.requests.meanDecisionSeconds)}
+              status="SUBMITTED"
+              icon={Clock01Icon}
+            />
+          </div>
+        </ChartCard>
+
+        <ChartCard
+          title="Tracking"
+          description="Public tracking views and how many repairs were looked up"
+        >
+          <AdoptionGauge percent={metrics.tracking.adoptionPercent} />
+          <div className="grid grid-cols-2 gap-3">
+            <StatTile
+              label="Views in period"
+              value={formatCount(metrics.tracking.periodViews)}
+              status="IN_PROGRESS"
+              icon={Search01Icon}
+            />
+            <StatTile
+              label="Distinct repairs viewed in period"
+              value={formatCount(metrics.tracking.periodRepairsViewed)}
+              status="IN_PROGRESS"
+              icon={Wrench01Icon}
+            />
+          </div>
         </ChartCard>
 
         <ChartCard
@@ -282,13 +499,6 @@ export default async function ActivityPage({
         </ChartCard>
 
         <ChartCard
-          title="Repairs by status (now)"
-          description="Current Repair status, in lifecycle order"
-        >
-          <RankedChart title="Repairs by status (now)" rows={statusRows} />
-        </ChartCard>
-
-        <ChartCard
           title="Feedback by category"
           description="Feedback submissions in the period, by category"
         >
@@ -298,136 +508,200 @@ export default async function ActivityPage({
             <UnavailableState />
           )}
         </ChartCard>
+
+        <ChartCard
+          title="Feedback by status"
+          description="Current status of feedback submitted in the period"
+        >
+          {statusDonut ? (
+            <Donut
+              title="Feedback by status"
+              rows={statusDonut}
+              emptyMessage="No feedback in this period"
+            />
+          ) : (
+            <UnavailableState />
+          )}
+        </ChartCard>
       </div>
 
-      <section
-        aria-label="Metric details"
-        className="grid gap-4 md:grid-cols-2"
-      >
-        <MetricCard title="Providers">
-          <CountGroup
-            title="Onboarded in period"
-            counts={metrics.providers.onboardedInPeriod}
-          />
-          <CountGroup title="All time" counts={metrics.providers.allTime} />
-        </MetricCard>
-
-        <MetricCard title="Activity">
-          <Stat
-            label="Active providers"
-            value={formatCount(metrics.activity.distinctProviders)}
-          />
-          <Stat
-            label="Repeat providers (2 or more days)"
-            value={formatCount(metrics.activity.repeatProviders)}
-          />
-        </MetricCard>
-
-        <MetricCard title="Staff">
-          <Stat
-            label="Active memberships (now)"
-            value={formatCount(metrics.staff.memberships)}
-          />
-          <Stat
-            label="Shops with staff (now)"
-            value={formatCount(metrics.staff.shopsWithStaff)}
-          />
-        </MetricCard>
-
-        <MetricCard title="Repairs">
-          <Stat
-            label="Created in period"
-            value={formatCount(metrics.repairs.created.total)}
-          />
-          <Stat
-            label="From customer request"
-            value={formatCount(metrics.repairs.created.customerRequest)}
-          />
-          <Stat
-            label="Provider created"
-            value={formatCount(metrics.repairs.created.providerCreated)}
-          />
-          <Stat
-            label="Reached READY in period"
-            value={formatCount(metrics.repairs.readyReached)}
-          />
-          <Stat
-            label="Completed in period"
-            value={formatCount(metrics.repairs.completed)}
-          />
-          <CountGroup title="Status now" counts={metrics.repairs.statusNow} />
-        </MetricCard>
-
-        <MetricCard title="Requests">
-          <Stat
-            label="Received in period"
-            value={formatCount(metrics.requests.received)}
-          />
-          <Stat
-            label="Decided in period"
-            value={formatCount(metrics.requests.decided.total)}
-          />
-          <Stat
-            label="Accepted"
-            value={formatCount(metrics.requests.decided.accepted)}
-          />
-          <Stat
-            label="Declined"
-            value={formatCount(metrics.requests.decided.declined)}
-          />
-          <Stat
-            label="Pending (now)"
-            value={formatCount(metrics.requests.pendingNow)}
-          />
-          <Stat
-            label="Conversion (submission cohort)"
-            value={formatPercent(metrics.requests.conversionPercent)}
-          />
-          <Stat
-            label="Mean decision time"
-            value={formatDuration(metrics.requests.meanDecisionSeconds)}
-          />
-        </MetricCard>
-
-        <MetricCard title="Tracking">
-          <Stat
-            label="Views in period"
-            value={formatCount(metrics.tracking.periodViews)}
-          />
-          <Stat
-            label="Distinct repairs viewed in period"
-            value={formatCount(metrics.tracking.periodRepairsViewed)}
-          />
-          <Stat
-            label="Adoption (all time)"
-            value={formatPercent(metrics.tracking.adoptionPercent)}
-          />
-        </MetricCard>
-
-        <MetricCard title="Feedback">
-          {metrics.feedback ? (
-            <>
-              <Stat
-                label="Submissions in period"
-                value={formatCount(metrics.feedback.total)}
-              />
-              <CountGroup
-                title="By category"
-                counts={metrics.feedback.byCategory}
-              />
-              <CountGroup
-                title="By status"
-                counts={metrics.feedback.byStatus}
-              />
-            </>
-          ) : (
-            <p className="text-sm text-muted-foreground">
-              Unavailable for this period.
-            </p>
-          )}
-        </MetricCard>
-      </section>
+      <Card>
+        <details>
+          <summary className="cursor-pointer px-4 py-4 text-base leading-tight font-semibold sm:px-5">
+            All numbers
+          </summary>
+          <div className="overflow-x-auto px-4 pb-4 sm:px-5 sm:pb-5">
+            <table className="w-full text-sm">
+              <tbody>
+                {allNumberGroups(metrics).map((group) => (
+                  <AllNumbersGroup key={group.title} group={group} />
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </details>
+      </Card>
     </ActivityShell>
+  );
+}
+
+// Every metric the visual cards show, as label/value pairs. Labels match the
+// cards, so the table is the same data in text form.
+function allNumberGroups(metrics: ValidationMetrics) {
+  const feedback = metrics.feedback;
+  const feedbackRows: [string, string][] = feedback
+    ? [
+        ["Submissions in period", formatCount(feedback.total)],
+        ...FEEDBACK_CATEGORY_ORDER.map(
+          (category): [string, string] => [
+            `Category: ${humanize(category)}`,
+            formatCount(feedback.byCategory[category]),
+          ],
+        ),
+        ...FEEDBACK_STATUS_ORDER.map(
+          (status): [string, string] => [
+            `Status: ${humanize(status)}`,
+            formatCount(feedback.byStatus[status]),
+          ],
+        ),
+      ]
+    : [["Feedback", "Unavailable for this period."]];
+
+  return [
+    {
+      title: "Providers",
+      rows: [
+        [
+          "Onboarded in period (total)",
+          formatCount(metrics.providers.onboardedInPeriod.total),
+        ],
+        [
+          "Onboarded in period (shop)",
+          formatCount(metrics.providers.onboardedInPeriod.shop),
+        ],
+        [
+          "Onboarded in period (independent)",
+          formatCount(metrics.providers.onboardedInPeriod.independent),
+        ],
+        ["All time (total)", formatCount(metrics.providers.allTime.total)],
+        ["All time (shop)", formatCount(metrics.providers.allTime.shop)],
+        [
+          "All time (independent)",
+          formatCount(metrics.providers.allTime.independent),
+        ],
+      ] as [string, string][],
+    },
+    {
+      title: "Activity",
+      rows: [
+        [
+          "Active providers",
+          formatCount(metrics.activity.distinctProviders),
+        ],
+        [
+          "Repeat providers (2 or more days)",
+          formatCount(metrics.activity.repeatProviders),
+        ],
+      ] as [string, string][],
+    },
+    {
+      title: "Staff",
+      rows: [
+        [
+          "Active memberships (now)",
+          formatCount(metrics.staff.memberships),
+        ],
+        ["Shops with staff (now)", formatCount(metrics.staff.shopsWithStaff)],
+      ] as [string, string][],
+    },
+    {
+      title: "Repairs",
+      rows: [
+        ["Created in period", formatCount(metrics.repairs.created.total)],
+        [
+          "From customer request",
+          formatCount(metrics.repairs.created.customerRequest),
+        ],
+        [
+          "Provider created",
+          formatCount(metrics.repairs.created.providerCreated),
+        ],
+        [
+          "Reached READY in period",
+          formatCount(metrics.repairs.readyReached),
+        ],
+        ["Completed in period", formatCount(metrics.repairs.completed)],
+        ...REPAIR_STATUS_ORDER.map(
+          (status): [string, string] => [
+            `Status now: ${humanize(status)}`,
+            formatCount(metrics.repairs.statusNow[status]),
+          ],
+        ),
+      ] as [string, string][],
+    },
+    {
+      title: "Requests",
+      rows: [
+        ["Received in period", formatCount(metrics.requests.received)],
+        ["Decided in period", formatCount(metrics.requests.decided.total)],
+        ["Accepted", formatCount(metrics.requests.decided.accepted)],
+        ["Declined", formatCount(metrics.requests.decided.declined)],
+        ["Pending (now)", formatCount(metrics.requests.pendingNow)],
+        [
+          "Conversion (submission cohort)",
+          formatPercent(metrics.requests.conversionPercent),
+        ],
+        [
+          "Mean decision time",
+          formatDuration(metrics.requests.meanDecisionSeconds),
+        ],
+      ] as [string, string][],
+    },
+    {
+      title: "Tracking",
+      rows: [
+        ["Views in period", formatCount(metrics.tracking.periodViews)],
+        [
+          "Distinct repairs viewed in period",
+          formatCount(metrics.tracking.periodRepairsViewed),
+        ],
+        [
+          "Adoption (all time)",
+          formatPercent(metrics.tracking.adoptionPercent),
+        ],
+      ] as [string, string][],
+    },
+    { title: "Feedback", rows: feedbackRows },
+  ];
+}
+
+function AllNumbersGroup({
+  group,
+}: {
+  group: { title: string; rows: [string, string][] };
+}) {
+  return (
+    <>
+      <tr>
+        <th
+          scope="colgroup"
+          colSpan={2}
+          className="pt-4 pb-1 text-left font-mono text-xs tracking-wider text-muted-foreground uppercase"
+        >
+          {group.title}
+        </th>
+      </tr>
+      {group.rows.map(([label, value]) => (
+        <tr key={label} className="border-b border-border last:border-b-0">
+          <th scope="row" className="py-2 pr-4 text-left font-normal">
+            {label}
+          </th>
+          <td className="py-2 text-right font-semibold tabular-nums">
+            {value}
+          </td>
+        </tr>
+      ))}
+    </>
   );
 }
 
@@ -569,7 +843,7 @@ function ChartCard({
         <h2 className="text-base leading-tight font-semibold">{title}</h2>
         <CardDescription>{description}</CardDescription>
       </CardHeader>
-      <CardContent className="px-2 pb-4 sm:px-3 sm:pb-5">
+      <CardContent className="space-y-4 px-4 pb-4 sm:px-5 sm:pb-5">
         {children}
       </CardContent>
     </Card>
@@ -586,7 +860,7 @@ function DailyChart({
   rows: ChartRow[];
 }) {
   if (!hasActivity(rows)) {
-    return <NoActivityState />;
+    return <NoneState message="No activity in this period" />;
   }
 
   return (
@@ -606,22 +880,80 @@ function RankedChart({
   rows: { key: string; label: string; value: number }[];
 }) {
   if (!hasActivity(rows)) {
-    return <NoActivityState />;
+    return <NoneState message="No activity in this period" />;
   }
 
   return (
     <CategoryBarChart
       summary={rankedSummary(title, rows)}
-      data={rows.map((row) => ({ ...row, color: "var(--chart-1)" }))}
+      data={rows.map((row) => ({ ...row, color: "var(--chart-cat-1)" }))}
     />
   );
 }
 
-function NoActivityState() {
+function Donut({
+  title,
+  rows,
+  emptyMessage,
+}: {
+  title: string;
+  rows: { key: string; label: string; value: number }[];
+  emptyMessage: string;
+}) {
+  if (!hasActivity(rows)) {
+    return <NoneState message={emptyMessage} />;
+  }
+
+  return (
+    <DonutChart
+      summary={breakdownSummary(title, rows)}
+      data={categorical(rows)}
+    />
+  );
+}
+
+function RepeatShare({ percent }: { percent: number | null }) {
+  if (percent === null) {
+    return <NoneValue label="Repeat share" />;
+  }
+
+  return (
+    <GaugeChart
+      summary={percentSummary("Repeat share", percent)}
+      label="Repeat share"
+      percent={percent}
+    />
+  );
+}
+
+function AdoptionGauge({ percent }: { percent: number | null }) {
+  if (percent === null) {
+    return <NoneValue label="Adoption (all time)" />;
+  }
+
+  return (
+    <GaugeChart
+      summary={percentSummary("Adoption (all time)", percent)}
+      label="Adoption (all time)"
+      percent={percent}
+    />
+  );
+}
+
+function NoneValue({ label }: { label: string }) {
+  return (
+    <div className="flex h-[200px] flex-col items-center justify-center gap-1">
+      <p className="text-3xl font-semibold tabular-nums">N/A</p>
+      <p className="text-sm text-muted-foreground">{label}</p>
+    </div>
+  );
+}
+
+function NoneState({ message }: { message: string }) {
   return (
     <Empty className="min-h-48 p-6">
       <EmptyHeader>
-        <EmptyTitle>No activity in this period</EmptyTitle>
+        <EmptyTitle>{message}</EmptyTitle>
       </EmptyHeader>
     </Empty>
   );
@@ -635,52 +967,5 @@ function UnavailableState() {
         <EmptyDescription>Unavailable for this period.</EmptyDescription>
       </EmptyHeader>
     </Empty>
-  );
-}
-
-function MetricCard({
-  title,
-  children,
-}: {
-  title: string;
-  children: ReactNode;
-}) {
-  return (
-    <Card>
-      <CardHeader className="px-4 pt-4 pb-0 sm:px-5 sm:pt-5">
-        <h2 className="text-base leading-tight font-semibold">{title}</h2>
-      </CardHeader>
-      <CardContent className="space-y-2 px-4 pb-4 sm:px-5 sm:pb-5">
-        {children}
-      </CardContent>
-    </Card>
-  );
-}
-
-function Stat({ label, value }: { label: string; value: string }) {
-  return (
-    <div className="flex items-baseline justify-between gap-3 border-b border-border py-2 last:border-b-0">
-      <span className="text-sm text-muted-foreground">{label}</span>
-      <span className="text-sm font-semibold tabular-nums">{value}</span>
-    </div>
-  );
-}
-
-function CountGroup({
-  title,
-  counts,
-}: {
-  title: string;
-  counts: Record<string, number>;
-}) {
-  return (
-    <div className="pt-2">
-      <p className="font-mono text-xs tracking-wider text-muted-foreground uppercase">
-        {title}
-      </p>
-      {Object.entries(counts).map(([key, count]) => (
-        <Stat key={key} label={humanize(key)} value={formatCount(count)} />
-      ))}
-    </div>
   );
 }
