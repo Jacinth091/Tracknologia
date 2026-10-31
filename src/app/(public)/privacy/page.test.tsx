@@ -8,7 +8,7 @@ describe("privacy page", () => {
     const html = renderToStaticMarkup(<PrivacyPage />);
 
     for (const heading of [
-      "1. Feedback (approved 2026-10-30, unchanged)",
+      "1. Feedback",
       "2. Repair requests and repairs (customers)",
       "3. Tracking a repair",
       "4. Repair shops and repairers (Provider accounts)",

@@ -44,7 +44,7 @@ export default function PrivacyPage() {
 
           <section aria-labelledby="privacy-feedback">
             <h2 id="privacy-feedback" className={SECTION_HEADING_CLASS}>
-              1. Feedback (approved 2026-10-30, unchanged)
+              1. Feedback
             </h2>
             <div className="mt-3 text-sm leading-relaxed text-muted-foreground">
               <FeedbackPrivacyNotice />
