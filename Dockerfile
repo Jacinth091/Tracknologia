@@ -64,8 +64,9 @@ ENV NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY=${NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY}
 
 RUN --mount=type=cache,target=/app/.next/cache \
     SUPABASE_SERVICE_ROLE_KEY=build-only-service-role-placeholder \
-    RESEND_API_KEY=re_build_only_placeholder \
-    RESEND_FROM_EMAIL="Tracknologia <noreply@build.invalid>" \
+    SMTP_HOST=smtp.gmail.com \
+    SMTP_USER=build-only@build.invalid \
+    SMTP_PASSWORD=smtp_build_only_placeholder \
     PUBLIC_ABUSE_HMAC_SECRET=build-only-hmac-placeholder-32-chars \
     PUBLIC_ABUSE_TRUSTED_PROXY_SECRET=build-only-proxy-placeholder-32-chars \
     pnpm build
