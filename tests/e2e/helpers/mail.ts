@@ -34,10 +34,19 @@ type MailpitSummary = {
   Created?: string;
 };
 type MailpitSearch = { messages?: MailpitSummary[] };
-type MailpitMessage = MailBody & {
-  Subject?: string;
-  To?: { Address: string }[];
-};
+// Mailpit returns the detail with capitalized fields.
+type MailpitMessage = { Subject?: string; Text?: string; HTML?: string };
+// The shape the link rules read: lowercase bodies, plus the subject for
+// diagnostics.
+type MailMessage = MailBody & { subject?: string };
+
+function toMailMessage(message: MailpitMessage): MailMessage {
+  return {
+    subject: message.Subject,
+    text: message.Text,
+    html: message.HTML,
+  };
+}
 
 const LOCAL_HOSTS = new Set(["localhost", "127.0.0.1", "::1"]);
 
@@ -84,9 +93,7 @@ export async function purgeRecoveryMailbox(email: string): Promise<void> {
 }
 
 /** The recipient's messages, newest first, with their bodies. */
-async function fetchRecipientMessages(
-  email: string,
-): Promise<MailpitMessage[]> {
+async function fetchRecipientMessages(email: string): Promise<MailMessage[]> {
   let summaries: MailpitSummary[] = [];
   try {
     const response = await fetch(
@@ -104,14 +111,15 @@ async function fetchRecipientMessages(
     (a, b) => Date.parse(b.Created ?? "") - Date.parse(a.Created ?? ""),
   );
 
-  const messages: MailpitMessage[] = [];
+  const messages: MailMessage[] = [];
   for (const summary of newestFirst) {
     try {
       const response = await fetch(
         `${MAILPIT_URL}/api/v1/message/${encodeURIComponent(summary.ID)}`,
       );
       if (!response.ok) continue;
-      messages.push((await response.json()) as MailpitMessage);
+      const detail = (await response.json()) as MailpitMessage;
+      messages.push(toMailMessage(detail));
     } catch {
       continue;
     }
@@ -126,13 +134,13 @@ async function fetchRecipientMessages(
  */
 function diagnose(
   email: string,
-  messages: MailpitMessage[],
+  messages: MailMessage[],
   deadlineMs: number,
 ): string {
   const lines = messages.map((message, index) => {
     const links = describeLinks(message);
     const linkText = links.length > 0 ? links.join("; ") : "no links";
-    return `  [${index + 1}] subject "${message.Subject ?? ""}" — ${linkText}`;
+    return `  [${index + 1}] subject "${message.subject ?? ""}" — ${linkText}`;
   });
   return (
     `[E2E fixture] no recovery verify link for ${email} within ${deadlineMs}ms. ` +
@@ -158,7 +166,7 @@ export async function findRecoveryLink(
   const expected = expectation();
   const deadlineMs = options.deadlineMs ?? 20_000;
   const deadline = Date.now() + deadlineMs;
-  let lastMessages: MailpitMessage[] = [];
+  let lastMessages: MailMessage[] = [];
 
   while (Date.now() < deadline) {
     lastMessages = await fetchRecipientMessages(email);
