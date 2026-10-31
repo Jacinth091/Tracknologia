@@ -209,7 +209,7 @@ missing groups and days, so the summary always lists every category, source,
 status, and day in the window.
 
 `status` is a **current snapshot**, not a historical transition count.
-`retention` reports `UNAPPROVED` and `RETAINED_ROWS_ONLY`, so the summary
+`retention` reports `APPROVED` and `RETAINED_ROWS_ONLY`, so the summary
 never implies an all-time total. No row identifiers, text, nonce, or
 reviewer identity appear in the result.
 
