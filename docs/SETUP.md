@@ -181,7 +181,11 @@ launch. The owner approved running the check here (#109, 2026-10-30).
    - Note the Supabase Auth email rate limit and Gmail's daily sending limit. If either blocks a flow, record that flow as failed.
    - **A failure is NO-GO for the pilot.** Do not fix it by turning off email confirmation in production; the app rejects `NEXT_PUBLIC_REQUIRE_EMAIL_CONFIRMATION=false` at startup.
    - If Google offers no App Password for the project account (some Google Workspace policies block them), use another SMTP provider the owner has approved, then repeat this step.
-5. Record pass or fail for each check, including both hosted Auth flows, the deployed SHA and the date only. Do not record IP
+5. Check app staff-invitation email. This uses the app's own `SMTP_*` settings, separate from Supabase Auth:
+   - If `SMTP_HOST`, `SMTP_USER` and `SMTP_PASSWORD` are set on Vercel for this deployment, a test Shop OWNER invites a **non-team** test mailbox from the Team page. Confirm the invitation email arrives and its link opens the registration page.
+   - If the SMTP settings are intentionally unset, do not claim email invitations work. Confirm the Team page shows "Invitation created" with a Copy Link button, and record that the pilot runs on Copy Link only.
+   - If delivery fails, the invitation must still show its Copy Link. Record the failure, and do not advertise email invitations until this check passes.
+6. Record pass or fail for each check, including both hosted Auth flows and the app invitation check, the deployed SHA and the date only. Do not record IP
    addresses, tracking codes, message bodies, links or credentials.
 
 ### Test data cleanup

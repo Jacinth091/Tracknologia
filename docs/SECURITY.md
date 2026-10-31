@@ -28,6 +28,7 @@ Key invariants:
 - **Forbidden Ingress Bypasses**: `PUBLIC_ABUSE_SHARED_DEV_BUCKET=true` and `NEXT_PUBLIC_REQUIRE_EMAIL_CONFIRMATION=false` are explicitly rejected in production to prevent silent security degradation.
 - **Secret Privacy**: Configuration validation errors and email client error logs MUST NEVER leak API keys, HMAC secrets, bearer tokens, or email message bodies. Dev email logging executes ONLY when no SMTP settings are configured in local/development mode, printing only safe non-sensitive metadata (recipient address, sender address, subject line).
 - **Browser Bundle Scan**: Server secrets are read only in the `server-only` config seam and are never `NEXT_PUBLIC_*`. The CI `Verify` build then searches `.next/static` for the build's placeholder values of `SUPABASE_SERVICE_ROLE_KEY`, `SMTP_PASSWORD`, `PUBLIC_ABUSE_HMAC_SECRET` and `PUBLIC_ABUSE_TRUSTED_PROXY_SECRET`, and fails if any appears or the directory is empty.
+- **SMTP TLS**: App SMTP requires TLS before any login or message data. Port 465 uses implicit TLS, and every other port requires STARTTLS. Certificates are always verified.
 
 ## Authentication
 
