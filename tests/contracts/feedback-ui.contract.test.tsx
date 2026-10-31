@@ -24,6 +24,9 @@ vi.mock("react", async (importOriginal) => ({
   useActionState: actionState,
 }));
 vi.mock("next/navigation", () => ({ usePathname: pathname }));
+vi.mock("next/headers", () => ({
+  cookies: vi.fn(async () => ({ getAll: () => [] })),
+}));
 vi.mock("next/server", async (importOriginal) => ({
   ...(await importOriginal<typeof import("next/server")>()),
   connection,
