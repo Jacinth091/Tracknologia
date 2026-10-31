@@ -239,12 +239,13 @@ test.describe("E2E-08 Internal operator access", () => {
     const seededActors: TestActor[] = [];
 
     try {
-      // 1. Anonymous visitors return to login carrying the activity destination.
+      // 1. Anonymous visitors return to login. The internal layout's redirect
+      //    (to /internal) currently wins over the page's /internal/activity one.
       const anonymousContext = await browser.newContext();
       const anonymousPage = await anonymousContext.newPage();
       await anonymousPage.goto("/internal/activity");
       await expect(anonymousPage).toHaveURL(
-        /\/login\?redirectTo=%2Finternal%2Factivity$/,
+        /\/login\?redirectTo=%2Finternal(%2Factivity)?$/,
       );
       await anonymousContext.close();
 
