@@ -65,3 +65,11 @@ export function breakdownSummary(title: string, rows: ChartRow[]) {
 export function percentSummary(title: string, percent: number | null) {
   return percent === null ? `${title}, N/A` : `${title}, ${percent}%`;
 }
+
+// The ChartConfig for a series: each key carries its text label (for legends
+// and tooltips) and its colour token.
+export function seriesConfig(rows: { key: string; label: string; color: string }[]) {
+  return Object.fromEntries(
+    rows.map((row) => [row.key, { label: row.label, color: row.color }]),
+  );
+}

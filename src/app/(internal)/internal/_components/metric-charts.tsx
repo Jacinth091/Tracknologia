@@ -20,11 +20,16 @@ import {
   ChartTooltip,
   ChartTooltipContent,
 } from "@/components/ui/chart";
+import { seriesConfig } from "./chart-data";
 
 // Plain serialisable props from the Server Component pages. The caller decides
 // when to show an empty state instead of a chart; no data is fetched here.
 
 type Slice = { key: string; label: string; value: number; color: string };
+
+// One horizontal bar row is about 32px, plus room for the axis.
+const ROW_HEIGHT = 32;
+const ROW_PADDING = 24;
 
 export function DayBarChart({
   seriesLabel,
@@ -40,7 +45,7 @@ export function DayBarChart({
       config={{ value: { label: seriesLabel, color: "var(--chart-cat-1)" } }}
       role="img"
       aria-label={summary}
-      className="aspect-auto h-[200px] w-full"
+      className="aspect-auto h-[180px] w-full"
     >
       <BarChart data={data} margin={{ top: 20, right: 4, left: 4, bottom: 0 }}>
         <XAxis
@@ -73,7 +78,7 @@ export function DayBarChart({
 }
 
 // Horizontal bars in the order given. Each row names its colour token, so a
-// series can use one hue or a fixed sequence.
+// series can use one hue or a fixed sequence. The height follows the row count.
 export function CategoryBarChart({
   summary,
   data,
@@ -81,16 +86,13 @@ export function CategoryBarChart({
   summary: string;
   data: Slice[];
 }) {
-  const config = Object.fromEntries(
-    data.map((row) => [row.key, { label: row.label, color: row.color }]),
-  );
-
   return (
     <ChartContainer
-      config={config}
+      config={seriesConfig(data)}
       role="img"
       aria-label={summary}
-      className="aspect-auto h-[200px] w-full"
+      className="aspect-auto w-full"
+      style={{ height: data.length * ROW_HEIGHT + ROW_PADDING }}
     >
       <BarChart
         data={data}
@@ -125,8 +127,9 @@ export function CategoryBarChart({
   );
 }
 
-// Categorical donut: every slice has a value label and the legend names each
-// slice, so identity never rests on colour alone.
+// Categorical donut: every slice has a value label, and the legend names each
+// slice by its config label, so identity never rests on colour alone. The
+// caller passes only non-zero slices.
 export function DonutChart({
   summary,
   data,
@@ -134,23 +137,19 @@ export function DonutChart({
   summary: string;
   data: Slice[];
 }) {
-  const config = Object.fromEntries(
-    data.map((row) => [row.key, { label: row.label, color: row.color }]),
-  );
-
   return (
     <ChartContainer
-      config={config}
+      config={seriesConfig(data)}
       role="img"
       aria-label={summary}
-      className="aspect-auto h-[240px] w-full"
+      className="aspect-auto h-[180px] w-full"
     >
       <PieChart>
-        <ChartTooltip content={<ChartTooltipContent hideLabel />} />
+        <ChartTooltip content={<ChartTooltipContent hideLabel nameKey="key" />} />
         <Pie
           data={data}
           dataKey="value"
-          nameKey="label"
+          nameKey="key"
           innerRadius="55%"
           outerRadius="80%"
           paddingAngle={2}
@@ -163,7 +162,7 @@ export function DonutChart({
             className="fill-foreground text-xs font-medium tabular-nums"
           />
         </Pie>
-        <ChartLegend content={<ChartLegendContent />} />
+        <ChartLegend content={<ChartLegendContent nameKey="key" />} />
       </PieChart>
     </ChartContainer>
   );
@@ -186,7 +185,7 @@ export function GaugeChart({
         config={{ value: { label, color: "var(--chart-cat-1)" } }}
         role="img"
         aria-label={summary}
-        className="aspect-auto h-[200px] w-full"
+        className="aspect-auto h-[160px] w-full"
       >
         <RadialBarChart
           data={[{ name: label, value: percent }]}
@@ -205,7 +204,7 @@ export function GaugeChart({
           />
         </RadialBarChart>
       </ChartContainer>
-      <p className="pointer-events-none absolute inset-x-0 bottom-8 text-center text-3xl font-semibold tabular-nums">
+      <p className="pointer-events-none absolute inset-x-0 bottom-6 text-center text-3xl font-semibold tabular-nums">
         {percent}%
       </p>
     </div>
