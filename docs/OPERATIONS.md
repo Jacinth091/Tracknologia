@@ -274,9 +274,10 @@ where operator_user_id = '<operator-auth-user-uuid>'::uuid
 order by created_at desc;
 ```
 
-Then have the operator sign in and confirm `/internal` renders. A successful
-sensitive render appends an `INTERNAL_ACCESS_VIEW` event; no application session
-inherits access merely from an Auth login.
+Then have the operator sign in normally at `/login`; they land on `/internal`
+and should confirm it renders. A successful sensitive render appends an
+`INTERNAL_ACCESS_VIEW` event; no application session inherits access merely
+from an Auth login.
 
 ### Revoke
 
