@@ -68,7 +68,9 @@ export function percentSummary(title: string, percent: number | null) {
 
 // The ChartConfig for a series: each key carries its text label (for legends
 // and tooltips) and its colour token.
-export function seriesConfig(rows: { key: string; label: string; color: string }[]) {
+export function seriesConfig(
+  rows: { key: string; label: string; color: string }[],
+) {
   return Object.fromEntries(
     rows.map((row) => [row.key, { label: row.label, color: row.color }]),
   );

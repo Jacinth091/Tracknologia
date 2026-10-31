@@ -145,7 +145,9 @@ export function DonutChart({
       className="aspect-auto h-[180px] w-full"
     >
       <PieChart>
-        <ChartTooltip content={<ChartTooltipContent hideLabel nameKey="key" />} />
+        <ChartTooltip
+          content={<ChartTooltipContent hideLabel nameKey="key" />}
+        />
         <Pie
           data={data}
           dataKey="value"
