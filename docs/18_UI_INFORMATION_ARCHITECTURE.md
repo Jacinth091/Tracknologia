@@ -206,6 +206,10 @@ Internal operations / Operator without displaying a Provider identity.
 
 ## Authenticated Provider area
 
+Provider overview, lists, team, and feedback pages use direct page headings
+without repeated section eyebrows. The heading remains the primary wayfinding
+label; other surfaces can retain their contextual labels.
+
 ### Settings
 
 Settings uses a vertical tab menu beside a shared content column on desktop,
@@ -228,6 +232,10 @@ Four stat tiles — Active, Waiting, Ready, and Completed — each carry a hugei
 icon and status accent and link to the matching filtered Repair list. `Create
 Repair` is the single primary action.
 
+The tiles use compact horizontal icon/count groups. The shared request-link
+panel keeps the full selectable URL, Copy/Open controls, acceptance badge, and
+Settings link together with wrapping appropriate to sidebars and phone screens.
+
 Below the tiles, **Needs attention** groups `READY` repairs (ready for handover),
 `AWAITING_APPROVAL` repairs, and `SUBMITTED` Repair Requests, capped at five rows
 and built from the existing list queries. Each group links to its filtered list,
@@ -243,13 +251,29 @@ Do not force shop-only widgets such as branch/staff workload onto Independent Re
 Repairs and Requests use one dense bordered list. Each row is a single link:
 
 ```text
-[gauge]  Lenovo IdeaPad 3 · Battery issue        [IN_PROGRESS]
+[gauge]  Lenovo IdeaPad 3                       [IN_PROGRESS]
+         Battery issue
          TN-2026-00125 · Juan Dela Cruz · Updated 10:32
 ```
 
-Device and reported problem stay bold; the meta line is Geist Mono. Rows keep
-larger phone targets. Status filters preserve the current search query (`q`) and
+Device identity is emphasized separately from the reported problem, and each
+can wrap to two lines. Codes retain Geist Mono; customer and timestamp metadata
+wrap independently in the body typeface. Status badges stay visible, with
+keyboard focus on the full row. Pagination controls and status filters keep
+phone-sized targets. Status filters preserve the current search query (`q`) and
 mark the active filter with the yellow underline.
+
+### Team and feedback
+
+The invitation form uses a visible Staff Email label and a full-width action,
+avoiding a squeezed field/button row in the desktop sidebar. Member names and
+roles wrap, and dates use readable body text. Generated invitation codes wrap
+within their panel. Existing recipient, expiry, and removal rules still apply.
+
+Provider feedback uses a centered form column. The shared public/Provider form
+has one defined surface, clear category selection, a grouped send/privacy row,
+and a separated privacy disclosure. Approved notice wording, retry handling,
+and personal-details warnings are unchanged.
 
 Repair search accepts common customer/device punctuation. Invalid bounded input
 is preserved in the field and receives an inline validation message rather than
