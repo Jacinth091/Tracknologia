@@ -98,9 +98,7 @@ test.describe("E2E-08 Internal operator access", () => {
       const internalResponse = await operatorPage.goto("/internal");
       expect(internalResponse?.status()).toBe(200);
       await expect(
-        operatorPage
-          .getByRole("heading", { name: "Internal operations" })
-          .first(),
+        operatorPage.getByRole("heading", { name: "Overview" }).first(),
       ).toBeVisible();
 
       // The explicit visit must persist at least one new view event for this
@@ -162,7 +160,7 @@ test.describe("E2E-08 Internal operator access", () => {
           }),
         ).toBeVisible();
         await expect(
-          operatorPage.getByRole("heading", { name: "Internal operations" }),
+          operatorPage.getByRole("heading", { name: "Overview" }),
         ).toHaveCount(0);
 
         const knownFaultIds = new Set(
@@ -179,9 +177,7 @@ test.describe("E2E-08 Internal operator access", () => {
       const recovered = await operatorPage.goto("/internal");
       expect(recovered?.status()).toBe(200);
       await expect(
-        operatorPage
-          .getByRole("heading", { name: "Internal operations" })
-          .first(),
+        operatorPage.getByRole("heading", { name: "Overview" }).first(),
       ).toBeVisible();
 
       // 3. Revocation applies to the same session on the next request.
@@ -189,7 +185,7 @@ test.describe("E2E-08 Internal operator access", () => {
       const afterRevoke = await operatorPage.goto("/internal");
       expect(afterRevoke?.status()).toBe(404);
       await expect(
-        operatorPage.getByRole("heading", { name: "Internal operations" }),
+        operatorPage.getByRole("heading", { name: "Overview" }),
       ).toHaveCount(0);
       await operatorContext.close();
 
@@ -248,7 +244,7 @@ test.describe("E2E-08 Internal operator access", () => {
         .click();
       await expect(page).toHaveURL(/\/internal$/, { timeout: 20_000 });
       await expect(
-        page.getByRole("heading", { name: "Internal operations" }).first(),
+        page.getByRole("heading", { name: "Overview" }).first(),
       ).toBeVisible();
       await context.close();
     } finally {

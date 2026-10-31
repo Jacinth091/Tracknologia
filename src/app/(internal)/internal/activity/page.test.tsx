@@ -33,6 +33,28 @@ vi.mock("next/navigation", () => ({
   },
 }));
 
+// The charts are client components; the page's props are what these tests
+// check, so the chart components render as plain markers.
+type DayChartProps = {
+  seriesLabel: string;
+  summary: string;
+  data: { label: string; value: number }[];
+};
+type RankedChartProps = {
+  summary: string;
+  data: { key: string; label: string; value: number; color: string }[];
+};
+
+const charts = vi.hoisted(() => ({
+  DayBarChart: vi.fn((_props: DayChartProps) => "DAY_BAR_CHART"),
+  CategoryBarChart: vi.fn((_props: RankedChartProps) => "CATEGORY_BAR_CHART"),
+}));
+
+vi.mock("../_components/metric-charts", () => ({
+  DayBarChart: charts.DayBarChart,
+  CategoryBarChart: charts.CategoryBarChart,
+}));
+
 vi.mock("next/link", () => ({
   default: ({ children }: { children: unknown }) => children,
 }));
@@ -175,22 +197,44 @@ describe("Validation metrics page", () => {
     expect(html).toContain("Asia/Manila");
   });
 
-  it("renders each chart with its heading and summary", async () => {
-    const html = await renderActivity();
+  it("passes each chart its rows and summary, in order", async () => {
+    await renderActivity();
 
-    expect(html).toContain("<h2");
-    expect(html).toContain(
-      'aria-label="Active providers per day, Oct 24 to Oct 30, peak 3 on Oct 27"',
+    const [providers, feedback] = charts.DayBarChart.mock.calls.map(
+      ([props]) => props,
     );
-    expect(html).toContain(
-      'aria-label="Feedback per day, Oct 24 to Oct 30, peak 2 on Oct 26"',
+    expect(providers.seriesLabel).toBe("Active providers");
+    expect(providers.summary).toBe(
+      "Active providers per day, Oct 24 to Oct 30, peak 3 on Oct 27",
     );
-    expect(html).toContain(
-      'aria-label="Repairs by status (now), largest Completed at 33"',
+    expect(providers.data[3]).toEqual({ label: "Oct 27", value: 3 });
+    expect(feedback.summary).toBe(
+      "Feedback per day, Oct 24 to Oct 30, peak 2 on Oct 26",
     );
-    expect(html).toContain(
-      'aria-label="Feedback by category, largest Usability at 3"',
+
+    const [status, category] = charts.CategoryBarChart.mock.calls.map(
+      ([props]) => props,
     );
+    expect(status.summary).toBe(
+      "Repairs by status (now), largest Completed at 33",
+    );
+    expect(status.data.map((row: { label: string }) => row.label)).toEqual([
+      "In progress",
+      "Waiting for parts",
+      "Awaiting approval",
+      "Ready",
+      "Completed",
+    ]);
+    expect(status.data[0].color).toBe("var(--chart-1)");
+    expect(category.summary).toBe(
+      "Feedback by category, largest Usability at 3",
+    );
+    expect(category.data.map((row: { label: string }) => row.label)).toEqual([
+      "Bug",
+      "Usability",
+      "Feature request",
+      "General",
+    ]);
   });
 
   it("shows Unavailable in place of the feedback charts", async () => {
@@ -203,11 +247,12 @@ describe("Validation metrics page", () => {
 
     expect(html).toContain("Feedback per day");
     expect(html).toContain("Feedback by category");
-    expect(html).not.toContain("Feedback per day, ");
-    expect(html).not.toContain("Feedback by category, ");
+    expect(html).toContain("Unavailable");
+    expect(charts.DayBarChart).toHaveBeenCalledTimes(1);
+    expect(charts.CategoryBarChart).toHaveBeenCalledTimes(1);
   });
 
-  it("notes no activity when every daily value is zero", async () => {
+  it("shows the empty state, not an all-zero chart", async () => {
     feature.getValidationMetrics.mockResolvedValue({
       ...fixture,
       activity: {
@@ -221,10 +266,11 @@ describe("Validation metrics page", () => {
 
     const html = await renderActivity();
 
-    expect(html).toContain(
-      "Active providers per day, Oct 24 to Oct 30, no activity in this period",
+    expect(html).toContain("No activity in this period");
+    expect(charts.DayBarChart).toHaveBeenCalledTimes(1);
+    expect(charts.DayBarChart.mock.calls[0][0].seriesLabel).toBe(
+      "Submissions",
     );
-    expect(html).toContain("No activity in this period.");
   });
 
   it("renders null ratios as N/A, never as 0", async () => {
