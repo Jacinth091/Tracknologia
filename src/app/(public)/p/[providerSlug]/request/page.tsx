@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 
 import { PageHeader } from "@/components/shared/page-header";
+import { PublicFooter } from "@/components/shared/public-footer";
 import { PublicHeader } from "@/components/shared/public-header";
 import {
   Card,
@@ -48,6 +49,7 @@ export default async function PublicRepairRequestPage({
             </Card>
           </div>
         </main>
+        <PublicFooter />
       </div>
     );
   }
@@ -79,6 +81,8 @@ export default async function PublicRepairRequestPage({
           />
         </div>
       </main>
+
+      <PublicFooter />
     </div>
   );
 }

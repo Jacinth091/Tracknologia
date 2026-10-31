@@ -8,7 +8,7 @@ import {
   SmartPhone01Icon,
   Wrench01Icon,
 } from "@hugeicons/core-free-icons";
-import { BrandLogo } from "@/components/shared/brand-logo";
+import { PublicFooter } from "@/components/shared/public-footer";
 import { PublicHeader } from "@/components/shared/public-header";
 import { StatusGauge } from "@/components/shared/status-gauge";
 import { buttonVariants } from "@/components/ui/button";
@@ -225,24 +225,7 @@ export default function Home() {
         </section>
       </main>
 
-      <footer className="bg-foreground py-8 text-background">
-        <div className="mx-auto flex max-w-6xl flex-col gap-6 px-4 sm:flex-row sm:items-center sm:justify-between sm:px-6">
-          <div className="flex flex-col gap-3">
-            <BrandLogo className="text-background" />
-            <p className="text-xs text-background/70">
-              Tracknologia &copy; {new Date().getFullYear()}
-            </p>
-          </div>
-          <nav aria-label="Footer navigation" className="flex gap-6 text-sm">
-            <Link href="/track" className="underline-offset-4 hover:underline">
-              Track
-            </Link>
-            <Link href="/login" className="underline-offset-4 hover:underline">
-              Sign In
-            </Link>
-          </nav>
-        </div>
-      </footer>
+      <PublicFooter />
     </div>
   );
 }

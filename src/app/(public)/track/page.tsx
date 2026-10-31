@@ -1,3 +1,4 @@
+import { PublicFooter } from "@/components/shared/public-footer";
 import { PublicHeader } from "@/components/shared/public-header";
 import { StatusGauge } from "@/components/shared/status-gauge";
 import { Card } from "@/components/ui/card";
@@ -140,6 +141,8 @@ export default async function TrackRepairPage({
           </p>
         </div>
       </main>
+
+      <PublicFooter />
     </div>
   );
 }
