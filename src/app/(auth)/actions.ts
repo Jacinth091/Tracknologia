@@ -11,6 +11,8 @@ import {
   resetPassword,
   getUser,
   signOutUser,
+  consumeRecoveryGrant,
+  hasRecoveryGrant,
   AuthError,
 } from "@/features/auth";
 import { getAppOrigin, getServerConfig } from "@/lib/config/server";
@@ -169,6 +171,17 @@ export async function forgotPasswordAction(
       redirectTo,
     });
   } catch (err: unknown) {
+    // Delivery failures (e.g. SMTP outages) would distinguish accounts that
+    // exist from unknown addresses. In production the public response stays
+    // identical to a successful request; operators still see the failure in
+    // server logs. In local/test runtimes a real error message aids debugging.
+    if (getServerConfig().runtime === "production") {
+      console.error("Password reset request failed", err);
+      return {
+        success:
+          "If an account is registered with this email, a password reset email is on its way. If you don't receive one shortly, try again later.",
+      };
+    }
     return {
       error:
         err instanceof Error ? err.message : "Failed to request password reset",
@@ -197,8 +210,11 @@ export async function updatePasswordAction(
     };
   }
 
-  // Fail closed on the trusted recovery context: the recovery exchange must
-  // have established this visitor's session before their password changes.
+  // Fail closed on the trusted recovery context. An ordinary session is not
+  // recovery authority: the visitor must carry a server-issued recovery
+  // grant (created by the Auth callback after a real one-time email code
+  // exchange) that also matches the signed-in Auth user. Forged
+  // `?flow=recovery` markers and direct action calls fail here.
   const recoveryUser = await getUser();
   if (!recoveryUser) {
     return {
@@ -207,8 +223,18 @@ export async function updatePasswordAction(
     };
   }
 
+  if (!(await hasRecoveryGrant(recoveryUser.id))) {
+    return {
+      error:
+        "Your password reset grant is missing or expired. Open a fresh recovery email link in this browser, then set your new password again.",
+    };
+  }
+
   try {
     await resetPassword({ newPassword: parsed.data.password });
+
+    // Single use: the grant is spent once its password change succeeded.
+    await consumeRecoveryGrant();
   } catch (err: unknown) {
     return {
       error: err instanceof Error ? err.message : "Failed to update password",

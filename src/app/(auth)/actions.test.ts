@@ -10,6 +10,8 @@ const mocks = vi.hoisted(() => ({
   redirect: vi.fn(),
   cookies: vi.fn(),
   setCookie: vi.fn(),
+  deleteCookie: vi.fn(),
+  getCookie: vi.fn(),
   consoleError: vi.spyOn(console, "error").mockImplementation(() => undefined),
 }));
 
@@ -22,6 +24,7 @@ vi.mock("@/lib/config/server", () => ({
   getServerConfig: () => ({
     runtime: "production",
     auth: { requireEmailConfirmation: true },
+    publicAbuse: { hmacSecret: "test_recovery_grant_secret_32_chars_long" },
   }),
 }));
 
@@ -34,6 +37,10 @@ import {
   registerAction,
   updatePasswordAction,
 } from "./actions";
+import {
+  createRecoveryGrantCookie,
+  RECOVERY_GRANT_COOKIE,
+} from "@/features/auth";
 
 function registerFormData() {
   const formData = new FormData();
@@ -56,7 +63,12 @@ function loginFormData(redirectTo?: string) {
 
 beforeEach(() => {
   vi.clearAllMocks();
-  mocks.cookies.mockResolvedValue({ set: mocks.setCookie });
+  mocks.cookies.mockResolvedValue({
+    set: mocks.setCookie,
+    get: mocks.getCookie,
+    delete: mocks.deleteCookie,
+  });
+  mocks.getCookie.mockReturnValue(undefined);
   mocks.createClient.mockResolvedValue({
     auth: {
       signUp: mocks.signUp,
@@ -220,11 +232,17 @@ describe("forgotPasswordAction", () => {
 
     const result = await forgotPasswordAction(null, formData);
 
+    // Identical response for unknown/known addresses and delivery
+    // failures; operators observe the failure through server logs only.
     expect(result).toEqual({
-      error:
-        "Unable to send password reset email at this time. Please try again later.",
+      success:
+        "If an account is registered with this email, a password reset email is on its way. If you don't receive one shortly, try again later.",
     });
     expect(JSON.stringify(result)).not.toContain(sentinel);
+    expect(mocks.consoleError).toHaveBeenCalledWith(
+      "Password reset request failed",
+      expect.objectContaining({ message: sentinel }),
+    );
   });
 });
 
@@ -236,12 +254,23 @@ describe("updatePasswordAction", () => {
     return formData;
   }
 
+  function grantRecoverySession(userId: string) {
+    const cookie = createRecoveryGrantCookie(userId);
+    mocks.getCookie.mockImplementation(
+      (name: string) =>
+        (name === RECOVERY_GRANT_COOKIE ? { value: cookie.value } : undefined) ??
+        undefined,
+    );
+    return cookie;
+  }
+
   it("sends the new password to Supabase Auth for the recovery session user", async () => {
     mocks.getAuthUser.mockResolvedValue({
       data: { user: { id: "user-1", email: "owner@shop.com" } },
       error: null,
     });
     mocks.updateUser.mockResolvedValue({ data: {}, error: null });
+    const grant = grantRecoverySession("user-1");
 
     await updatePasswordAction(null, resetFormData());
 
@@ -249,6 +278,14 @@ describe("updatePasswordAction", () => {
       password: "newPassw0rd",
     });
     expect(mocks.redirect).toHaveBeenCalledWith("/dashboard");
+    expect(mocks.setCookie).toHaveBeenCalledWith(
+      RECOVERY_GRANT_COOKIE,
+      "",
+      expect.objectContaining({ path: "/reset-password", maxAge: 0 }),
+    );
+    // Consuming the grant must not weaken the cookie contract.
+    expect(grant.options.httpOnly).toBe(true);
+    expect(grant.options.sameSite).toBe("lax");
   });
 
   it("fails closed before touching Auth when no recovery session exists", async () => {
@@ -266,6 +303,39 @@ describe("updatePasswordAction", () => {
       error:
         "Your password recovery session has expired or was never established. Request a fresh password reset email and try again.",
     });
+    expect(mocks.updateUser).not.toHaveBeenCalled();
+    expect(mocks.redirect).not.toHaveBeenCalled();
+  });
+
+  it("refuses an ordinary signed-in session that carries no recovery grant", async () => {
+    // An forged `?flow=recovery` marker plus a valid session is not
+    // recovery authority: the server-issued grant cookie is required.
+    mocks.getAuthUser.mockResolvedValue({
+      data: { user: { id: "user-1", email: "owner@shop.com" } },
+      error: null,
+    });
+
+    const result = await updatePasswordAction(null, resetFormData());
+
+    expect(result).toEqual({
+      error:
+        "Your password reset grant is missing or expired. Open a fresh recovery email link in this browser, then set your new password again.",
+    });
+    expect(mocks.updateUser).not.toHaveBeenCalled();
+    expect(mocks.redirect).not.toHaveBeenCalled();
+  });
+
+  it("does not spend a grant belonging to a different account", async () => {
+    mocks.getAuthUser.mockResolvedValue({
+      data: { user: { id: "user-2", email: "other@shop.com" } },
+      error: null,
+    });
+    mocks.updateUser.mockResolvedValue({ data: {}, error: null });
+    grantRecoverySession("user-1");
+
+    const result = await updatePasswordAction(null, resetFormData());
+
+    expect(result.error).toContain("grant is missing or expired");
     expect(mocks.updateUser).not.toHaveBeenCalled();
     expect(mocks.redirect).not.toHaveBeenCalled();
   });

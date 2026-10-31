@@ -1,3 +1,4 @@
+import { createRecoveryGrantCookie } from "@/features/auth";
 import { createClient } from "@/lib/supabase/server";
 import { getSafeInternalRedirectUrl } from "@/lib/utils";
 import { NextResponse } from "next/server";
@@ -9,22 +10,39 @@ export async function GET(request: Request) {
   const { searchParams, origin } = new URL(request.url);
   const code = searchParams.get("code");
   const next = searchParams.get("next");
+  const safeTarget = getSafeInternalRedirectUrl(next, "/confirmed");
+  const isRecoveryCallback = safeTarget === PASSWORD_RECOVERY_NEXT;
 
   if (code) {
     const supabase = await createClient();
     const { data, error } = await supabase.auth.exchangeCodeForSession(code);
     if (!error && data.user) {
-      const safeTarget = getSafeInternalRedirectUrl(next, "/confirmed");
-      // A recovery exchange has just established the password-recovery
-      // session. The reset page only trusts its form when this deliberate
-      // marker is present, so it never opens as a silent password change on
-      // an arbitrary signed-in visit, and proxy.ts forwards signed-in
-      // visitors here instead of bouncing them to the dashboard.
-      if (safeTarget === PASSWORD_RECOVERY_NEXT) {
-        return NextResponse.redirect(`${origin}/reset-password?flow=recovery`);
+      if (isRecoveryCallback) {
+        // A recovery email's one-time code has just been verified and
+        // exchanged by the server. This response hands the visitor their
+        // recovery grant cookie: the only server-issued proof the password
+        // action accepts, bound to the exchanged Auth user and short-lived.
+        // A browser marker (`?flow=recovery`) alone can never open or submit
+        // the reset form.
+        const grantCookie = createRecoveryGrantCookie(data.user.id);
+        const response = NextResponse.redirect(
+          `${origin}/reset-password?flow=recovery`,
+        );
+        response.cookies.set(grantCookie);
+        return response;
       }
       return NextResponse.redirect(`${origin}${safeTarget}`);
     }
+  }
+
+  // A failed recovery link (expired, reused, mismatched code) must show a
+  // deliberate failure even while a session already exists in this browser:
+  // /reset-password is a recovery route the proxy never bounces away from,
+  // unlike /login which redirects signed-in visitors back to the dashboard.
+  if (isRecoveryCallback) {
+    return NextResponse.redirect(
+      `${origin}/reset-password?callback_error=auth_callback_failed`,
+    );
   }
 
   // Return to login with error if verification fails
