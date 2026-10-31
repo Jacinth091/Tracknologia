@@ -1,36 +1,33 @@
 import Link from "next/link";
+import { BrandLogo } from "@/components/shared/brand-logo";
 
-// The one footer for public pages. Links are the public routes a visitor
-// might need next; it carries no session state, unlike PublicHeader.
+// The one footer for public pages: the dark brand footer from the home page.
+// It carries no session state, unlike PublicHeader.
 export function PublicFooter() {
   return (
-    <footer className="border-t border-border">
-      <nav
-        aria-label="Footer"
-        className="mx-auto flex max-w-6xl flex-col items-center justify-between gap-3 px-4 py-6 text-sm text-muted-foreground sm:flex-row sm:px-6"
-      >
-        <p>© 2026 Tracknologia</p>
-        <div className="flex flex-wrap justify-center gap-x-6 gap-y-2">
-          <Link
-            href="/privacy"
-            className="underline-offset-4 hover:text-foreground hover:underline"
-          >
-            Privacy
+    <footer className="bg-foreground py-8 text-background">
+      <div className="mx-auto flex max-w-6xl flex-col gap-6 px-4 sm:flex-row sm:items-center sm:justify-between sm:px-6">
+        <div className="flex flex-col gap-3">
+          <BrandLogo className="text-background" />
+          <p className="text-xs text-background/70">
+            Tracknologia &copy; {new Date().getFullYear()}
+          </p>
+        </div>
+        <nav aria-label="Footer navigation" className="flex gap-6 text-sm">
+          <Link href="/track" className="underline-offset-4 hover:underline">
+            Track
           </Link>
-          <Link
-            href="/feedback"
-            className="underline-offset-4 hover:text-foreground hover:underline"
-          >
+          <Link href="/feedback" className="underline-offset-4 hover:underline">
             Send feedback
           </Link>
-          <Link
-            href="/track"
-            className="underline-offset-4 hover:text-foreground hover:underline"
-          >
-            Track a repair
+          <Link href="/privacy" className="underline-offset-4 hover:underline">
+            Privacy
           </Link>
-        </div>
-      </nav>
+          <Link href="/login" className="underline-offset-4 hover:underline">
+            Sign In
+          </Link>
+        </nav>
+      </div>
     </footer>
   );
 }

@@ -21,19 +21,29 @@ vi.mock("next/link", () => ({
 import { PublicFooter } from "./public-footer";
 
 describe("PublicFooter", () => {
-  it("labels the footer navigation and shows the copyright", () => {
+  it("is the dark brand footer with a navigation landmark", () => {
     const html = renderToStaticMarkup(<PublicFooter />);
 
-    expect(html).toContain('aria-label="Footer"');
-    expect(html).toContain("© 2026 Tracknologia");
+    expect(html).toContain("bg-foreground");
+    expect(html).toContain("text-background");
+    expect(html).toContain('aria-label="Footer navigation"');
   });
 
-  it("links Privacy, Send feedback and Track a repair", () => {
+  it("shows the copyright with the current year", () => {
     const html = renderToStaticMarkup(<PublicFooter />);
 
-    expect(html.match(/<a\b/g)).toHaveLength(3);
-    expect(html).toMatch(/<a href="\/privacy"[^>]*>Privacy<\/a>/);
-    expect(html).toMatch(/<a href="\/feedback"[^>]*>Send feedback<\/a>/);
-    expect(html).toMatch(/<a href="\/track"[^>]*>Track a repair<\/a>/);
+    expect(html).toContain(`Tracknologia © ${new Date().getFullYear()}`);
+  });
+
+  it("links Track, Send feedback, Privacy and Sign In in order", () => {
+    const html = renderToStaticMarkup(<PublicFooter />);
+    const links = [...html.matchAll(/<a href="([^"]+)"[^>]*>([^<]+)<\/a>/g)];
+
+    expect(links.map((link) => [link[1], link[2]])).toEqual([
+      ["/track", "Track"],
+      ["/feedback", "Send feedback"],
+      ["/privacy", "Privacy"],
+      ["/login", "Sign In"],
+    ]);
   });
 });
