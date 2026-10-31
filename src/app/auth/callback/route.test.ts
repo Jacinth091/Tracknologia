@@ -17,6 +17,30 @@ function requestFor(query: string): Request {
   return new Request(`${ORIGIN}/auth/callback${query}`);
 }
 
+/** An access token shaped like Supabase's; the route reads only the payload. */
+function sessionWith(claims: Record<string, unknown>) {
+  const encode = (value: object) =>
+    Buffer.from(JSON.stringify(value)).toString("base64url");
+  return {
+    access_token: `${encode({ alg: "HS256", typ: "JWT" })}.${encode(claims)}.sig`,
+  };
+}
+
+function nowSeconds(offsetSeconds = 0): number {
+  return Math.floor(Date.now() / 1000) + offsetSeconds;
+}
+
+/** The exchange returns a session whose `amr` names how it was produced. */
+function exchangeReturns(
+  claims: Record<string, unknown>,
+  user: Record<string, unknown> = { id: "user-1", email: "owner@shop.com" },
+) {
+  mocks.exchangeCodeForSession.mockResolvedValue({
+    data: { user, session: sessionWith(claims) },
+    error: null,
+  });
+}
+
 beforeEach(() => {
   vi.clearAllMocks();
   mocks.createClient.mockResolvedValue({
@@ -27,16 +51,10 @@ beforeEach(() => {
 });
 
 describe("auth callback route (#126)", () => {
-  it("opens the recovery flow and sets a grant after a recent recovery request", async () => {
-    mocks.exchangeCodeForSession.mockResolvedValue({
-      data: {
-        user: {
-          id: "user-1",
-          email: "owner@shop.com",
-          recovery_sent_at: new Date().toISOString(),
-        },
-      },
-      error: null,
+  it("sets a grant only when the redeemed session is a recent recovery", async () => {
+    exchangeReturns({
+      session_id: "sess-1",
+      amr: [{ method: "recovery", timestamp: nowSeconds() }],
     });
 
     const response = await callbackRoute(
@@ -56,14 +74,23 @@ describe("auth callback route (#126)", () => {
     expect(setCookie).toContain("Max-Age=600");
   });
 
-  it("sets no grant for a recovery-routed code without recovery_sent_at", async () => {
-    mocks.exchangeCodeForSession.mockResolvedValue({
-      data: { user: { id: "user-1", email: "owner@shop.com" } },
-      error: null,
-    });
+  it("sets no grant for a valid non-recovery code, even with a recent recovery request", async () => {
+    // The user's own recovery timestamp is recent, so only the session's amr
+    // can tell that this code is not a recovery.
+    exchangeReturns(
+      {
+        session_id: "sess-1",
+        amr: [{ method: "magiclink", timestamp: nowSeconds() }],
+      },
+      {
+        id: "user-1",
+        email: "owner@shop.com",
+        recovery_sent_at: new Date().toISOString(),
+      },
+    );
 
     const response = await callbackRoute(
-      requestFor("?code=confirm-code&next=%2Freset-password"),
+      requestFor("?code=magic-code&next=%2Freset-password"),
     );
 
     expect(response.headers.get("set-cookie")).toBeNull();
@@ -72,17 +99,25 @@ describe("auth callback route (#126)", () => {
     );
   });
 
-  it("sets no grant when the recovery request is older than an hour", async () => {
-    const twoHoursAgo = new Date(Date.now() - 2 * 60 * 60 * 1000);
-    mocks.exchangeCodeForSession.mockResolvedValue({
-      data: {
-        user: {
-          id: "user-1",
-          email: "owner@shop.com",
-          recovery_sent_at: twoHoursAgo.toISOString(),
-        },
-      },
-      error: null,
+  it("sets no grant for a password or OTP session routed to recovery", async () => {
+    for (const method of ["password", "otp"]) {
+      exchangeReturns({
+        session_id: "sess-1",
+        amr: [{ method, timestamp: nowSeconds() }],
+      });
+
+      const response = await callbackRoute(
+        requestFor("?code=other-code&next=%2Freset-password"),
+      );
+
+      expect(response.headers.get("set-cookie")).toBeNull();
+    }
+  });
+
+  it("sets no grant when the recovery amr entry is older than the window", async () => {
+    exchangeReturns({
+      session_id: "sess-1",
+      amr: [{ method: "recovery", timestamp: nowSeconds(-2 * 60 * 60) }],
     });
 
     const response = await callbackRoute(
@@ -93,6 +128,18 @@ describe("auth callback route (#126)", () => {
     expect(response.headers.get("location")).toBe(
       `${ORIGIN}/reset-password?callback_error=auth_callback_failed`,
     );
+  });
+
+  it("sets no grant when the session carries no session id to bind to", async () => {
+    exchangeReturns({
+      amr: [{ method: "recovery", timestamp: nowSeconds() }],
+    });
+
+    const response = await callbackRoute(
+      requestFor("?code=no-sid-code&next=%2Freset-password"),
+    );
+
+    expect(response.headers.get("set-cookie")).toBeNull();
   });
 
   it("still redirects the email-confirmation exchange to /confirmed", async () => {

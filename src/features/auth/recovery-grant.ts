@@ -7,12 +7,17 @@ import { getServerConfig } from "@/lib/config/server";
  * Recovery grant (issue #126 security seam).
  *
  * A browser-supplied `?flow=recovery` marker and an ordinary Auth session do
- * NOT prove that a recovery email was used, so the credential-changing
- * password action requires a server-issued recovery grant instead. The grant
- * is a signed, HttpOnly cookie created by the Auth callback route only after
- * a real one-time Supabase code exchange, bound to the exchanged Auth user,
- * expiring quickly, and consumed by the Server Action that changes the
- * password. Supabase Auth still owns the credential change itself.
+ * NOT prove that a recovery email was used. The Auth callback therefore issues
+ * a grant only when the code it has just redeemed produced a recovery session:
+ * the session's access-token `amr` claim names `recovery` with a recent
+ * timestamp. The grant is a signed, HttpOnly cookie bound to the Auth user and
+ * the session id, expiring after ten minutes. The credential-changing password
+ * action accepts it only for that same user and session.
+ *
+ * Honest lifetime: this is a short-lived, user- and session-bound grant that
+ * the browser clears after a successful change. It is NOT an atomic server-side
+ * spent token. A copied cookie stays usable from the same session until it
+ * expires. Supabase Auth still owns the credential change itself.
  */
 
 export const RECOVERY_GRANT_COOKIE = "tracknologia_recovery_grant";
@@ -20,36 +25,68 @@ export const RECOVERY_GRANT_COOKIE = "tracknologia_recovery_grant";
 export const RECOVERY_GRANT_TTL_SECONDS = 10 * 60;
 
 /**
- * How old Supabase's `recovery_sent_at` may be before the callback stops
- * treating the exchanged session as a recovery. Supabase's own recovery links
- * expire on a similar scale.
+ * How old the `amr` recovery entry may be when the callback exchanges the code.
+ * A recovery link is redeemed moments after it is sent, so ten minutes is
+ * generous without accepting an old session.
  */
-export const RECOVERY_REQUEST_MAX_AGE_MS = 60 * 60 * 1000;
+export const RECOVERY_AMR_MAX_AGE_SECONDS = 10 * 60;
 
 /**
- * Supabase stamps `recovery_sent_at` with its own clock, while `now` is the app
- * server's. A few seconds of skew must not refuse a genuine, just-sent reset.
+ * Supabase stamps the `amr` timestamp with its own clock, while `now` is the
+ * app server's. A few seconds of skew must not refuse a genuine, just-used link.
  */
 export const RECOVERY_CLOCK_SKEW_MS = 60 * 1000;
 
+/** The claims this module reads from a Supabase access token. */
+export type SessionClaims = {
+  session_id?: string;
+  amr?: { method?: string; timestamp?: number }[];
+};
+
 /**
- * True when the exchanged Auth user shows a recovery email sent recently.
- * Supabase records `recovery_sent_at` when it mails a recovery link, so this is
- * the verified purpose of the exchange. The `next` parameter never is.
+ * Reads the claims of an access token that Supabase has just returned to this
+ * server. The token is decoded but not signature-verified: it came straight
+ * from `exchangeCodeForSession` or the server session cookie, and the purpose
+ * check is a decision about the response Supabase just gave us, not about a
+ * token supplied by the browser. Returns null for anything malformed.
  */
-export function hasRecentRecoveryRequest(
-  user: { recovery_sent_at?: string },
-  now: number = Date.now(),
+export function readSessionClaims(accessToken: string): SessionClaims | null {
+  const parts = accessToken.split(".");
+  if (parts.length !== 3) {
+    return null;
+  }
+
+  try {
+    const claims = JSON.parse(Buffer.from(parts[1], "base64url").toString());
+    return typeof claims === "object" && claims !== null
+      ? (claims as SessionClaims)
+      : null;
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * True when the session was produced by a recovery code: its `amr` names the
+ * `recovery` method with a timestamp inside the allowed window. The `next`
+ * parameter and any user-level field never prove purpose.
+ */
+export function isRecoverySession(
+  claims: SessionClaims | null,
+  nowMs: number = Date.now(),
 ): boolean {
-  if (!user.recovery_sent_at) {
+  if (!claims || !Array.isArray(claims.amr)) {
     return false;
   }
 
-  const sentAt = Date.parse(user.recovery_sent_at);
-  return (
-    Number.isFinite(sentAt) &&
-    sentAt <= now + RECOVERY_CLOCK_SKEW_MS &&
-    now - sentAt <= RECOVERY_REQUEST_MAX_AGE_MS
+  const nowSeconds = nowMs / 1000;
+  const skewSeconds = RECOVERY_CLOCK_SKEW_MS / 1000;
+  return claims.amr.some(
+    (entry) =>
+      entry?.method === "recovery" &&
+      typeof entry.timestamp === "number" &&
+      entry.timestamp <= nowSeconds + skewSeconds &&
+      nowSeconds - entry.timestamp <= RECOVERY_AMR_MAX_AGE_SECONDS,
   );
 }
 
@@ -84,10 +121,13 @@ function signGrantPayload(payload: string, secret: string): string {
 }
 
 /**
- * Builds the cookie set by the Auth callback route after the recovery
- * exchange. The route owns writing it to the redirect response.
+ * Builds the cookie set by the Auth callback route after a recovery session
+ * was confirmed. The route owns writing it to the redirect response.
  */
-export function createRecoveryGrantCookie(userId: string): {
+export function createRecoveryGrantCookie(
+  userId: string,
+  sessionId: string,
+): {
   name: string;
   value: string;
   options: {
@@ -100,7 +140,9 @@ export function createRecoveryGrantCookie(userId: string): {
 } {
   const config = getServerConfig();
   const exp = Math.floor(Date.now() / 1000) + RECOVERY_GRANT_TTL_SECONDS;
-  const payload = base64UrlEncode(JSON.stringify({ sub: userId, exp }));
+  const payload = base64UrlEncode(
+    JSON.stringify({ sub: userId, sid: sessionId, exp }),
+  );
   const signature = signGrantPayload(payload, config.publicAbuse.hmacSecret);
 
   return {
@@ -118,13 +160,14 @@ export function createRecoveryGrantCookie(userId: string): {
 
 /**
  * True when the browser carries a valid, unexpired recovery grant for the
- * given Auth user. Read-only: safe to call from the reset page and the
- * password action alike.
+ * given Auth user AND session. Read-only: safe to call from the reset page and
+ * the password action alike. A grant copied into another session is refused.
  */
 export async function hasRecoveryGrant(
   userId: string | undefined,
+  sessionId: string | undefined,
 ): Promise<boolean> {
-  if (!userId) {
+  if (!userId || !sessionId) {
     return false;
   }
 
@@ -153,11 +196,17 @@ export async function hasRecoveryGrant(
   }
 
   try {
-    const { sub, exp } = JSON.parse(base64UrlDecode(payload)) as {
+    const { sub, sid, exp } = JSON.parse(base64UrlDecode(payload)) as {
       sub: unknown;
+      sid: unknown;
       exp: unknown;
     };
-    return sub === userId && typeof exp === "number" && exp > Date.now() / 1000;
+    return (
+      sub === userId &&
+      sid === sessionId &&
+      typeof exp === "number" &&
+      exp > Date.now() / 1000
+    );
   } catch {
     // Malformed payloads are invalid grants; the caller fails closed.
     return false;
@@ -165,9 +214,9 @@ export async function hasRecoveryGrant(
 }
 
 /**
- * Consumes the grant after a successful password change so it cannot be
- * reused. Must be called from a Server Action (it mutates the response
- * cookies).
+ * Clears the grant cookie after a successful password change, so the browser
+ * stops sending it. This is a browser instruction, not an atomic server-side
+ * spend. It must be called from a Server Action (it mutates response cookies).
  */
 export async function consumeRecoveryGrant(): Promise<void> {
   const cookieStore = await cookies();

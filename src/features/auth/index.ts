@@ -1,5 +1,6 @@
 // Public Interface for src/features/auth
 export {
+  getCurrentSessionId,
   getUser,
   requireUser,
   getProviderContext,
@@ -40,8 +41,9 @@ export {
 export {
   consumeRecoveryGrant,
   createRecoveryGrantCookie,
-  hasRecentRecoveryRequest,
   hasRecoveryGrant,
+  isRecoverySession,
+  readSessionClaims,
   RECOVERY_GRANT_COOKIE,
   RECOVERY_GRANT_TTL_SECONDS,
 } from "./recovery-grant";

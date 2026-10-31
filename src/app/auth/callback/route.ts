@@ -1,6 +1,7 @@
 import {
   createRecoveryGrantCookie,
-  hasRecentRecoveryRequest,
+  isRecoverySession,
+  readSessionClaims,
 } from "@/features/auth";
 import { createClient } from "@/lib/supabase/server";
 import { getSafeInternalRedirectUrl } from "@/lib/utils";
@@ -21,22 +22,23 @@ export async function GET(request: Request) {
     const { data, error } = await supabase.auth.exchangeCodeForSession(code);
     if (!error && data.user) {
       if (isRecoveryCallback) {
-        // Purpose comes from Supabase, not from `next`: only a code exchanged
-        // for a user whose recovery email was sent recently is a recovery. Any
-        // other code routed here gets no grant and the recovery error state.
-        if (!hasRecentRecoveryRequest(data.user)) {
+        // Purpose comes from the session this code just produced, not from
+        // `next` or from user-level history. Only a recovery session (an `amr`
+        // entry with method `recovery`, recent) earns a grant. Any other code
+        // routed here gets no grant and the recovery error state.
+        const claims = readSessionClaims(data.session?.access_token ?? "");
+        const sessionId = claims?.session_id;
+        if (!isRecoverySession(claims) || !sessionId) {
           return NextResponse.redirect(
             `${origin}/reset-password?callback_error=auth_callback_failed`,
           );
         }
 
-        // A recovery email's one-time code has just been verified and
-        // exchanged by the server. This response hands the visitor their
-        // recovery grant cookie: the only server-issued proof the password
-        // action accepts, bound to the exchanged Auth user and short-lived.
-        // A browser marker (`?flow=recovery`) alone can never open or submit
-        // the reset form.
-        const grantCookie = createRecoveryGrantCookie(data.user.id);
+        // The recovery code was verified and exchanged by the server. This
+        // response hands the visitor their recovery grant cookie, bound to the
+        // exchanged Auth user and this session, and short-lived. A browser
+        // marker (`?flow=recovery`) alone can never open or submit the form.
+        const grantCookie = createRecoveryGrantCookie(data.user.id, sessionId);
         const response = NextResponse.redirect(
           `${origin}/reset-password?flow=recovery`,
         );
