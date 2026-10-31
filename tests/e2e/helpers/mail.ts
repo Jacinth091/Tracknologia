@@ -4,15 +4,29 @@
  * the repo default (`[local_smtp] enabled = false` in supabase/config.toml) and
  * switched on only by the E2E workflow before `supabase start`. Like the
  * destructive fixtures, this must only ever talk to the disposable local stack;
- * the host check below keeps the helper honest.
+ * the host checks below keep the helper honest.
  *
  * Mailpit v1 API used here (https://mailpit.axllent.org/docs/api-v1/):
  *   GET    /api/v1/search?query=to:"<address>"  messages[] (ID, To[], Created)
- *   GET    /api/v1/message/{ID}                 Text and HTML bodies
+ *   GET    /api/v1/message/{ID}                 Subject, To, Text, HTML
  *   DELETE /api/v1/search?query=to:"<address>"  purge that recipient's mail
+ *
+ * The link rules live in recovery-link.ts. The recovery email links to
+ * Supabase's own verify endpoint, which the spec opens; the spec never builds
+ * a callback URL itself.
  */
 
+import {
+  describeLinks,
+  findRecoveryLinkInBody,
+  type MailBody,
+  type RecoveryLinkExpectation,
+} from "./recovery-link";
+
 const MAILPIT_URL = process.env.E2E_MAILPIT_URL || "http://127.0.0.1:54324";
+const SUPABASE_URL =
+  process.env.NEXT_PUBLIC_SUPABASE_URL || "http://127.0.0.1:54321";
+const APP_URL = process.env.NEXT_PUBLIC_APP_URL || "http://localhost:3000";
 
 type MailpitSummary = {
   ID: string;
@@ -20,27 +34,37 @@ type MailpitSummary = {
   Created?: string;
 };
 type MailpitSearch = { messages?: MailpitSummary[] };
-type MailpitMessage = {
+type MailpitMessage = MailBody & {
+  Subject?: string;
   To?: { Address: string }[];
-  Text?: string;
-  HTML?: string;
 };
 
-function assertLocalMailpitUrl(): URL {
+const LOCAL_HOSTS = new Set(["localhost", "127.0.0.1", "::1"]);
+
+function assertLocalUrl(label: string, value: string): URL {
   let parsed: URL;
   try {
-    parsed = new URL(MAILPIT_URL);
+    parsed = new URL(value);
   } catch {
-    throw new Error(`Invalid E2E_MAILPIT_URL: "${MAILPIT_URL}"`);
+    throw new Error(`Invalid ${label}: "${value}"`);
   }
-  const local = new Set(["localhost", "127.0.0.1", "::1"]);
-  if (!local.has(parsed.hostname)) {
+  if (!LOCAL_HOSTS.has(parsed.hostname)) {
     throw new Error(
-      `E2E mail capture refuses non-local host "${parsed.hostname}". ` +
+      `E2E mail capture refuses non-local host "${parsed.hostname}" for ${label}. ` +
         "The recovery link must come from a disposable local Supabase stack.",
     );
   }
   return parsed;
+}
+
+function assertLocalMailpitUrl(): URL {
+  return assertLocalUrl("E2E_MAILPIT_URL", MAILPIT_URL);
+}
+
+/** The local Supabase API host a recovery verify link must point at. */
+function expectation(): RecoveryLinkExpectation {
+  const supabase = assertLocalUrl("NEXT_PUBLIC_SUPABASE_URL", SUPABASE_URL);
+  return { supabaseHost: supabase.host, appOrigin: new URL(APP_URL).origin };
 }
 
 /** Mailpit's search syntax: the exact recipient, quoted. */
@@ -59,83 +83,93 @@ export async function purgeRecoveryMailbox(email: string): Promise<void> {
   }
 }
 
-function decodeHtmlEntities(link: string): string {
-  return link
-    .replace(/&amp;/g, "&")
-    .replace(/&#39;/g, "'")
-    .replace(/&quot;/g, '"');
+/** The recipient's messages, newest first, with their bodies. */
+async function fetchRecipientMessages(
+  email: string,
+): Promise<MailpitMessage[]> {
+  let summaries: MailpitSummary[] = [];
+  try {
+    const response = await fetch(
+      `${MAILPIT_URL}/api/v1/search?query=${recipientQuery(email)}`,
+    );
+    if (response.ok) {
+      const body = (await response.json()) as MailpitSearch;
+      summaries = body.messages ?? [];
+    }
+  } catch {
+    summaries = [];
+  }
+
+  const newestFirst = [...summaries].sort(
+    (a, b) => Date.parse(b.Created ?? "") - Date.parse(a.Created ?? ""),
+  );
+
+  const messages: MailpitMessage[] = [];
+  for (const summary of newestFirst) {
+    try {
+      const response = await fetch(
+        `${MAILPIT_URL}/api/v1/message/${encodeURIComponent(summary.ID)}`,
+      );
+      if (!response.ok) continue;
+      messages.push((await response.json()) as MailpitMessage);
+    } catch {
+      continue;
+    }
+  }
+  return messages;
+}
+
+/**
+ * Safe timeout diagnostic: how many messages reached the recipient, their
+ * subjects, and for each offered link only host + pathname and `type`. Tokens,
+ * full URLs and bodies are never printed.
+ */
+function diagnose(
+  email: string,
+  messages: MailpitMessage[],
+  deadlineMs: number,
+): string {
+  const lines = messages.map((message, index) => {
+    const links = describeLinks(message);
+    const linkText = links.length > 0 ? links.join("; ") : "no links";
+    return `  [${index + 1}] subject "${message.Subject ?? ""}" — ${linkText}`;
+  });
+  return (
+    `[E2E fixture] no recovery verify link for ${email} within ${deadlineMs}ms. ` +
+    `Messages for the recipient: ${messages.length}.` +
+    (lines.length > 0 ? `\n${lines.join("\n")}` : "") +
+    "\nExpected a Supabase /auth/v1/verify link with type=recovery whose " +
+    `redirect_to is ${APP_URL}/auth/callback?next=/reset-password. ` +
+    "Check that mail capture is running ([local_smtp], enabled by the E2E workflow)."
+  );
 }
 
 /**
  * Polls the local mail capture for the newest password recovery email for
- * `email` and returns the recovery callback link it carries. The inbox is
- * only checked for the /auth/callback?next=/reset-password link shape, so a
- * registration confirmation email is never mistaken for it.
+ * `email` and returns its Supabase verify link. The spec opens that link with
+ * the page that requested the reset, so Supabase can verify the token and
+ * redirect to the app callback. The link is not fetched here.
  */
 export async function findRecoveryLink(
   email: string,
   options: { deadlineMs?: number } = {},
 ): Promise<string> {
   assertLocalMailpitUrl();
-  const deadline = Date.now() + (options.deadlineMs ?? 20_000);
-  const recoveryLinkPattern =
-    /https?:\/\/[^\s"'<>]+\/auth\/callback\?next=%?2?F?\/?reset-password[^"'<>\s]+/i;
+  const expected = expectation();
+  const deadlineMs = options.deadlineMs ?? 20_000;
+  const deadline = Date.now() + deadlineMs;
+  let lastMessages: MailpitMessage[] = [];
 
   while (Date.now() < deadline) {
-    let summaries: MailpitSummary[] = [];
-    try {
-      const response = await fetch(
-        `${MAILPIT_URL}/api/v1/search?query=${recipientQuery(email)}`,
-      );
-      if (response.ok) {
-        const body = (await response.json()) as MailpitSearch;
-        summaries = body.messages ?? [];
-      }
-    } catch {
-      summaries = [];
-    }
-
-    // Newest first, so a fresh link wins over an earlier one.
-    const newestFirst = [...summaries].sort(
-      (a, b) => Date.parse(b.Created ?? "") - Date.parse(a.Created ?? ""),
-    );
-
-    for (const summary of newestFirst) {
-      let message: MailpitMessage;
-      try {
-        const response = await fetch(
-          `${MAILPIT_URL}/api/v1/message/${encodeURIComponent(summary.ID)}`,
-        );
-        if (!response.ok) continue;
-        message = (await response.json()) as MailpitMessage;
-      } catch {
-        continue;
-      }
-
-      // The search already filters on the recipient; the message's own To
-      // list must agree, so a mis-filtered message is never used.
-      const recipients = (message.To ?? []).map((to) =>
-        to.Address.toLowerCase(),
-      );
-      if (recipients.length > 0 && !recipients.includes(email.toLowerCase())) {
-        continue;
-      }
-
-      const raw = [message.Text ?? "", message.HTML ?? ""].join("\n");
-      const match = raw.match(recoveryLinkPattern);
-      if (match) {
-        return decodeHtmlEntities(match[0]);
+    lastMessages = await fetchRecipientMessages(email);
+    for (const message of lastMessages) {
+      const link = findRecoveryLinkInBody(message, expected);
+      if (link) {
+        return link;
       }
     }
-
     await new Promise((resolve) => setTimeout(resolve, 1_000));
   }
 
-  throw new Error(
-    `[E2E fixture] no password recovery email with a /reset-password callback ` +
-      `link arrived at ${MAILPIT_URL} for ${email} within ` +
-      `${options.deadlineMs ?? 20_000}ms. Is the local Supabase stack's ` +
-      "mail capture running ([local_smtp] in supabase/config.toml, enabled " +
-      "by the E2E workflow)?",
-  );
+  throw new Error(diagnose(email, lastMessages, deadlineMs));
 }
