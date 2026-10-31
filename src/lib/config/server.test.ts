@@ -167,20 +167,32 @@ describe("Configuration Seam (src/lib/config/server.ts)", () => {
       ).toThrow("SUPABASE_SERVICE_ROLE_KEY is required");
     });
 
-    it("fails when Resend API key is missing or uses onboarding address in production", () => {
-      expect(() =>
-        parseServerConfig(
-          { ...VALID_PROD_ENV, RESEND_API_KEY: "" },
-          "production",
-        ),
-      ).toThrow("RESEND_API_KEY is required in production");
+    it("allows production without a Resend key, with email disabled", () => {
+      const config = parseServerConfig(
+        { ...VALID_PROD_ENV, RESEND_API_KEY: "" },
+        "production",
+      );
+      expect(config.runtime).toBe("production");
+      expect(config.resend.apiKey).toBeNull();
+      expect(config.resend.isDevLogger).toBe(false);
+    });
 
+    it("fails when a Resend key is set with the default onboarding sender in production", () => {
       expect(() =>
         parseServerConfig(
           {
             ...VALID_PROD_ENV,
             RESEND_FROM_EMAIL: "Tracknologia <onboarding@resend.dev>",
           },
+          "production",
+        ),
+      ).toThrow(
+        "RESEND_FROM_EMAIL cannot use default onboarding@resend.dev address in production",
+      );
+
+      expect(() =>
+        parseServerConfig(
+          { ...VALID_PROD_ENV, RESEND_FROM_EMAIL: "" },
           "production",
         ),
       ).toThrow(
