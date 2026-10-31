@@ -8,6 +8,7 @@ import {
 } from "@hugeicons/core-free-icons";
 
 import { BrandLogo } from "@/components/shared/brand-logo";
+import { buttonVariants } from "@/components/ui/button";
 
 const BRAND_POINTS = [
   {
@@ -90,7 +91,10 @@ export default function AuthLayout({
         <div className="mx-auto w-full max-w-xl space-y-5 sm:space-y-6">
           <Link
             href="/"
-            className="inline-flex w-fit items-center gap-1.5 text-sm text-muted-foreground underline-offset-4 hover:text-foreground hover:underline"
+            className={buttonVariants({
+              variant: "outline",
+              className: "w-fit",
+            })}
           >
             <HugeiconsIcon
               icon={ArrowLeft01Icon}

@@ -247,6 +247,7 @@ test.describe("E2E-08 Internal operator access", () => {
       if (!backLink || !signInHeading)
         throw new Error("Sign-in content must be visible");
       expect(backLink.y).toBeLessThan(48);
+      expect(backLink.height).toBeGreaterThanOrEqual(44);
       expect(signInHeading.y).toBeLessThan(220);
       await page.locator('input[name="email"]').fill(operator.email);
       await page.locator('input[name="password"]').fill(operator.password);
