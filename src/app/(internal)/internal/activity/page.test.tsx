@@ -70,7 +70,13 @@ vi.mock("../_components/metric-charts", () => ({
 }));
 
 vi.mock("next/link", () => ({
-  default: ({ children }: { children: unknown }) => children,
+  default: ({
+    href,
+    children,
+  }: {
+    href: string;
+    children: React.ReactNode;
+  }) => <a href={href}>{children}</a>,
 }));
 
 import { MetricsError } from "@/features/internal-operations";
@@ -211,6 +217,41 @@ describe("Validation metrics page", () => {
     expect(html).toContain("Asia/Manila");
   });
 
+  it("groups the charts in Provider, repair, tracking and feedback order", async () => {
+    const html = await renderActivity();
+    const headings = [...html.matchAll(/<h2\b[^>]*>([^<]+)<\/h2>/g)].map(
+      (match) => match[1],
+    );
+    expect(headings).toEqual([
+      "Providers &amp; activity",
+      "Requests &amp; repairs",
+      "Customer tracking",
+      "Feedback",
+    ]);
+    expect(html).toContain('aria-label="Metrics period"');
+    expect(html).toContain('aria-describedby="metrics-range-help"');
+    expect(html).toContain("Data coverage &amp; retention");
+    expect(html).toContain("Retention policy: Approved (#87, 2026-10-31).");
+  });
+
+  it("clears a custom range by linking back to the default period", async () => {
+    const html = await renderActivity({
+      period: "custom",
+      start: "2026-10-24",
+      end: "2026-10-31",
+    });
+    expect(html).toMatch(
+      /<a[^>]*href="\/internal\/activity"[^>]*>Clear filters<\/a>/,
+    );
+    expect(html).toContain('id="metrics-start"');
+    expect(html).toContain('value="2026-10-24"');
+    expect(feature.getValidationMetrics).toHaveBeenCalledWith({
+      mode: "custom",
+      startDate: "2026-10-24",
+      endDateExclusive: "2026-10-31",
+    });
+  });
+
   it("passes each chart its rows and summary, in order", async () => {
     await renderActivity();
 
@@ -226,7 +267,7 @@ describe("Validation metrics page", () => {
       "Feedback per day, Oct 24 to Oct 30, peak 2 on Oct 26",
     );
 
-    const [status, , category] = charts.CategoryBarChart.mock.calls.map(
+    const [, status, category] = charts.CategoryBarChart.mock.calls.map(
       ([props]) => props,
     );
     expect(status.summary).toBe(
@@ -496,10 +537,27 @@ describe("Validation metrics page", () => {
     expect(html.match(/>N\/A</g)?.length).toBeGreaterThanOrEqual(2);
   });
 
-  it("lists every visual-card metric in the All numbers table", async () => {
+  it("groups the reference numbers without losing metric labels or values", async () => {
     const html = await renderActivity();
 
     expect(html).toContain("All numbers");
+    const reference = html.slice(html.indexOf("All numbers"));
+    expect(
+      [...reference.matchAll(/<h3[^>]*>([^<]+)<\/h3>/g)].map(
+        ([, title]) => title,
+      ),
+    ).toEqual([
+      "Providers",
+      "Activity",
+      "Staff",
+      "Requests",
+      "Repairs",
+      "Tracking",
+      "Feedback",
+    ]);
+    expect(reference.match(/<dl\b/g)).toHaveLength(7);
+    expect(reference.match(/<dt\b/g)).toHaveLength(40);
+    expect(reference.match(/<dd\b/g)).toHaveLength(40);
     for (const label of [
       "Onboarded in period (total)",
       "All time (independent)",

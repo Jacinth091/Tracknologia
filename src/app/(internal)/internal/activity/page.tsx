@@ -279,14 +279,29 @@ export default async function ActivityPage({
       : null;
 
   return (
-    <ActivityShell period={period} start={start} end={end}>
-      <p className="text-sm text-muted-foreground">
-        Period (Asia/Manila): {metrics.window.startDate} to{" "}
-        {metrics.window.endDateExclusive} (end exclusive), {metrics.window.days}{" "}
-        days. Generated (Asia/Manila): {formatTimestamp(metrics.asOf)}.
-      </p>
-      <CoverageNotes coverage={metrics.coverage} />
-
+    <ActivityShell
+      period={period}
+      start={start}
+      end={end}
+      summary={
+        <div className="space-y-3 border-t border-border pt-4">
+          <p className="text-sm text-muted-foreground">
+            Period (Asia/Manila): {metrics.window.startDate} to{" "}
+            {metrics.window.endDateExclusive} (end exclusive),{" "}
+            {metrics.window.days} days. Generated (Asia/Manila):{" "}
+            {formatTimestamp(metrics.asOf)}.
+          </p>
+          <details>
+            <summary className="cursor-pointer rounded-sm text-sm font-medium underline-offset-4 hover:underline focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-ring">
+              Data coverage &amp; retention
+            </summary>
+            <div className="pt-4">
+              <CoverageNotes coverage={metrics.coverage} />
+            </div>
+          </details>
+        </div>
+      }
+    >
       <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
         <StatTile
           label="Active providers (period)"
@@ -318,198 +333,299 @@ export default async function ActivityPage({
         />
       </div>
 
-      <div className="grid items-start gap-4 md:grid-cols-2 xl:grid-cols-3">
-        <ChartCard
-          title="Providers"
-          description="All-time Provider accounts by type"
-        >
-          <InlineStats
-            items={[
-              {
-                label: "Providers (all time)",
-                value: formatCount(metrics.providers.allTime.total),
-                detail: `+${metrics.providers.onboardedInPeriod.total} this period`,
-              },
-            ]}
-          />
-          <Donut
-            title="Providers by type"
-            rows={providerDonut}
-            emptyMessage="No providers yet"
-          />
-        </ChartCard>
+      <section
+        className="space-y-4"
+        aria-labelledby="providers-activity-heading"
+      >
+        <div>
+          <h2
+            id="providers-activity-heading"
+            className="text-xl font-semibold tracking-tight"
+          >
+            Providers &amp; activity
+          </h2>
+          <p className="mt-1 text-sm text-muted-foreground">
+            Who is using Tracknologia, and how often they return.
+          </p>
+        </div>
+        <div className="grid items-start gap-4 xl:grid-cols-2">
+          <ChartCard
+            title="Providers & staff"
+            description="All-time Provider accounts and current Staff memberships"
+          >
+            <div className="grid items-center gap-6 sm:grid-cols-2">
+              <div className="space-y-5">
+                {" "}
+                <InlineStats
+                  items={[
+                    {
+                      label: "Providers (all time)",
+                      value: formatCount(metrics.providers.allTime.total),
+                      detail: `+${metrics.providers.onboardedInPeriod.total} this period`,
+                    },
+                  ]}
+                />
+                <div className="space-y-3 border-t border-border pt-4">
+                  <h4 className="text-sm font-medium">
+                    Staff ? current memberships
+                  </h4>{" "}
+                  <InlineStats
+                    items={[
+                      {
+                        label: "Active memberships (now)",
+                        value: formatCount(metrics.staff.memberships),
+                      },
+                      {
+                        label: "Shops with staff (now)",
+                        value: formatCount(metrics.staff.shopsWithStaff),
+                      },
+                    ]}
+                  />
+                </div>
+              </div>
+              <div className="min-w-0">
+                {" "}
+                <Donut
+                  title="Providers by type"
+                  rows={providerDonut}
+                  emptyMessage="No providers yet"
+                />
+              </div>
+            </div>
+          </ChartCard>
+          <ChartCard
+            title="Provider activity"
+            description="Active and repeat Providers in the selected period"
+          >
+            <InlineStats
+              items={[
+                {
+                  label: "Active providers",
+                  value: formatCount(metrics.activity.distinctProviders),
+                },
+                {
+                  label: "Repeat providers (2 or more days)",
+                  value: formatCount(metrics.activity.repeatProviders),
+                },
+              ]}
+            />
 
-        <ChartCard
-          title="Active providers per day"
-          description="Distinct providers with activity on each Manila day"
-        >
-          <DailyChart
-            title="Active providers per day"
-            seriesLabel="Active providers"
-            rows={daily}
-          />
-        </ChartCard>
-
-        <ChartCard
-          title="Activity"
-          description="Providers active in the period and how many came back"
-        >
-          <InlineStats
-            items={[
-              {
-                label: "Active providers",
-                value: formatCount(metrics.activity.distinctProviders),
-              },
-              {
-                label: "Repeat providers (2 or more days)",
-                value: formatCount(metrics.activity.repeatProviders),
-              },
-            ]}
-          />
-          <RepeatShare percent={repeatShare} />
-        </ChartCard>
-
-        <ChartCard
-          title="Staff"
-          description="Current memberships, not windowed"
-        >
-          <InlineStats
-            items={[
-              {
-                label: "Active memberships (now)",
-                value: formatCount(metrics.staff.memberships),
-              },
-              {
-                label: "Shops with staff (now)",
-                value: formatCount(metrics.staff.shopsWithStaff),
-              },
-            ]}
-          />
-        </ChartCard>
-
-        <ChartCard
-          title="Repairs by status (now)"
-          description="Current Repair status, in lifecycle order"
-        >
-          <RankedChart title="Repairs by status (now)" rows={statusRows} />
-        </ChartCard>
-
-        <ChartCard
-          title="Repairs"
-          description="Repairs created, ready and completed in the period"
-        >
-          <InlineStats
-            items={[
-              {
-                label: "Reached READY",
-                value: formatCount(metrics.repairs.readyReached),
-              },
-              {
-                label: "Completed",
-                value: formatCount(metrics.repairs.completed),
-              },
-            ]}
-          />
-          <Donut
-            title="Repairs by origin, in period"
-            rows={originDonut}
-            emptyMessage="No repairs in this period"
-          />
-        </ChartCard>
-
-        <ChartCard
-          title="Requests"
-          description="Submitted requests, decisions and conversion"
-        >
-          <RankedChart title="Requests funnel" rows={requestFunnel} />
-          <InlineStats
-            items={[
-              {
-                label: "Conversion (submission cohort)",
-                value: formatPercent(metrics.requests.conversionPercent),
-              },
-              {
-                label: "Mean decision time",
-                value: formatDuration(metrics.requests.meanDecisionSeconds),
-              },
-            ]}
-          />
-        </ChartCard>
-
+            <div className="grid items-center gap-4 sm:grid-cols-2">
+              <div className="min-w-0 space-y-3">
+                <h4 className="text-sm font-medium">
+                  Active providers per day
+                </h4>{" "}
+                <DailyChart
+                  title="Active providers per day"
+                  seriesLabel="Active providers"
+                  rows={daily}
+                />
+              </div>
+              <div className="min-w-0">
+                {" "}
+                <RepeatShare percent={repeatShare} />
+              </div>
+            </div>
+          </ChartCard>
+        </div>
+      </section>
+      <section className="space-y-4" aria-labelledby="requests-repairs-heading">
+        <div>
+          <h2
+            id="requests-repairs-heading"
+            className="text-xl font-semibold tracking-tight"
+          >
+            Requests &amp; repairs
+          </h2>
+          <p className="mt-1 text-sm text-muted-foreground">
+            From incoming requests to repair outcomes. Current status is shown
+            separately.
+          </p>
+        </div>
+        <div className="grid items-start gap-4 xl:grid-cols-2">
+          <ChartCard
+            title="Requests"
+            description="Submitted requests, decisions and conversion"
+          >
+            <RankedChart title="Requests funnel" rows={requestFunnel} />
+            <InlineStats
+              items={[
+                {
+                  label: "Conversion (submission cohort)",
+                  value: formatPercent(metrics.requests.conversionPercent),
+                },
+                {
+                  label: "Mean decision time",
+                  value: formatDuration(metrics.requests.meanDecisionSeconds),
+                },
+              ]}
+            />
+          </ChartCard>
+          <ChartCard
+            title="Repairs"
+            description="Created, ready and completed in the period; status counts are current"
+          >
+            <div className="grid items-start gap-6 sm:grid-cols-2">
+              <div className="min-w-0 space-y-4">
+                {" "}
+                <InlineStats
+                  items={[
+                    {
+                      label: "Reached READY",
+                      value: formatCount(metrics.repairs.readyReached),
+                    },
+                    {
+                      label: "Completed",
+                      value: formatCount(metrics.repairs.completed),
+                    },
+                  ]}
+                />
+                <Donut
+                  title="Repairs by origin, in period"
+                  rows={originDonut}
+                  emptyMessage="No repairs in this period"
+                />
+              </div>
+              <div className="min-w-0 space-y-3">
+                <h4 className="text-sm font-medium">Repairs by status (now)</h4>{" "}
+                <RankedChart
+                  title="Repairs by status (now)"
+                  rows={statusRows}
+                />
+              </div>
+            </div>
+          </ChartCard>
+        </div>
+      </section>
+      <section
+        className="space-y-4"
+        aria-labelledby="customer-tracking-heading"
+      >
+        <div>
+          <h2
+            id="customer-tracking-heading"
+            className="text-xl font-semibold tracking-tight"
+          >
+            Customer tracking
+          </h2>
+          <p className="mt-1 text-sm text-muted-foreground">
+            How customers follow their repairs after intake.
+          </p>
+        </div>
         <ChartCard
           title="Tracking"
-          description="Public tracking views and how many repairs were looked up"
+          description="Public tracking views in the period, with all-time adoption"
         >
-          <AdoptionGauge percent={metrics.tracking.adoptionPercent} />
-          <InlineStats
-            items={[
-              {
-                label: "Views in period",
-                value: formatCount(metrics.tracking.periodViews),
-              },
-              {
-                label: "Distinct repairs viewed in period",
-                value: formatCount(metrics.tracking.periodRepairsViewed),
-              },
-            ]}
-          />
+          <div className="grid items-center gap-6 sm:grid-cols-[minmax(0,1fr)_14rem]">
+            <div>
+              {" "}
+              <InlineStats
+                items={[
+                  {
+                    label: "Views in period",
+                    value: formatCount(metrics.tracking.periodViews),
+                  },
+                  {
+                    label: "Distinct repairs viewed in period",
+                    value: formatCount(metrics.tracking.periodRepairsViewed),
+                  },
+                ]}
+              />
+            </div>
+            <div>
+              {" "}
+              <AdoptionGauge percent={metrics.tracking.adoptionPercent} />
+            </div>
+          </div>
         </ChartCard>
-
+      </section>
+      <section className="space-y-4" aria-labelledby="feedback-heading">
+        <div>
+          <h2
+            id="feedback-heading"
+            className="text-xl font-semibold tracking-tight"
+          >
+            Feedback
+          </h2>
+          <p className="mt-1 text-sm text-muted-foreground">
+            What participants reported during the selected period.
+          </p>
+        </div>
         <ChartCard
-          title="Feedback per day"
-          description="Feedback submissions on each Manila day"
+          title="Participant feedback"
+          description="Daily submissions, categories and current triage status"
         >
-          {feedbackDaily ? (
-            <DailyChart
-              title="Feedback per day"
-              seriesLabel="Submissions"
-              rows={feedbackDaily}
-            />
-          ) : (
-            <UnavailableState />
-          )}
+          <div className="grid items-start gap-6 lg:grid-cols-3">
+            <section
+              className="min-w-0 space-y-4"
+              aria-labelledby="feedback-daily-heading"
+            >
+              <h4 id="feedback-daily-heading" className="text-sm font-medium">
+                Feedback per day
+              </h4>{" "}
+              {feedbackDaily ? (
+                <DailyChart
+                  title="Feedback per day"
+                  seriesLabel="Submissions"
+                  rows={feedbackDaily}
+                />
+              ) : (
+                <UnavailableState />
+              )}
+            </section>
+            <section
+              className="min-w-0 space-y-4"
+              aria-labelledby="feedback-category-heading"
+            >
+              <h4
+                id="feedback-category-heading"
+                className="text-sm font-medium"
+              >
+                Feedback by category
+              </h4>{" "}
+              {categoryRows ? (
+                <RankedChart title="Feedback by category" rows={categoryRows} />
+              ) : (
+                <UnavailableState />
+              )}
+            </section>
+            <section
+              className="min-w-0 space-y-4"
+              aria-labelledby="feedback-status-heading"
+            >
+              <h4 id="feedback-status-heading" className="text-sm font-medium">
+                Feedback by status
+              </h4>{" "}
+              {statusDonut ? (
+                <Donut
+                  title="Feedback by status"
+                  rows={statusDonut}
+                  emptyMessage="No feedback in this period"
+                />
+              ) : (
+                <UnavailableState />
+              )}
+            </section>
+          </div>
         </ChartCard>
-
-        <ChartCard
-          title="Feedback by category"
-          description="Feedback submissions in the period, by category"
-        >
-          {categoryRows ? (
-            <RankedChart title="Feedback by category" rows={categoryRows} />
-          ) : (
-            <UnavailableState />
-          )}
-        </ChartCard>
-
-        <ChartCard
-          title="Feedback by status"
-          description="Current status of feedback submitted in the period"
-        >
-          {statusDonut ? (
-            <Donut
-              title="Feedback by status"
-              rows={statusDonut}
-              emptyMessage="No feedback in this period"
-            />
-          ) : (
-            <UnavailableState />
-          )}
-        </ChartCard>
-      </div>
+      </section>
 
       <Card>
         <details>
-          <summary className="cursor-pointer px-4 py-4 text-base leading-tight font-semibold sm:px-5">
+          <summary className="cursor-pointer rounded-xl px-4 py-4 text-base leading-tight font-semibold outline-none focus-visible:ring-2 focus-visible:ring-ring sm:px-5">
             All numbers
           </summary>
-          <div className="overflow-x-auto px-4 pb-4 sm:px-5 sm:pb-5">
-            <table className="w-full text-sm">
-              <tbody>
-                {allNumberGroups(metrics).map((group) => (
-                  <AllNumbersGroup key={group.title} group={group} />
-                ))}
-              </tbody>
-            </table>
+          <div className="space-y-6 border-t border-border px-4 py-5 sm:px-5">
+            <p className="max-w-prose text-sm leading-relaxed text-muted-foreground">
+              The same chart data, grouped for reference. In period means the
+              selected dates; now means the current snapshot. N/A means there is
+              not enough data to calculate a value.
+            </p>
+            <div className="grid items-start gap-x-10 gap-y-8 lg:grid-cols-2">
+              {allNumberGroups(metrics).map((group) => (
+                <AllNumbersGroup key={group.title} group={group} />
+              ))}
+            </div>
           </div>
         </details>
       </Card>
@@ -518,7 +634,7 @@ export default async function ActivityPage({
 }
 
 // Every metric the visual cards show, as label/value pairs. Labels match the
-// cards, so the table is the same data in text form.
+// cards, so the grouped list is the same data in text form.
 function allNumberGroups(metrics: ValidationMetrics) {
   const feedback = metrics.feedback;
   const feedbackRows: [string, string][] = feedback
@@ -577,6 +693,24 @@ function allNumberGroups(metrics: ValidationMetrics) {
       ] as [string, string][],
     },
     {
+      title: "Requests",
+      rows: [
+        ["Received in period", formatCount(metrics.requests.received)],
+        ["Decided in period", formatCount(metrics.requests.decided.total)],
+        ["Accepted", formatCount(metrics.requests.decided.accepted)],
+        ["Declined", formatCount(metrics.requests.decided.declined)],
+        ["Pending (now)", formatCount(metrics.requests.pendingNow)],
+        [
+          "Conversion (submission cohort)",
+          formatPercent(metrics.requests.conversionPercent),
+        ],
+        [
+          "Mean decision time",
+          formatDuration(metrics.requests.meanDecisionSeconds),
+        ],
+      ] as [string, string][],
+    },
+    {
       title: "Repairs",
       rows: [
         ["Created in period", formatCount(metrics.repairs.created.total)],
@@ -594,24 +728,6 @@ function allNumberGroups(metrics: ValidationMetrics) {
           `Status now: ${humanize(status)}`,
           formatCount(metrics.repairs.statusNow[status]),
         ]),
-      ] as [string, string][],
-    },
-    {
-      title: "Requests",
-      rows: [
-        ["Received in period", formatCount(metrics.requests.received)],
-        ["Decided in period", formatCount(metrics.requests.decided.total)],
-        ["Accepted", formatCount(metrics.requests.decided.accepted)],
-        ["Declined", formatCount(metrics.requests.decided.declined)],
-        ["Pending (now)", formatCount(metrics.requests.pendingNow)],
-        [
-          "Conversion (submission cohort)",
-          formatPercent(metrics.requests.conversionPercent),
-        ],
-        [
-          "Mean decision time",
-          formatDuration(metrics.requests.meanDecisionSeconds),
-        ],
       ] as [string, string][],
     },
     {
@@ -638,27 +754,26 @@ function AllNumbersGroup({
   group: { title: string; rows: [string, string][] };
 }) {
   return (
-    <>
-      <tr>
-        <th
-          scope="colgroup"
-          colSpan={2}
-          className="pt-4 pb-1 text-left font-mono text-xs tracking-wider text-muted-foreground uppercase"
-        >
-          {group.title}
-        </th>
-      </tr>
-      {group.rows.map(([label, value]) => (
-        <tr key={label} className="border-b border-border last:border-b-0">
-          <th scope="row" className="py-2 pr-4 text-left font-normal">
-            {label}
-          </th>
-          <td className="py-2 text-right font-semibold tabular-nums">
-            {value}
-          </td>
-        </tr>
-      ))}
-    </>
+    <section className="min-w-0">
+      <h3 className="border-b border-border pb-3 text-base font-semibold">
+        {group.title}
+      </h3>
+      <dl className="divide-y divide-border/60">
+        {group.rows.map(([label, value]) => (
+          <div
+            key={label}
+            className="flex items-baseline justify-between gap-4 py-3"
+          >
+            <dt className="min-w-0 text-sm leading-relaxed text-muted-foreground">
+              {label}
+            </dt>
+            <dd className="max-w-1/2 shrink-0 text-right text-base font-semibold tabular-nums">
+              {value}
+            </dd>
+          </div>
+        ))}
+      </dl>
+    </section>
   );
 }
 
@@ -667,11 +782,13 @@ function ActivityShell({
   start,
   end,
   children,
+  summary,
 }: {
   period: Period;
   start?: string;
   end?: string;
   children: ReactNode;
+  summary?: ReactNode;
 }) {
   return (
     <div className="space-y-8">
@@ -680,7 +797,6 @@ function ActivityShell({
         title="Validation metrics"
         actions={
           <>
-            <PeriodPicker period={period} start={start} end={end} />
             <Link
               href={activityHref(period, start, end)}
               className={buttonVariants({ variant: "outline", size: "sm" })}
@@ -690,6 +806,10 @@ function ActivityShell({
           </>
         }
       />
+      <Card className="space-y-4 p-4 sm:p-5">
+        <PeriodPicker period={period} start={start} end={end} />
+        {summary}
+      </Card>
       {children}
     </div>
   );
@@ -709,46 +829,63 @@ function PeriodPicker({
       method="get"
       action="/internal/activity"
       aria-label="Metrics period"
-      className="flex flex-wrap items-end gap-2"
+      aria-describedby="metrics-range-help"
+      className="space-y-3"
     >
-      <div className="grid gap-1.5">
-        <Label htmlFor="metrics-period">Period</Label>
-        <select
-          id="metrics-period"
-          name="period"
-          defaultValue={period}
-          className="h-9 min-w-32 rounded-lg border border-input bg-card px-3 text-sm shadow-xs outline-none focus-visible:border-ring"
-        >
-          {PERIOD_OPTIONS.map((option) => (
-            <option key={option.value} value={option.value}>
-              {option.label}
-            </option>
-          ))}
-        </select>
+      <div className="grid items-end gap-3 sm:grid-cols-2 lg:grid-cols-[minmax(0,1fr)_minmax(0,1fr)_minmax(0,1fr)_auto]">
+        <div className="grid min-w-0 gap-1.5">
+          <Label htmlFor="metrics-period">Period</Label>
+          <select
+            id="metrics-period"
+            name="period"
+            defaultValue={period}
+            className="h-11 w-full min-w-0 rounded-lg border border-input bg-card px-3 text-sm outline-none focus-visible:border-ring focus-visible:ring-2 focus-visible:ring-ring sm:h-9"
+          >
+            {PERIOD_OPTIONS.map((option) => (
+              <option key={option.value} value={option.value}>
+                {option.label}
+              </option>
+            ))}
+          </select>
+        </div>
+        <div className="grid min-w-0 gap-1.5">
+          <Label htmlFor="metrics-start">Start date</Label>
+          <Input
+            id="metrics-start"
+            name="start"
+            type="date"
+            defaultValue={start ?? ""}
+            className="w-full min-w-0"
+          />
+        </div>
+        <div className="grid min-w-0 gap-1.5">
+          <Label htmlFor="metrics-end">End date (exclusive)</Label>
+          <Input
+            id="metrics-end"
+            name="end"
+            type="date"
+            defaultValue={end ?? ""}
+            className="w-full min-w-0"
+          />
+        </div>
+        <div className="flex flex-wrap gap-2">
+          <Button type="submit" className="flex-1 sm:flex-none">
+            Show period
+          </Button>
+          <Link
+            href="/internal/activity"
+            className={buttonVariants({
+              variant: "outline",
+              className: "flex-1 sm:flex-none",
+            })}
+          >
+            Clear filters
+          </Link>
+        </div>
       </div>
-      <div className="grid gap-1.5">
-        <Label htmlFor="metrics-start">Start date</Label>
-        <Input
-          id="metrics-start"
-          name="start"
-          type="date"
-          defaultValue={start ?? ""}
-          className="h-9 w-40"
-        />
-      </div>
-      <div className="grid gap-1.5">
-        <Label htmlFor="metrics-end">End date (exclusive)</Label>
-        <Input
-          id="metrics-end"
-          name="end"
-          type="date"
-          defaultValue={end ?? ""}
-          className="h-9 w-40"
-        />
-      </div>
-      <Button type="submit" variant="outline" size="sm">
-        Show period
-      </Button>
+      <p id="metrics-range-help" className="text-xs text-muted-foreground">
+        Dates apply to a Custom period. The end date is excluded.
+      </p>
     </form>
   );
 }
@@ -760,7 +897,7 @@ function CoverageNotes({
 }) {
   const { feedback } = coverage;
   return (
-    <ul className="list-disc space-y-1 pl-5 text-sm text-muted-foreground">
+    <ul className="grid gap-3 text-sm leading-relaxed text-muted-foreground sm:grid-cols-3">
       <li>
         Domain counts: {humanize(coverage.domain.coverage)}, snapshot{" "}
         {humanize(coverage.domain.snapshot)}. Observed up to{" "}
@@ -797,7 +934,7 @@ function ChartCard({
   return (
     <Card>
       <CardHeader className="px-4 pt-4 pb-0 sm:px-5 sm:pt-5">
-        <h2 className="text-base leading-tight font-semibold">{title}</h2>
+        <h3 className="text-base leading-tight font-semibold">{title}</h3>
         <CardDescription>{description}</CardDescription>
       </CardHeader>
       <CardContent className="space-y-4 px-4 pb-4 sm:px-5 sm:pb-5">

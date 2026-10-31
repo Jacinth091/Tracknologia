@@ -63,6 +63,8 @@ export function DayBarChart({
         <Bar
           dataKey="value"
           fill="var(--color-value)"
+          stroke="var(--foreground)"
+          strokeWidth={1}
           radius={[6, 6, 0, 0]}
           maxBarSize={24}
         >
@@ -112,7 +114,13 @@ export function CategoryBarChart({
           cursor={{ fill: "var(--muted)" }}
           content={<ChartTooltipContent hideLabel />}
         />
-        <Bar dataKey="value" radius={[0, 6, 6, 0]} maxBarSize={24}>
+        <Bar
+          dataKey="value"
+          radius={[0, 6, 6, 0]}
+          maxBarSize={24}
+          stroke="var(--foreground)"
+          strokeWidth={1}
+        >
           {data.map((row) => (
             <Cell key={row.key} fill={`var(--color-${row.key})`} />
           ))}
@@ -155,12 +163,15 @@ export function DonutChart({
           innerRadius="55%"
           outerRadius="80%"
           paddingAngle={2}
+          stroke="var(--foreground)"
+          strokeWidth={1}
         >
           {data.map((row) => (
             <Cell key={row.key} fill={`var(--color-${row.key})`} />
           ))}
           <LabelList
             dataKey="value"
+            position="outside"
             className="fill-foreground text-xs font-medium tabular-nums"
           />
         </Pie>
@@ -201,7 +212,9 @@ export function GaugeChart({
           <RadialBar
             dataKey="value"
             fill="var(--color-value)"
-            background
+            stroke="var(--foreground)"
+            strokeWidth={1}
+            background={{ fill: "var(--muted)", stroke: "var(--border)" }}
             cornerRadius={9}
           />
         </RadialBarChart>
