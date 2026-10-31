@@ -192,7 +192,7 @@ export function TeamClient({
                   <div className="flex items-center justify-between gap-2">
                     <span className="text-xs font-semibold text-foreground">
                       {state.emailDeliveryFailed
-                        ? "Invitation Created (Email Failed)"
+                        ? "Invitation created"
                         : "Invitation Created & Sent!"}
                     </span>
                     <span className="font-mono text-[11px] uppercase tracking-wide text-muted-foreground">
@@ -201,19 +201,16 @@ export function TeamClient({
                   </div>
 
                   {state.emailDeliveryFailed && (
-                    <Alert variant="destructive">
+                    <Alert>
                       <HugeiconsIcon
                         icon={AlertCircleIcon}
                         strokeWidth={1.8}
                         className="size-4"
                         aria-hidden="true"
                       />
-                      <AlertTitle>
-                        Email delivery could not be completed
-                      </AlertTitle>
                       <AlertDescription>
-                        Copy the invitation link below and share it directly
-                        with your staff member.
+                        We didn&apos;t email this invitation. Copy the link
+                        below and share it with them directly.
                       </AlertDescription>
                     </Alert>
                   )}
@@ -310,7 +307,7 @@ export function TeamClient({
                 Pending Staff Invitations
               </CardTitle>
               <CardDescription>
-                Unaccepted invitations sent to staff members
+                Invitations waiting to be accepted
               </CardDescription>
             </CardHeader>
             <CardContent>
@@ -325,7 +322,7 @@ export function TeamClient({
                         {inv.email}
                       </p>
                       <p className="font-mono text-[11px] text-muted-foreground">
-                        Sent {new Date(inv.createdAt).toLocaleDateString()} •
+                        Created {new Date(inv.createdAt).toLocaleDateString()} •
                         Expires {new Date(inv.expiresAt).toLocaleDateString()}
                       </p>
                     </div>
