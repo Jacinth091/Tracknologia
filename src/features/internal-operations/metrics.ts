@@ -76,7 +76,7 @@ export type MetricsCoverage = {
     asOfEnd: string | null;
     batches: number;
   };
-  retentionPolicy: "UNAPPROVED";
+  retentionPolicy: "APPROVED";
 };
 
 export type ValidationMetrics = {
@@ -353,7 +353,7 @@ export function buildValidationMetrics(
         asOfEnd: feedback?.asOf ?? null,
         batches: feedback ? 1 : 0,
       },
-      retentionPolicy: "UNAPPROVED",
+      retentionPolicy: "APPROVED",
     },
   };
 }

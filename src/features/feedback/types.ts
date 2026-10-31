@@ -128,7 +128,7 @@ export interface FeedbackCountSummary {
   asOf: string;
   window: FeedbackSummaryWindowLabel;
   snapshot: "CURRENT_STATUS";
-  retention: { policy: "UNAPPROVED"; coverage: "RETAINED_ROWS_ONLY" };
+  retention: { policy: "APPROVED"; coverage: "RETAINED_ROWS_ONLY" };
   total: number;
   byCategory: Record<FeedbackCategory, number>;
   bySource: Record<FeedbackSource, number>;

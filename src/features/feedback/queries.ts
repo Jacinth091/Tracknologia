@@ -173,7 +173,7 @@ export function buildFeedbackCountSummary(
     asOf,
     window,
     snapshot: "CURRENT_STATUS",
-    retention: { policy: "UNAPPROVED", coverage: "RETAINED_ROWS_ONLY" },
+    retention: { policy: "APPROVED", coverage: "RETAINED_ROWS_ONLY" },
     total: Object.values(byCategory).reduce((sum, count) => sum + count, 0),
     byCategory,
     bySource,

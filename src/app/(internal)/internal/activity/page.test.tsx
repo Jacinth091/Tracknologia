@@ -108,7 +108,7 @@ const fixture: ValidationMetrics = {
       days: 7,
     },
     snapshot: "CURRENT_STATUS",
-    retention: { policy: "UNAPPROVED", coverage: "RETAINED_ROWS_ONLY" },
+    retention: { policy: "APPROVED", coverage: "RETAINED_ROWS_ONLY" },
     total: 9,
     byCategory: { BUG: 2, USABILITY: 3, FEATURE_REQUEST: 1, GENERAL: 3 },
     bySource: {
@@ -143,7 +143,7 @@ const fixture: ValidationMetrics = {
       asOfEnd: "2026-10-30T09:00:00.000Z",
       batches: 1,
     },
-    retentionPolicy: "UNAPPROVED",
+    retentionPolicy: "APPROVED",
   },
 };
 
