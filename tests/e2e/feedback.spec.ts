@@ -375,7 +375,9 @@ test.describe("E2E-10 Participant feedback forms", () => {
     }
   });
 
-  test("an anonymous visitor can open the privacy page", async ({ browser }) => {
+  test("an anonymous visitor can open the privacy page", async ({
+    browser,
+  }) => {
     const context = await browser.newContext();
     const page = await context.newPage();
     try {

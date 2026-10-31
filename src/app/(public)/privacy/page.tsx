@@ -37,8 +37,7 @@ export default function PrivacyPage() {
             <p className="mt-2 text-sm leading-relaxed text-muted-foreground sm:text-base">
               Tracknologia is a school project that helps repair shops and
               independent repairers track repairs during a small pilot in
-              November 2026. This page explains what we keep and who can see
-              it.
+              November 2026. This page explains what we keep and who can see it.
             </p>
           </div>
 
@@ -64,10 +63,9 @@ export default function PrivacyPage() {
                 add.
               </p>
               <p>
-                <strong>Who can see it:</strong> the repair shop or repairer
-                you sent it to, and their staff. The Tracknologia team can see
-                it to keep the service running. Other shops and repairers
-                can&apos;t.
+                <strong>Who can see it:</strong> the repair shop or repairer you
+                sent it to, and their staff. The Tracknologia team can see it to
+                keep the service running. Other shops and repairers can&apos;t.
               </p>
               <p>
                 <strong>How long we keep it:</strong> for as long as that shop
@@ -116,10 +114,10 @@ export default function PrivacyPage() {
                 with its link.
               </p>
               <p>
-                <strong>How long we keep it:</strong> while your account
-                exists. To delete your account and your shop&apos;s data, email
-                the Tracknologia team (below). We do it within 30 days. Copies
-                may stay in backups for a limited time.
+                <strong>How long we keep it:</strong> while your account exists.
+                To delete your account and your shop&apos;s data, email the
+                Tracknologia team (below). We do it within 30 days. Copies may
+                stay in backups for a limited time.
               </p>
             </div>
           </section>
@@ -130,8 +128,7 @@ export default function PrivacyPage() {
             </h2>
             <div className={SECTION_BODY_CLASS}>
               <p>
-                Questions about your information: email the Tracknologia team
-                at{" "}
+                Questions about your information: email the Tracknologia team at{" "}
                 <a
                   href={`mailto:${PRIVACY_CONTACT_EMAIL}`}
                   className="font-semibold text-foreground underline underline-offset-4"
