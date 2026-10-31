@@ -9,6 +9,7 @@ import {
   Wrench01Icon,
 } from "@hugeicons/core-free-icons";
 import { BrandLogo } from "@/components/shared/brand-logo";
+import { PublicHeader } from "@/components/shared/public-header";
 import { StatusGauge } from "@/components/shared/status-gauge";
 import { buttonVariants } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
@@ -73,36 +74,9 @@ const features = [
 export default function Home() {
   return (
     <div className="flex min-h-screen flex-col bg-background text-foreground">
-      <header className="border-b border-border bg-card">
-        <div className="mx-auto flex h-16 max-w-6xl items-center justify-between gap-4 px-4 sm:px-6">
-          <Link href="/" className="shrink-0 rounded-sm">
-            <BrandLogo />
-          </Link>
-          <nav
-            aria-label="Main navigation"
-            className="flex items-center gap-1 sm:gap-4"
-          >
-            <Link
-              href="#providers"
-              className="hidden px-2 py-3 text-sm font-medium underline-offset-4 hover:underline sm:inline-flex"
-            >
-              For providers
-            </Link>
-            <Link
-              href="/track"
-              className="px-2 py-3 text-sm font-medium underline-offset-4 hover:underline"
-            >
-              Track a repair
-            </Link>
-            <Link
-              href="/login"
-              className={buttonVariants({ variant: "outline", size: "sm" })}
-            >
-              Sign In
-            </Link>
-          </nav>
-        </div>
-      </header>
+      <PublicHeader
+        extraLinks={[{ href: "#providers", label: "For providers" }]}
+      />
 
       <main className="flex-1">
         <section className="bg-foreground text-background">
