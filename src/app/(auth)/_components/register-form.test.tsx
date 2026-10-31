@@ -20,7 +20,9 @@ describe("RegisterForm initial state", () => {
   it("preselects Shop Staff and collapses the code when an invite arrives", () => {
     const html = renderToStaticMarkup(<RegisterForm initialInvite="tok_abc" />);
 
-    expect(html).toMatch(/<input[^>]*value="STAFF"[^>]*checked=""[^>]*>/);
+    expect(html.match(/<input[^>]*value="STAFF"[^>]*>/)?.[0]).toContain(
+      'checked=""',
+    );
     expect(html).toContain("Invite code added ✓");
     expect(html).toContain("Change");
     expect(html).toMatch(/<input[^>]*name="inviteToken"[^>]*value="tok_abc"/);
@@ -31,7 +33,9 @@ describe("RegisterForm initial state", () => {
   it("starts on Independent without an invite and shows no code field", () => {
     const html = renderToStaticMarkup(<RegisterForm />);
 
-    expect(html).toMatch(/<input[^>]*value="INDEPENDENT"[^>]*checked=""[^>]*>/);
+    expect(html.match(/<input[^>]*value="INDEPENDENT"[^>]*>/)?.[0]).toContain(
+      'checked=""',
+    );
     expect(html).not.toContain('name="inviteToken"');
     expect(html).not.toContain("Invite code added");
     expect(html).toContain("Create account");

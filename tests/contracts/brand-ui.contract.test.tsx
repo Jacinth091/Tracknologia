@@ -1,4 +1,4 @@
-import { renderToStaticMarkup } from "react-dom/server";
+import { renderToReadableStream, renderToStaticMarkup } from "react-dom/server";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import { StatusGauge } from "@/components/shared/status-gauge";
@@ -231,9 +231,11 @@ describe("customer tracking", () => {
   ])(
     "only accepts valid Request references from URL prefill: %s",
     async (code, expected) => {
-      const html = renderToStaticMarkup(
-        await TrackRepairPage({ searchParams: Promise.resolve({ code }) }),
-      );
+      const html = await new Response(
+        await renderToReadableStream(
+          await TrackRepairPage({ searchParams: Promise.resolve({ code }) }),
+        ),
+      ).text();
       expect(html).toMatch(
         new RegExp(`<input[^>]*name="trackingCode"[^>]*value="${expected}"`),
       );

@@ -1,11 +1,17 @@
-import { renderToStaticMarkup } from "react-dom/server";
-import { describe, expect, it } from "vitest";
+import { renderToReadableStream } from "react-dom/server";
+import { describe, expect, it, vi } from "vitest";
+
+vi.mock("next/headers", () => ({
+  cookies: vi.fn(async () => ({ getAll: () => [] })),
+}));
 
 import PrivacyPage from "./page";
 
 describe("privacy page", () => {
-  it("renders the five sections, the contact link and the approved notice", () => {
-    const html = renderToStaticMarkup(<PrivacyPage />);
+  it("renders the five sections, the contact link and the approved notice", async () => {
+    const html = await new Response(
+      await renderToReadableStream(<PrivacyPage />),
+    ).text();
 
     for (const heading of [
       "1. Feedback",
@@ -21,8 +27,10 @@ describe("privacy page", () => {
     expect(html).toContain("Last updated: 31 October 2026.");
   });
 
-  it("lists the five sections as anchors to their headings", () => {
-    const html = renderToStaticMarkup(<PrivacyPage />);
+  it("lists the five sections as anchors to their headings", async () => {
+    const html = await new Response(
+      await renderToReadableStream(<PrivacyPage />),
+    ).text();
 
     for (const id of [
       "privacy-feedback",
@@ -36,8 +44,10 @@ describe("privacy page", () => {
     }
   });
 
-  it("keeps the labelled sentences word for word", () => {
-    const html = renderToStaticMarkup(<PrivacyPage />);
+  it("keeps the labelled sentences word for word", async () => {
+    const html = await new Response(
+      await renderToReadableStream(<PrivacyPage />),
+    ).text();
 
     expect(html).toContain("What we collect:");
     expect(html).toContain("Who can see it:");
@@ -46,8 +56,10 @@ describe("privacy page", () => {
     expect(html).toContain("Your shop&#x27;s public page shows only");
   });
 
-  it("renders the shared public header", () => {
-    const html = renderToStaticMarkup(<PrivacyPage />);
+  it("renders the shared public header", async () => {
+    const html = await new Response(
+      await renderToReadableStream(<PrivacyPage />),
+    ).text();
 
     expect(html).toContain('aria-label="Main navigation"');
     expect(html).toContain("Track a repair");

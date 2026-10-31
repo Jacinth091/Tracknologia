@@ -32,6 +32,10 @@ tracking outcomes and URL prefill, Request receipts, and native account radios.
 It supplies action results at the rendering seam; it does not exercise browser
 events, real Server Action transport, responsive layout, or computed styles.
 
+Page trees containing async Server Components (such as `PublicHeader`) use
+`renderToReadableStream` and consume the stream before asserting on the HTML.
+`renderToStaticMarkup` remains suitable for synchronous component trees.
+
 `tests/contracts/feedback-ui.contract.test.tsx` applies the same method to the
 participant feedback form: category radios and prompts, field-error wiring,
 pending, alert and receipt states, the plain `/feedback` links from Tracking and
