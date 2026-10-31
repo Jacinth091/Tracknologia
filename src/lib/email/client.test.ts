@@ -3,6 +3,11 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 const mocks = vi.hoisted(() => ({
   send: vi.fn(),
   consoleError: vi.spyOn(console, "error").mockImplementation(() => undefined),
+  resend: {
+    apiKey: "re_production_key" as string | null,
+    fromEmail: "Tracknologia <team@tracknologia.example>",
+    isDevLogger: false,
+  },
 }));
 
 vi.mock("resend", () => ({
@@ -14,11 +19,7 @@ vi.mock("resend", () => ({
 vi.mock("@/lib/config/server", () => ({
   getServerConfig: () => ({
     runtime: "production",
-    resend: {
-      apiKey: "re_production_key",
-      fromEmail: "Tracknologia <team@tracknologia.example>",
-      isDevLogger: false,
-    },
+    resend: mocks.resend,
   }),
 }));
 
@@ -26,6 +27,7 @@ import { sendEmail } from "./client";
 
 beforeEach(() => {
   vi.clearAllMocks();
+  mocks.resend.apiKey = "re_production_key";
 });
 
 describe("sendEmail", () => {
@@ -64,5 +66,34 @@ describe("sendEmail", () => {
         html: "<p>Invite</p>",
       }),
     ).resolves.toEqual({ success: false, reason: "provider_error" });
+  });
+
+  it("returns EMAIL_DISABLED in production without a key, with no Resend call and no logs", async () => {
+    mocks.resend.apiKey = null;
+    const logSpies = [
+      vi.spyOn(console, "log").mockImplementation(() => undefined),
+      vi.spyOn(console, "info").mockImplementation(() => undefined),
+      vi.spyOn(console, "warn").mockImplementation(() => undefined),
+    ];
+
+    try {
+      const result = await sendEmail({
+        to: "staff@example.com",
+        subject: "You're invited to join River Repair on Tracknologia",
+        html: "<p>INVITE_CODE_SENTINEL_7c3e</p>",
+        text: "Join Link: https://app.tracknologia.example/register?invite=INVITE_CODE_SENTINEL_7c3e",
+      });
+
+      expect(result).toEqual({ success: false, reason: "EMAIL_DISABLED" });
+      expect(mocks.send).not.toHaveBeenCalled();
+      expect(mocks.consoleError).not.toHaveBeenCalled();
+      for (const spy of logSpies) {
+        expect(spy).not.toHaveBeenCalled();
+      }
+    } finally {
+      for (const spy of logSpies) {
+        spy.mockRestore();
+      }
+    }
   });
 });
