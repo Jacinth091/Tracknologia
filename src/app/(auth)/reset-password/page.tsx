@@ -12,7 +12,12 @@ import {
   CardTitle,
 } from "@/components/ui/card";
 import { buttonVariants } from "@/components/ui/button";
-import { getUser, hasRecoveryGrant, maskEmail } from "@/features/auth";
+import {
+  getCurrentSessionId,
+  getUser,
+  hasRecoveryGrant,
+  maskEmail,
+} from "@/features/auth";
 import { ResetPasswordForm } from "../_components/reset-password-form";
 
 export const metadata: Metadata = {
@@ -140,9 +145,12 @@ export default async function ResetPasswordPage({
   }
 
   // Even a signed-in session with the `?flow=recovery` marker is not enough:
-  // the form opens only for a server-issued, still-valid recovery grant.
-  if (!(await hasRecoveryGrant(user.id))) {
-    redirect("/dashboard");
+  // the form opens only for a server-issued, still-valid recovery grant bound
+  // to this session. A recovery attempt whose grant is missing or has expired
+  // gets the fresh-link card, not a silent bounce to the dashboard.
+  const sessionId = await getCurrentSessionId();
+  if (!(await hasRecoveryGrant(user.id, sessionId))) {
+    return <RecoveryLinkRequiredCard callbackFailed={false} />;
   }
 
   return <PasswordFormCard recoveredEmail={maskEmail(user.email)} />;

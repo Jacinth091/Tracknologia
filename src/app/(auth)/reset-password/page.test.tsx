@@ -7,6 +7,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 const feature = vi.hoisted(() => ({
   getUser: vi.fn(),
   hasRecoveryGrant: vi.fn(),
+  getCurrentSessionId: vi.fn(),
 }));
 
 const navigation = vi.hoisted(() => ({
@@ -43,6 +44,7 @@ beforeEach(() => {
   vi.clearAllMocks();
   feature.getUser.mockResolvedValue(null);
   feature.hasRecoveryGrant.mockResolvedValue(false);
+  feature.getCurrentSessionId.mockResolvedValue("sess-1");
 });
 
 describe("reset password page states (#126)", () => {
@@ -73,16 +75,22 @@ describe("reset password page states (#126)", () => {
     expect(navigation.redirect).not.toHaveBeenCalled();
   });
 
-  it("refuses the form for a signed-in marker visit without a recovery grant", async () => {
+  it("shows the fresh-link card, not the form, when the grant is missing or expired", async () => {
     feature.getUser.mockResolvedValue({
       id: "user-1",
       email: "owner@shop.com",
     });
     feature.hasRecoveryGrant.mockResolvedValue(false);
 
-    await expect(openResetPage({ flow: "recovery" })).rejects.toThrow(
-      "redirect:/dashboard",
+    const html = renderToStaticMarkup(
+      await openResetPage({ flow: "recovery" }),
     );
+
+    expect(html).toContain("Recovery link required");
+    expect(html).toContain("/forgot-password");
+    expect(html).not.toContain("Set New Password");
+    expect(html).not.toContain("reset password form");
+    expect(navigation.redirect).not.toHaveBeenCalled();
   });
 
   it("does not open the form as a silent password change on a plain signed-in visit", async () => {
