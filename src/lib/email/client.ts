@@ -44,6 +44,7 @@ export async function sendEmail(
       host: smtp.host,
       port: smtp.port,
       secure: smtp.secure,
+      requireTLS: !smtp.secure,
       auth: { user: smtp.user, pass: smtp.password },
     });
     const info = await transport.sendMail({
