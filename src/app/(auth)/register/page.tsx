@@ -1,7 +1,5 @@
 import type { Metadata } from "next";
 import Link from "next/link";
-import { HugeiconsIcon } from "@hugeicons/react";
-import { UserAdd01Icon } from "@hugeicons/core-free-icons";
 import {
   Card,
   CardContent,
@@ -26,43 +24,38 @@ export default async function RegisterPage({
   const { invite } = await searchParams;
 
   return (
-    <Card className="w-full shadow-md">
-      <CardHeader className="space-y-1 pb-4 text-center">
-        <CardTitle className="flex items-center justify-center gap-2.5 text-2xl font-bold tracking-tight">
-          <span className="inline-flex size-9 shrink-0 items-center justify-center rounded-lg border border-border bg-muted">
-            <HugeiconsIcon
-              icon={UserAdd01Icon}
-              strokeWidth={1.8}
-              className="size-4.5"
-              aria-hidden="true"
-            />
-          </span>
-          Get Started with Tracknologia
+    <Card>
+      <CardHeader className="space-y-1 text-center">
+        <CardTitle>
+          <h1 className="text-2xl font-bold tracking-tight">
+            Create your account
+          </h1>
         </CardTitle>
-        <CardDescription className="text-sm">
-          Select what you are signing up as to create your account
+        <CardDescription>
+          Choose how you&apos;ll use Tracknologia.
         </CardDescription>
       </CardHeader>
       <CardContent>
         <RegisterForm initialInvite={invite} />
       </CardContent>
-      <CardFooter className="justify-center border-t border-border/50 pt-4 text-xs text-muted-foreground">
-        Already have an account?{" "}
-        <Link
-          href="/login"
-          className="ml-1 font-medium text-foreground underline-offset-4 hover:underline"
-        >
-          Sign in
-        </Link>
+      <CardFooter className="justify-center border-t border-border/50 pt-4 text-sm text-muted-foreground">
+        <span>
+          Already have an account?{" "}
+          <Link
+            href="/login"
+            className="font-medium text-foreground underline-offset-4 hover:underline"
+          >
+            Sign in
+          </Link>
+          {" · "}
+          <Link
+            href="/privacy"
+            className="font-medium text-foreground underline-offset-4 hover:underline"
+          >
+            Privacy
+          </Link>
+        </span>
       </CardFooter>
-      <p className="pb-6 text-center text-xs text-muted-foreground">
-        <Link
-          href="/privacy"
-          className="font-medium text-foreground underline underline-offset-4"
-        >
-          Privacy notice
-        </Link>
-      </p>
     </Card>
   );
 }

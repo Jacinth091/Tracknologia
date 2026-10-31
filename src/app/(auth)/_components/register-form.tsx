@@ -6,9 +6,7 @@ import {
   AlertCircleIcon,
   CheckmarkCircle02Icon,
   Store01Icon,
-  Ticket01Icon,
   UserGroupIcon,
-  UserIcon,
   Wrench01Icon,
 } from "@hugeicons/core-free-icons";
 
@@ -50,79 +48,65 @@ export function RegisterForm({ initialInvite }: RegisterFormProps) {
   const [intent, setIntent] = useState<"INDEPENDENT" | "SHOP" | "STAFF">(
     initialInvite ? "STAFF" : "INDEPENDENT",
   );
+  const [changingInvite, setChangingInvite] = useState(false);
   const [state, formAction, isPending] = useActionState(registerAction, null);
+  // A code that arrived with the link stays out of the way until someone asks
+  // to change it, unless the server rejected it and the field must be shown.
+  const inviteCollapsed =
+    Boolean(initialInvite) &&
+    !changingInvite &&
+    !state?.fieldErrors?.inviteToken;
 
   return (
     <div className="space-y-6">
-      <div className="space-y-2.5">
-        <div className="flex items-center gap-2">
-          <HugeiconsIcon
-            icon={UserIcon}
-            strokeWidth={1.8}
-            className="size-4 text-muted-foreground"
-            aria-hidden="true"
-          />
-          <Label className="font-mono text-[11px] font-medium uppercase tracking-[0.14em] text-muted-foreground">
-            What are you signing up as?
-          </Label>
-        </div>
-        <div
-          role="radiogroup"
-          aria-label="Account Role"
-          className="grid grid-cols-1 gap-3 sm:grid-cols-3"
-        >
-          {INTENT_OPTIONS.map((option) => {
-            const selected = intent === option.value;
+      <div
+        role="radiogroup"
+        aria-label="Account Role"
+        className="grid grid-cols-1 gap-3 sm:grid-cols-3"
+      >
+        {INTENT_OPTIONS.map((option) => {
+          const selected = intent === option.value;
 
-            return (
-              <label
-                key={option.value}
-                className={cn(
-                  "flex cursor-pointer flex-col gap-3 rounded-lg border p-3.5 transition-colors",
-                  selected
-                    ? "border-foreground bg-muted/60 ring-1 ring-foreground"
-                    : "border-input bg-card hover:border-foreground/40 hover:bg-muted/30",
-                  isPending && "cursor-not-allowed opacity-50",
-                )}
+          return (
+            <label
+              key={option.value}
+              className={cn(
+                "flex cursor-pointer flex-col gap-3 rounded-lg border border-input bg-card p-4 transition-colors hover:bg-muted/30 focus-within:ring-2 focus-within:ring-ring has-[:checked]:border-foreground has-[:checked]:bg-muted/50",
+                isPending && "cursor-not-allowed opacity-50",
+              )}
+            >
+              <input
+                type="radio"
+                name="account-intent"
+                value={option.value}
+                checked={selected}
+                disabled={isPending}
+                onChange={() => setIntent(option.value)}
+                aria-labelledby={`intent-${option.value}-title`}
+                aria-describedby={`intent-${option.value}-description`}
+                className="sr-only"
+              />
+              <HugeiconsIcon
+                icon={option.icon}
+                strokeWidth={1.8}
+                className="size-5 text-foreground"
+                aria-hidden="true"
+              />
+              <span
+                id={`intent-${option.value}-title`}
+                className="block text-sm font-semibold"
               >
-                <span className="flex items-center justify-between">
-                  <span
-                    className={cn(
-                      "inline-flex size-8 items-center justify-center rounded-md border",
-                      selected
-                        ? "border-foreground/20 bg-background text-foreground"
-                        : "border-border bg-muted text-muted-foreground",
-                    )}
-                  >
-                    <HugeiconsIcon
-                      icon={option.icon}
-                      strokeWidth={1.8}
-                      className="size-4"
-                      aria-hidden="true"
-                    />
-                  </span>
-                  <input
-                    type="radio"
-                    name="account-intent"
-                    value={option.value}
-                    checked={selected}
-                    disabled={isPending}
-                    onChange={() => setIntent(option.value)}
-                    className="size-4 shrink-0 accent-foreground"
-                  />
-                </span>
-                <span>
-                  <span className="block text-sm font-semibold">
-                    {option.label}
-                  </span>
-                  <span className="mt-1 block text-xs leading-relaxed text-muted-foreground">
-                    {option.description}
-                  </span>
-                </span>
-              </label>
-            );
-          })}
-        </div>
+                {option.label}
+              </span>
+              <span
+                id={`intent-${option.value}-description`}
+                className="block text-xs leading-relaxed text-muted-foreground"
+              >
+                {option.description}
+              </span>
+            </label>
+          );
+        })}
       </div>
 
       <form action={formAction} className="space-y-4">
@@ -155,22 +139,23 @@ export function RegisterForm({ initialInvite }: RegisterFormProps) {
         )}
 
         {intent === "STAFF" && (
-          <div className="space-y-3 rounded-lg border border-foreground/15 bg-muted/50 p-4">
-            <div className="space-y-1.5">
-              <div className="flex items-center gap-2">
-                <HugeiconsIcon
-                  icon={Ticket01Icon}
-                  strokeWidth={1.8}
-                  className="size-4 text-muted-foreground"
-                  aria-hidden="true"
-                />
-                <Label
-                  htmlFor="inviteToken"
-                  className="text-xs font-semibold text-foreground"
+          <div className="space-y-2">
+            {inviteCollapsed && (
+              <div className="flex items-center justify-between gap-3 rounded-lg bg-muted/50 px-3 py-2 text-sm text-muted-foreground">
+                <span>Invite code added ✓</span>
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="sm"
+                  onClick={() => setChangingInvite(true)}
                 >
-                  Shop Invitation Code *
-                </Label>
+                  Change
+                </Button>
               </div>
+            )}
+            {/* Stays in the form when collapsed, so the code still submits. */}
+            <div hidden={inviteCollapsed} className="space-y-2">
+              <Label htmlFor="inviteToken">Shop Invitation Code *</Label>
               <Input
                 id="inviteToken"
                 name="inviteToken"
@@ -178,18 +163,20 @@ export function RegisterForm({ initialInvite }: RegisterFormProps) {
                 placeholder="Paste the invitation token from your Shop Owner"
                 disabled={isPending}
                 required
-                className="bg-background"
+                aria-describedby="inviteToken-help"
               />
               {state?.fieldErrors?.inviteToken && (
                 <p className="text-xs text-destructive">
                   {state.fieldErrors.inviteToken}
                 </p>
               )}
+              <p
+                id="inviteToken-help"
+                className="text-xs text-muted-foreground"
+              >
+                Ask your Shop Owner for an invite link.
+              </p>
             </div>
-            <p className="text-[11px] leading-relaxed text-muted-foreground">
-              Don&apos;t have an invite code? Ask your Shop Owner to generate an
-              invite from their dashboard.
-            </p>
           </div>
         )}
 
@@ -260,17 +247,11 @@ export function RegisterForm({ initialInvite }: RegisterFormProps) {
               Creating account...
             </span>
           ) : intent === "STAFF" ? (
-            "Verify Invite & Create Staff Account"
+            "Join shop"
           ) : (
-            "Create Account & Continue"
+            "Create account"
           )}
         </Button>
-
-        <p className="pt-1 text-center text-[11px] text-muted-foreground">
-          {intent === "STAFF"
-            ? "Your staff account will be linked to your shop upon registration."
-            : "Next step: configure your provider details in onboarding."}
-        </p>
       </form>
     </div>
   );
