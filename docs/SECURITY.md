@@ -62,18 +62,28 @@ Tracknologia must not implement its own password hashing or JWT system.
   signed-in visitors only from `/login` and `/register`. Recovery entry
   pages resolve their own state deliberately; an automatic redirect would
   strand a valid recovery session on the dashboard.
-- The reset form opens only after a successful recovery exchange, marked by
-  the `?flow=recovery` target the callback routes to `/reset-password`,
-  and `updatePasswordAction` re-checks the trusted recovery session server
-  side before changing credentials. A signed-in visit without the marker is
-  redirected to the dashboard, so the page cannot be used as a silent
-  password change — and no attacker can steer it: the credential change
-  only ever affects the signed-in visitor's own account.
+- The reset form opens only with a server-issued recovery grant. The callback
+  issues it only when the exchanged Auth user's `recovery_sent_at` is no older
+  than one hour, so the purpose comes from Supabase. The `next` parameter and
+  the `?flow=recovery` marker never prove purpose. A code routed to
+  `/reset-password` without a recent recovery request gets no grant.
+- The grant is an HMAC-signed, HttpOnly cookie scoped to `/reset-password`,
+  bound to the Auth user id, and valid for 10 minutes. Its signing key is
+  derived from the abuse secret under the label
+  `tracknologia:recovery-grant:v1`, so the raw secret is never the HMAC key.
+- `updatePasswordAction` refuses a missing, expired, tampered or other-user
+  grant without calling Supabase, so the password is unchanged. It consumes
+  the grant after a successful change, so a grant is single use. A signed-in
+  visit without a grant is redirected to the dashboard, so the page is never a
+  silent password change. The credential change only ever affects the
+  signed-in visitor's own account.
 - A recovery exchange replaces any existing session with the recovered
-  account's session. A failed or reused exchange returns the visitor to
-  `/login?error=auth_callback_failed`, where a specific message explains
-  the link was unverifiable and points at fresh recovery; unknown `error`
-  values are not echoed.
+  account's session. The reset form names that account by masked email
+  (`b•••@example.com`), so the change is never silent. A failed, expired or
+  reused recovery link lands on `/reset-password?callback_error=auth_callback_failed`,
+  which shows the recovery error state with a path to request a new email,
+  even when the browser already has a session. Unknown `error` values are not
+  echoed.
 - Production credential updates fail closed: Auth internals such as
   missing or expired recovery sessions surface as one deliberate message
   directing the person to request a fresh recovery email.

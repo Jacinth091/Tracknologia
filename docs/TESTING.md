@@ -93,18 +93,29 @@ Mandatory release scenarios (one spec file each under `tests/e2e/`):
    link or enters the code during onboarding, accepts, gets permitted
    access, owner-only controls are denied, OWNER removes Staff, access is
    denied.
-7. `password-recovery.spec.ts` (#126) — real forgot-password request → captured
-   recovery email → callback exchange → reset form → new-password sign-in
-   with the old password rejected, a reused link landing on the login error
-   message, an unauthenticated bare `/reset-password` visit staying on the
-   deliberate recovery screen, and the settings Account & Security area
-   keeping the read-only sign-in email clearly separate from the editable
-   customer contact email.
+7. `password-recovery.spec.ts` (#126) — real forgot-password request with the
+   full neutral copy → captured recovery email → callback exchange → reset form
+   naming the account by masked email → new password. A reused link lands on
+   the recovery error state, and the old password is refused while the new one
+   signs in. Account & Security keeps the read-only sign-in email separate from
+   the customer contact email, using its own account. A recovery link opened
+   while signed in as another account recovers that account and ends signed in
+   as it. An unauthenticated bare `/reset-password` visit shows the recovery
+   screen. Each scenario seeds its own accounts; only the serial recovery flow
+   shares one account. Retries stay at zero and there is one worker.
 
-Password recovery mail is read from the local stack's Inbucket capture
-(`supabase/config.toml` `[inbucket]` port, default `54324`) by
-`tests/e2e/helpers/mail.ts`; override the URL with `E2E_INBUCKET_URL` if the
-port is moved. Like every destructive fixture, it refuses non-local hosts.
+Password recovery mail is read from the local stack's Inbucket capture. The
+repo default keeps capture off: `supabase/config.toml` `[local_smtp]` has
+`enabled = false`. The E2E workflow switches it on with a `sed` step before
+`supabase start`, so only the disposable E2E stack captures mail. The helper,
+`tests/e2e/helpers/mail.ts`, calls the Inbucket v1 mailbox API on
+`[local_smtp] port` (default `54324`): the list
+`/api/v1/mailbox/{mailbox}` and the detail `/api/v1/mailbox/{mailbox}/{id}`.
+The mailbox is the recipient's local part. Override the URL with
+`E2E_INBUCKET_URL` if the port moves. Like every destructive fixture, it
+refuses non-local hosts. The local app callback is
+`http://localhost:3000/auth/callback`; `site_url` and
+`additional_redirect_urls` in `supabase/config.toml` allow it.
 
 Participant feedback has its own spec, `tests/e2e/feedback.spec.ts` (E2E-10),
 outside the numbered release list. It drives the real public and Provider forms
