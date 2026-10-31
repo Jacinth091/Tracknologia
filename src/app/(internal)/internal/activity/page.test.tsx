@@ -45,14 +45,28 @@ type RankedChartProps = {
   data: { key: string; label: string; value: number; color: string }[];
 };
 
+type DonutChartProps = {
+  summary: string;
+  data: { key: string; label: string; value: number; color: string }[];
+};
+type GaugeChartProps = {
+  summary: string;
+  label: string;
+  percent: number;
+};
+
 const charts = vi.hoisted(() => ({
   DayBarChart: vi.fn((_props: DayChartProps) => "DAY_BAR_CHART"),
   CategoryBarChart: vi.fn((_props: RankedChartProps) => "CATEGORY_BAR_CHART"),
+  DonutChart: vi.fn((_props: DonutChartProps) => "DONUT_CHART"),
+  GaugeChart: vi.fn((_props: GaugeChartProps) => "GAUGE_CHART"),
 }));
 
 vi.mock("../_components/metric-charts", () => ({
   DayBarChart: charts.DayBarChart,
   CategoryBarChart: charts.CategoryBarChart,
+  DonutChart: charts.DonutChart,
+  GaugeChart: charts.GaugeChart,
 }));
 
 vi.mock("next/link", () => ({
@@ -212,7 +226,7 @@ describe("Validation metrics page", () => {
       "Feedback per day, Oct 24 to Oct 30, peak 2 on Oct 26",
     );
 
-    const [status, category] = charts.CategoryBarChart.mock.calls.map(
+    const [status, , category] = charts.CategoryBarChart.mock.calls.map(
       ([props]) => props,
     );
     expect(status.summary).toBe(
@@ -225,7 +239,7 @@ describe("Validation metrics page", () => {
       "Ready",
       "Completed",
     ]);
-    expect(status.data[0].color).toBe("var(--chart-1)");
+    expect(status.data[0].color).toBe("var(--chart-cat-1)");
     expect(category.summary).toBe(
       "Feedback by category, largest Usability at 3",
     );
@@ -249,7 +263,8 @@ describe("Validation metrics page", () => {
     expect(html).toContain("Feedback by category");
     expect(html).toContain("Unavailable");
     expect(charts.DayBarChart).toHaveBeenCalledTimes(1);
-    expect(charts.CategoryBarChart).toHaveBeenCalledTimes(1);
+    // Status and the requests funnel render; feedback by category does not.
+    expect(charts.CategoryBarChart).toHaveBeenCalledTimes(2);
   });
 
   it("shows the empty state, not an all-zero chart", async () => {
@@ -268,7 +283,9 @@ describe("Validation metrics page", () => {
 
     expect(html).toContain("No activity in this period");
     expect(charts.DayBarChart).toHaveBeenCalledTimes(1);
-    expect(charts.DayBarChart.mock.calls[0][0].seriesLabel).toBe("Submissions");
+    expect(charts.DayBarChart.mock.calls[0][0].seriesLabel).toBe(
+      "Submissions",
+    );
   });
 
   it("renders null ratios as N/A, never as 0", async () => {
@@ -280,7 +297,8 @@ describe("Validation metrics page", () => {
 
     const html = await renderActivity();
 
-    expect(html.match(/>N\/A</g)).toHaveLength(2);
+    // Conversion tile, adoption gauge fallback, and both rows in All numbers.
+    expect(html.match(/>N\/A</g)).toHaveLength(4);
     expect(html).not.toMatch(/>\s*0(?:\.0+)?%\s*</);
   });
 
@@ -378,6 +396,99 @@ describe("Validation metrics page", () => {
     expect(feature.getValidationMetrics).toHaveBeenLastCalledWith({
       mode: "7d",
     });
+  });
+
+  it("assigns categorical slots in fixed order to each donut", async () => {
+    await renderActivity();
+
+    const donuts = charts.DonutChart.mock.calls.map(([props]) => props);
+    expect(donuts).toHaveLength(3);
+    expect(donuts[0].data.map((row) => [row.label, row.color])).toEqual([
+      ["Shop", "var(--chart-cat-1)"],
+      ["Independent", "var(--chart-cat-2)"],
+    ]);
+    expect(donuts[2].data.map((row) => row.label)).toEqual([
+      "New",
+      "Reviewing",
+      "Planned",
+      "Resolved",
+      "Dismissed",
+    ]);
+    expect(donuts[2].data[4].color).toBe("var(--chart-cat-5)");
+  });
+
+  it("passes the repeat share and adoption percentages to the gauges", async () => {
+    await renderActivity();
+
+    const gauges = charts.GaugeChart.mock.calls.map(([props]) => props);
+    expect(gauges.map((gauge) => [gauge.label, gauge.percent])).toEqual([
+      ["Repeat share", 33],
+      ["Adoption (all time)", 50],
+    ]);
+  });
+
+  it("shows an empty state, not an empty ring, for a donut with no data", async () => {
+    feature.getValidationMetrics.mockResolvedValue({
+      ...fixture,
+      feedback: {
+        ...fixture.feedback,
+        byStatus: {
+          NEW: 0,
+          REVIEWING: 0,
+          PLANNED: 0,
+          RESOLVED: 0,
+          DISMISSED: 0,
+        },
+      },
+    });
+
+    const html = await renderActivity();
+
+    expect(html).toContain("No feedback in this period");
+    expect(charts.DonutChart).toHaveBeenCalledTimes(2);
+  });
+
+  it("shows N/A instead of a gauge when a share has no base", async () => {
+    feature.getValidationMetrics.mockResolvedValue({
+      ...fixture,
+      activity: {
+        ...fixture.activity,
+        distinctProviders: 0,
+        repeatProviders: 0,
+      },
+      tracking: { ...fixture.tracking, adoptionPercent: null },
+    });
+
+    const html = await renderActivity();
+
+    expect(charts.GaugeChart).not.toHaveBeenCalled();
+    expect(html).toContain("Repeat share");
+    expect(html.match(/>N\/A</g)?.length).toBeGreaterThanOrEqual(2);
+  });
+
+  it("lists every visual-card metric in the All numbers table", async () => {
+    const html = await renderActivity();
+
+    expect(html).toContain("All numbers");
+    for (const label of [
+      "Onboarded in period (total)",
+      "All time (independent)",
+      "Active providers",
+      "Repeat providers (2 or more days)",
+      "Active memberships (now)",
+      "Created in period",
+      "Status now: In progress",
+      "Received in period",
+      "Conversion (submission cohort)",
+      "Mean decision time",
+      "Views in period",
+      "Adoption (all time)",
+      "Submissions in period",
+      "Category: Bug",
+      "Status: New",
+    ]) {
+      expect(html).toContain(label);
+    }
   });
 
   it("renders no raw identifiers", async () => {
