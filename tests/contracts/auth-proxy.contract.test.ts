@@ -255,4 +255,75 @@ describe("Proxy & Route Protection Contract (AUTH-R18, AUTH-R20)", () => {
       );
     });
   });
+
+  describe("Password recovery routing (#126)", () => {
+    const unauthenticated = {
+      data: { user: null },
+      error: {
+        name: "AuthSessionMissingError",
+        message: "Auth session missing!",
+      },
+    };
+
+    it("lets a signed-in recovery session reach /reset-password instead of bouncing to the dashboard", async () => {
+      // A recovery exchange establishes a session; redirecting authenticated
+      // visitors away here used to strand the password form behind the
+      // dashboard.
+      mockGetUser.mockResolvedValue({
+        data: { user: { id: "user-123", email: "test@example.com" } },
+        error: null,
+      });
+
+      const request = new NextRequest(
+        "https://tracknologia.com/reset-password?flow=recovery",
+      );
+      const response = await proxy(request);
+
+      expect(mockGetUser).toHaveBeenCalledTimes(1);
+      expect(response.status).not.toBe(307);
+      expect(response.headers.get("location")).toBeNull();
+    });
+
+    it("sends an unauthenticated /reset-password visit to the page's own recovery state, not /login", async () => {
+      mockGetUser.mockResolvedValue(unauthenticated);
+
+      const request = new NextRequest(
+        "https://tracknologia.com/reset-password",
+      );
+      const response = await proxy(request);
+
+      expect(response.status).not.toBe(307);
+      expect(response.headers.get("location")).toBeNull();
+    });
+
+    it("keeps /forgot-password reachable for signed-in account holders", async () => {
+      mockGetUser.mockResolvedValue({
+        data: { user: { id: "user-123", email: "test@example.com" } },
+        error: null,
+      });
+
+      const request = new NextRequest(
+        "https://tracknologia.com/forgot-password",
+      );
+      const response = await proxy(request);
+
+      expect(response.status).not.toBe(307);
+      expect(response.headers.get("location")).toBeNull();
+    });
+
+    it("still redirects signed-in users away from /login", async () => {
+      mockGetUser.mockResolvedValue({
+        data: { user: { id: "user-123", email: "test@example.com" } },
+        error: null,
+      });
+
+      const request = new NextRequest("https://tracknologia.com/login");
+      const response = await proxy(request);
+
+      expect(response.status).toBe(307);
+      expect(response.headers.get("location")).toBe(
+        "https://tracknologia.com/dashboard",
+      );
+    });
+  });
 });

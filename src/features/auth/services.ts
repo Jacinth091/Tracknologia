@@ -112,12 +112,16 @@ export async function requestPasswordReset(params: {
   );
 
   if (error) {
+    // The original Supabase error travels as the cause, so the action can log
+    // its status and code while the public answer stays neutral.
     if (config.runtime === "production") {
-      throw new Error(
+      throw new AuthError(
         "Unable to send password reset email at this time. Please try again later.",
+        "INFRASTRUCTURE_FAILURE",
+        error,
       );
     }
-    throw new Error(error.message);
+    throw new AuthError(error.message, "INFRASTRUCTURE_FAILURE", error);
   }
 
   return data;
@@ -125,11 +129,21 @@ export async function requestPasswordReset(params: {
 
 export async function resetPassword(params: { newPassword: string }) {
   const supabase = await createClient();
+  const config = getServerConfig();
   const { data, error } = await supabase.auth.updateUser({
     password: params.newPassword,
   });
 
   if (error) {
+    if (config.runtime === "production") {
+      // Fail closed without exposing Auth internals: the recovery session may
+      // be missing, expired, or already used, or the Auth service may be
+      // degraded. The reset page directs the visitor back to a fresh
+      // recovery request instead.
+      throw new Error(
+        "Unable to set your password right now. Request a fresh password reset email and try again.",
+      );
+    }
     throw new Error(error.message);
   }
 

@@ -70,6 +70,14 @@ jobs:
           sed -i '0,/port = 54322/s//port = 55432/' supabase/config.toml
           grep -q '^port = 55432$' supabase/config.toml
 
+      - name: Enable local mail capture for the recovery E2E
+        shell: bash
+        run: |
+          # The repo default keeps [local_smtp] off; only this disposable E2E
+          # stack captures mail, so the recovery link can be read back.
+          sed -i '/^\[local_smtp\]/,/^\[/ s/^enabled = false/enabled = true/' supabase/config.toml
+          sed -n '/^\[local_smtp\]/,/^\[/p' supabase/config.toml | grep -q '^enabled = true$'
+
       - name: Prepare empty local seed
         run: touch supabase/seed.sql
 

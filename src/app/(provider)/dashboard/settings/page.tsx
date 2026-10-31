@@ -43,6 +43,7 @@ export default async function ProviderSettingsPage() {
         personalProfile={personalProfile}
         serviceModes={serviceModes}
         canManageProvider={context.role === "OWNER"}
+        accountEmail={context.email}
         requestLinkUrl={`${getAppOrigin()}/p/${provider.slug}/request`}
       />
     </div>

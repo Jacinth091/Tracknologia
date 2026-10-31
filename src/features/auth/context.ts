@@ -3,6 +3,7 @@ import { cache } from "react";
 import { createClient } from "@/lib/supabase/server";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { findMembershipByUserId } from "./persistence";
+import { readSessionClaims } from "./recovery-grant";
 import {
   AuthError,
   isUnauthenticatedAuthError,
@@ -108,6 +109,22 @@ export async function getUser(
     return resolveUserFromSupabase(client);
   }
   return getRequestScopedUser();
+}
+
+/**
+ * The id of the current Auth session, read from its access-token claims. It is
+ * used only to bind a recovery grant to the session it was issued in. Fails
+ * closed: an unreadable session has no id, and no grant matches an absent id.
+ */
+export async function getCurrentSessionId(): Promise<string | undefined> {
+  try {
+    const supabase = await createClient();
+    const { data } = await supabase.auth.getSession();
+    const accessToken = data.session?.access_token;
+    return accessToken ? readSessionClaims(accessToken)?.session_id : undefined;
+  } catch {
+    return undefined;
+  }
 }
 
 export async function requireUser(

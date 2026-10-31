@@ -105,6 +105,80 @@ src/app/(auth)/
 └── actions.ts (Next.js Server Actions adapter)
 ```
 
+## Core workflow — password recovery
+
+Supabase Auth owns recovery tokens and email delivery. Tracknologia owns the
+routing and the deliberate recovery states:
+
+```text
+Account holder opens /forgot-password with a sign-in email
+        ↓
+Auth Module requestPasswordReset → Supabase Auth resetPasswordForEmail
+(callback target: <origin>/auth/callback?next=/reset-password)
+        ↓
+Supabase Auth emails the recovery link to the account's sign-in email
+(unknown accounts are silently skipped; the UI confirms neutrally). The default
+link is Supabase's own verify endpoint, /auth/v1/verify?type=recovery, whose
+redirect_to returns to /auth/callback?next=/reset-password
+        ↓
+The visitor opens the verify link in the same browser that requested the reset
+(the PKCE verifier cookie lives there). Supabase verifies the token and redirects
+to /auth/callback?code=…, which exchanges the code for a session
+        ↓
+/auth/callback checks the redeemed session's access-token amr claim. It issues
+the recovery grant only when amr names method "recovery" with a recent
+timestamp. The grant is a signed HttpOnly cookie for /reset-password, bound to
+the Auth user and the session id, valid for 10 minutes
+        ↓
+The callback redirects to /reset-password?flow=recovery, or to
+/reset-password?callback_error=auth_callback_failed when the code, the amr or the
+session is not a recovery
+        ↓
+The reset page resolves state server-side (Auth Module getUser() and the
+session id):
+- no session                         → "Recovery link required" card, fresh-link CTA
+- session, flow marker, no grant     → "Recovery link required" card (expired or missing)
+- session, flow marker, valid grant  → password form, naming the account by masked email
+- session, no flow marker            → redirect /dashboard (ordinary signed-in visit)
+        ↓
+updatePasswordAction checks the signed-in user and session against the grant,
+then Auth Module resetPassword → Supabase Auth updateUser({ password }). On
+success the browser's grant cookie is cleared
+        ↓
+Post-reset destination: /dashboard (the exchange established a signed-in session)
+```
+
+Rules the workflow depends on:
+
+- `proxy.ts` keeps `/forgot-password` and `/reset-password` reachable for
+  signed-in visitors (proxy-time session refresh still runs) and only
+  redirects signed-in visitors away from `/login` and `/register`. Recovery
+  entry pages resolve their own state; an automatic redirect there would
+  strand a valid recovery session on the dashboard.
+- The `?flow=recovery` marker is a navigation hint only. On its own it
+  authorizes nothing: the form opens and the password changes only with a valid
+  recovery grant for the signed-in user and session. A plain signed-in visit
+  without the marker goes to /dashboard. No application reset-token table
+  exists; Supabase Auth credentials own the mechanism.
+- The grant is short-lived (10 minutes), user- and session-bound, and cleared by
+  the browser after a successful change. It is not an atomic server-side spent
+  token: a copied cookie stays usable from the same session until it expires.
+- A recovery exchange replaces any existing session with the recovery
+  account's session. Each person recovers their own account; a Staff member
+  must use their own sign-in email, never the Shop Owner's.
+- Editing the Provider's customer contact email never affects sign-in
+  credentials or recovery delivery; recovery emails always go to the
+  sign-in email shown in the settings Account & Security area. The sign-in
+  email and the Provider's customer/public contact email are distinct
+  domain concepts.
+- The reset request response is neutral: it never reveals whether an email
+  is registered, and production Auth failures are never surfaced as raw
+  errors. Expired, reused, or missing recovery credentials lead to the
+  deliberate recovery screen with a fresh-link request path, even for a
+  signed-in visitor. A failed recovery callback lands on
+  /reset-password?callback_error=auth_callback_failed. A failed sign-in
+  callback (not a recovery) still lands on /login with a useful message.
+
 ## Security requirements
 
 Staff signup creates only the authenticated account, with email and password.
@@ -129,4 +203,11 @@ At minimum test:
 - multiple memberships without active selection fail closed with `AMBIGUOUS_PROVIDER_CONTEXT`;
 - valid membership resolves correct Provider context for both `OWNER` and `STAFF`;
 - Independent Repairer context resolves correctly;
-- allowed roles pass and disallowed roles fail with `UNAUTHORIZED_ROLE`.
+- allowed roles pass and disallowed roles fail with `UNAUTHORIZED_ROLE`;
+- password recovery keeps its deliberate routing contract: recovery sessions
+  reach `/reset-password`, the marker-less signed-in visit does not open the
+  reset form, the reset-request response is neutral, production Auth
+  failures do not leak raw messages, and stale/failed callback exchanges
+  recover on the login page (`tests/contracts/auth-proxy.contract.test.ts`,
+  the `(auth)` action/page/route tests, and
+  `tests/e2e/password-recovery.spec.ts` against a disposable local stack).

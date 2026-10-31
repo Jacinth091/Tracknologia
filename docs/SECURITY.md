@@ -46,6 +46,58 @@ Tracknologia must not implement its own password hashing or JWT system.
 
 `/login?redirectTo=` targets are untrusted input. One helper, `getSafeInternalRedirectUrl`, is shared by the login page, `loginAction`, the auth callback, and `proxy`: it accepts only single-leading-slash local paths of at most 2048 characters, trims boundary whitespace, preserves safe query/fragment values, and falls back to `/dashboard` for absolute, protocol-relative, backslash, control-character, or oversized targets. The login form re-posts only the sanitized target and the Server Action re-sanitizes it, so a forged form field cannot redirect off-site. `proxy` treats `/internal` and `/internal/...` (not lookalikes such as `/internally`) as coarse authenticated destinations only; that redirect is not operator authorization, which is enforced by the `/internal` guard and the service-role-only internal seams described below.
 
+### Password recovery routing
+
+- Supabase Auth owns every recovery token: its single-use recovery link is
+  exchanged only by `/auth/callback`; the application keeps no reset-token
+  table and never derives account state from link text.
+- The reset-request response is neutral. It never reveals whether an email
+  is registered (Supabase silently skips unknown addresses), and production
+  Auth failures are surfaced as generic messages only. The recovery email
+  goes to the account's sign-in email — never to a Provider's customer
+  contact email, and never to another person's account on request of a
+  third party.
+- `proxy.ts` keeps `/forgot-password` and `/reset-password` reachable for
+  signed-in visitors (it still refreshes their session) but redirects
+  signed-in visitors only from `/login` and `/register`. Recovery entry
+  pages resolve their own state deliberately; an automatic redirect would
+  strand a valid recovery session on the dashboard.
+- The reset form opens only with a server-issued recovery grant. The callback
+  issues one only when the session produced by the code it just redeemed has a
+  `recovery` entry in its `amr` claim, with a recent timestamp. The `amr` is
+  read from the access token Supabase returned in that exchange. The token is
+  decoded, not signature-verified, because the server received it straight
+  from Supabase. The user's `recovery_sent_at` history never proves purpose, and
+  neither do the `next` parameter or the `?flow=recovery` marker. A valid
+  magic-link, password or OTP exchange routed to `/reset-password` gets no grant.
+- The grant is an HMAC-signed, HttpOnly cookie scoped to `/reset-password`. It
+  is bound to the Auth user id and to the session id (`session_id`), and it is
+  valid for 10 minutes. Its signing key is derived from the abuse secret under
+  the label `tracknologia:recovery-grant:v1`, so the raw secret is never the
+  HMAC key.
+- Honest lifetime: the grant is short-lived (10 minutes), user- and
+  session-bound, and cleared by the browser after a successful change. It is
+  not an atomic server-side spent token. A copied cookie stays usable from the
+  same session until it expires, and two simultaneous requests carrying the same
+  cookie can both pass the check. The credential change itself is enforced by
+  Supabase Auth.
+- `updatePasswordAction` refuses a missing, expired, tampered, other-user or
+  other-session grant without calling Supabase, so the password is unchanged.
+  A signed-in visit with `?flow=recovery` but no valid grant shows the fresh-link
+  card, not a password form. A signed-in visit without that marker is redirected
+  to the dashboard. The credential change only ever affects the signed-in
+  visitor's own account.
+- A recovery exchange replaces any existing session with the recovered
+  account's session. The reset form names that account by masked email
+  (`b•••@example.com`), so the change is never silent. A failed, expired or
+  reused recovery link lands on `/reset-password?callback_error=auth_callback_failed`,
+  which shows the recovery error state with a path to request a new email,
+  even when the browser already has a session. Unknown `error` values are not
+  echoed.
+- Production credential updates fail closed: Auth internals such as
+  missing or expired recovery sessions surface as one deliberate message
+  directing the person to request a fresh recovery email.
+
 ## Authorization
 
 Tracknologia owns application permissions:

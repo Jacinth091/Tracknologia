@@ -9,7 +9,11 @@ import {
   registerProviderAccount,
   requestPasswordReset,
   resetPassword,
+  getCurrentSessionId,
+  getUser,
   signOutUser,
+  consumeRecoveryGrant,
+  hasRecoveryGrant,
   AuthError,
 } from "@/features/auth";
 import { getAppOrigin, getServerConfig } from "@/lib/config/server";
@@ -144,6 +148,20 @@ export async function registerAction(
   };
 }
 
+// The provider's status and code are enough to operate the outage. Its message
+// can echo the address being reset, so it is never logged.
+function deliveryFailureDetails(err: unknown): {
+  status?: unknown;
+  code?: unknown;
+} {
+  const cause =
+    typeof err === "object" && err !== null
+      ? (err as { cause?: unknown }).cause
+      : undefined;
+  const source = (cause ?? err) as { status?: unknown; code?: unknown } | null;
+  return { status: source?.status, code: source?.code };
+}
+
 export async function forgotPasswordAction(
   _prevState: ActionState | null,
   formData: FormData,
@@ -168,6 +186,20 @@ export async function forgotPasswordAction(
       redirectTo,
     });
   } catch (err: unknown) {
+    // Delivery failures (e.g. SMTP outages) would distinguish accounts that
+    // exist from unknown addresses. In production the public response stays
+    // identical to a successful request; operators still see the failure in
+    // server logs. In local/test runtimes a real error message aids debugging.
+    if (getServerConfig().runtime === "production") {
+      console.error(
+        "Password reset request failed",
+        deliveryFailureDetails(err),
+      );
+      return {
+        success:
+          "If an account is registered with this email, a password reset email is on its way. If you don't receive one shortly, try again later.",
+      };
+    }
     return {
       error:
         err instanceof Error ? err.message : "Failed to request password reset",
@@ -175,7 +207,11 @@ export async function forgotPasswordAction(
   }
 
   return {
-    success: "Password reset link sent. Please check your email inbox.",
+    // Neutral deliberate confirmation: never reveals whether the email is
+    // registered. Supabase Auth either delivers the recovery email or
+    // silently skips unknown addresses.
+    success:
+      "If an account is registered with this email, a password reset email is on its way. If you don't receive one shortly, try again later.",
   };
 }
 
@@ -192,8 +228,36 @@ export async function updatePasswordAction(
     };
   }
 
+  // Fail closed on the trusted recovery context. An ordinary session is not
+  // recovery authority: the visitor must carry a server-issued recovery
+  // grant (created by the Auth callback after a real one-time email code
+  // exchange) that also matches the signed-in Auth user. Forged
+  // `?flow=recovery` markers and direct action calls fail here.
+  const recoveryUser = await getUser();
+  if (!recoveryUser) {
+    return {
+      error:
+        "Your password recovery session has expired or was never established. Request a fresh password reset email and try again.",
+    };
+  }
+
+  // The grant must match this user and this session, so a cookie copied from
+  // another session is refused.
+  const sessionId = await getCurrentSessionId();
+  if (!(await hasRecoveryGrant(recoveryUser.id, sessionId))) {
+    return {
+      error:
+        "Your password reset grant is missing or expired. Open a fresh recovery email link in this browser, then set your new password again.",
+    };
+  }
+
   try {
     await resetPassword({ newPassword: parsed.data.password });
+
+    // Clear the grant cookie after a successful change. The grant is short-lived
+    // and session-bound, not an atomic spent token: a copied cookie stays usable
+    // until it expires, which is why the lifetime is ten minutes.
+    await consumeRecoveryGrant();
   } catch (err: unknown) {
     return {
       error: err instanceof Error ? err.message : "Failed to update password",

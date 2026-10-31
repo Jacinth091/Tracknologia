@@ -1,5 +1,6 @@
 // Public Interface for src/features/auth
 export {
+  getCurrentSessionId,
   getUser,
   requireUser,
   getProviderContext,
@@ -36,3 +37,15 @@ export {
   type ProviderRole,
   type ProviderType,
 } from "./types";
+
+export {
+  consumeRecoveryGrant,
+  createRecoveryGrantCookie,
+  hasRecoveryGrant,
+  isRecoverySession,
+  readSessionClaims,
+  RECOVERY_GRANT_COOKIE,
+  RECOVERY_GRANT_TTL_SECONDS,
+} from "./recovery-grant";
+
+export { maskEmail } from "./mask-email";

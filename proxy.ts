@@ -17,8 +17,15 @@ export async function proxy(request: NextRequest) {
   const isInternalRoute =
     pathname === "/internal" || pathname.startsWith("/internal/");
   const isAuthRoute =
-    pathname.startsWith("/login") ||
-    pathname.startsWith("/register") ||
+    pathname.startsWith("/login") || pathname.startsWith("/register");
+
+  // Recovery entry routes keep proxy-time session refresh (the proxy is the
+  // only layer that can write refreshed Auth cookies) but hand resolution to
+  // the pages themselves: a recovery exchange establishes a session, so an
+  // automatic authenticated redirect here would push the person off the
+  // password form. /reset-password resolves the recovery `flow` marker, and
+  // /forgot-password stays usable for signed-in account holders.
+  const isRecoveryRoute =
     pathname.startsWith("/forgot-password") ||
     pathname.startsWith("/reset-password");
 
@@ -26,7 +33,7 @@ export async function proxy(request: NextRequest) {
     isDashboardRoute || isOnboardingRoute || isInternalRoute;
 
   // Bypass Auth check entirely for accountless public routes
-  if (!isProtectedRoute && !isAuthRoute) {
+  if (!isProtectedRoute && !isAuthRoute && !isRecoveryRoute) {
     return supabaseResponse;
   }
 
