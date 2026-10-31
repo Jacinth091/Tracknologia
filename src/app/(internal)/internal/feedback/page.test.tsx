@@ -96,6 +96,29 @@ function preview(overrides: Record<string, unknown> = {}) {
 const BADGE = "May contain personal details";
 
 describe("Feedback inbox review aids", () => {
+  it("separates submission metadata and offers a clean unfiltered inbox", async () => {
+    feature.listInternalFeedback.mockResolvedValue({
+      items: [preview()],
+      nextCursor: null,
+    });
+    const html = renderToStaticMarkup(
+      await FeedbackInboxPage({
+        searchParams: Promise.resolve({
+          status: "NEW",
+          category: "BUG",
+          due: "1",
+        }),
+      }),
+    );
+    expect(html).toContain("Latest submissions</h2>");
+    expect(html).toContain("1 shown");
+    expect(html).toMatch(
+      /<a[^>]*href="\/internal\/feedback"[^>]*>Clear filters<\/a>/,
+    );
+    expect(html).toMatch(new RegExp(`<time[^>]*datetime="${INSTANT}"`, "i"));
+    expect(html).toContain("Customer (self-reported)");
+  });
+
   it("shows the personal-details badge only on flagged previews", async () => {
     feature.listInternalFeedback.mockResolvedValue({
       items: [
