@@ -17,7 +17,11 @@ vi.mock("next/link", () => ({
     href: string;
     children: ReactNode;
     "aria-current"?: "page";
-  }) => <a href={href} aria-current={props["aria-current"]}>{children}</a>,
+  }) => (
+    <a href={href} aria-current={props["aria-current"]}>
+      {children}
+    </a>
+  ),
 }));
 
 import { InternalNav } from "./internal-nav";

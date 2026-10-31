@@ -268,9 +268,7 @@ describe("Validation metrics page", () => {
 
     expect(html).toContain("No activity in this period");
     expect(charts.DayBarChart).toHaveBeenCalledTimes(1);
-    expect(charts.DayBarChart.mock.calls[0][0].seriesLabel).toBe(
-      "Submissions",
-    );
+    expect(charts.DayBarChart.mock.calls[0][0].seriesLabel).toBe("Submissions");
   });
 
   it("renders null ratios as N/A, never as 0", async () => {
