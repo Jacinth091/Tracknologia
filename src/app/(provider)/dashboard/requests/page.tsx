@@ -21,7 +21,7 @@ import {
 } from "@/features/repair-requests";
 import { cn } from "@/lib/utils";
 
-import { PageHeader } from "../_components/page-header";
+import { PageHeader } from "@/components/shared/page-header";
 
 export const metadata: Metadata = {
   title: "Repair Requests — Tracknologia",

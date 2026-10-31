@@ -40,7 +40,7 @@ import {
   EmptyTitle,
 } from "@/components/ui/empty";
 import { cn } from "@/lib/utils";
-import { PageHeader } from "../_components/page-header";
+import { PageHeader } from "@/components/shared/page-header";
 import { RequestLinkCard } from "../_components/request-link-card";
 import { repairStatusLabel } from "../_components/repair-status-badge";
 

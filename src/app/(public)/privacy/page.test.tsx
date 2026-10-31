@@ -20,4 +20,36 @@ describe("privacy page", () => {
     expect(html).toContain("We can&#x27;t reply to every message.");
     expect(html).toContain("Last updated: 31 October 2026.");
   });
+
+  it("lists the five sections as anchors to their headings", () => {
+    const html = renderToStaticMarkup(<PrivacyPage />);
+
+    for (const id of [
+      "privacy-feedback",
+      "privacy-repairs",
+      "privacy-tracking",
+      "privacy-providers",
+      "privacy-contact",
+    ]) {
+      expect(html).toContain(`href="#${id}"`);
+      expect(html).toContain(`id="${id}"`);
+    }
+  });
+
+  it("keeps the labelled sentences word for word", () => {
+    const html = renderToStaticMarkup(<PrivacyPage />);
+
+    expect(html).toContain("What we collect:");
+    expect(html).toContain("Who can see it:");
+    expect(html).toContain("How long we keep it:");
+    expect(html).toContain("Other shops and repairers can&#x27;t.");
+    expect(html).toContain("Your shop&#x27;s public page shows only");
+  });
+
+  it("renders the shared public header", () => {
+    const html = renderToStaticMarkup(<PrivacyPage />);
+
+    expect(html).toContain('aria-label="Main navigation"');
+    expect(html).toContain("Track a repair");
+  });
 });

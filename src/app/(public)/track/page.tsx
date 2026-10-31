@@ -1,4 +1,4 @@
-import { BrandLogo } from "@/components/shared/brand-logo";
+import { PublicHeader } from "@/components/shared/public-header";
 import { StatusGauge } from "@/components/shared/status-gauge";
 import { Card } from "@/components/ui/card";
 import type { Metadata } from "next";
@@ -63,19 +63,7 @@ export default async function TrackRepairPage({
 
   return (
     <div className="flex min-h-screen flex-col bg-background">
-      <header className="border-b border-border bg-card">
-        <div className="mx-auto flex h-16 max-w-2xl items-center justify-between gap-4 px-4 sm:px-6">
-          <Link href="/" className="inline-flex shrink-0">
-            <BrandLogo />
-          </Link>
-          <Link
-            href="/login"
-            className="px-2 py-3 text-sm text-muted-foreground underline-offset-4 hover:text-foreground hover:underline"
-          >
-            Sign In
-          </Link>
-        </div>
-      </header>
+      <PublicHeader current="track" />
 
       <main className="flex-1">
         <TrackingForm initialCode={initialCode} />

@@ -1,9 +1,22 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { notFound, redirect } from "next/navigation";
-
-import { buttonVariants } from "@/components/ui/button";
-import { Card } from "@/components/ui/card";
+import type { ReactNode } from "react";
+import {
+  Message01Icon,
+  Ticket01Icon,
+  UserGroupIcon,
+  Wrench01Icon,
+} from "@hugeicons/core-free-icons";
+import { PageHeader } from "@/components/shared/page-header";
+import { Button, buttonVariants } from "@/components/ui/button";
+import {
+  Card,
+  CardContent,
+  CardDescription,
+  CardHeader,
+} from "@/components/ui/card";
+import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import {
   getValidationMetrics,
@@ -11,9 +24,24 @@ import {
   requireInternalOperator,
   type ValidationMetrics,
 } from "@/features/internal-operations";
-import { cn } from "@/lib/utils";
 import { InternalServiceUnavailable } from "../_components/internal-service-unavailable";
-import { CategoryBars, DailyColumns } from "../_components/charts";
+import {
+  breakdownSummary,
+  categorical,
+  dailySeries,
+  dailySummary,
+  hasActivity,
+  percentSummary,
+  rankedSummary,
+  type ChartRow,
+} from "../_components/chart-data";
+import {
+  CategoryBarChart,
+  DayBarChart,
+  DonutChart,
+  GaugeChart,
+} from "../_components/metric-charts";
+import { StatTile } from "../_components/stat-tile";
 
 export const metadata: Metadata = {
   title: "Validation metrics — Tracknologia",
@@ -40,6 +68,14 @@ const FEEDBACK_CATEGORY_ORDER = [
   "USABILITY",
   "FEATURE_REQUEST",
   "GENERAL",
+] as const;
+
+const FEEDBACK_STATUS_ORDER = [
+  "NEW",
+  "REVIEWING",
+  "PLANNED",
+  "RESOLVED",
+  "DISMISSED",
 ] as const;
 
 type Period = (typeof PERIOD_OPTIONS)[number]["value"];
@@ -150,203 +186,483 @@ export default async function ActivityPage({
         return <InternalServiceUnavailable />;
       }
       return (
-        <ActivityFrame period={period} start={start} end={end}>
+        <ActivityShell period={period} start={start} end={end}>
           <Card className="p-5 text-sm">
             That period isn&apos;t valid. Choose today, 7 or 30 days, or a
             custom range up to 90 days.
           </Card>
-        </ActivityFrame>
+        </ActivityShell>
       );
     }
     throw error;
   }
 
+  const daily = dailySeries(
+    metrics.activity.daily.map((day) => ({
+      date: day.date,
+      value: day.distinctProviders,
+    })),
+  );
+  const feedbackDaily = metrics.feedback
+    ? dailySeries(
+        metrics.feedback.daily.map((day) => ({
+          date: day.date,
+          value: day.count,
+        })),
+      )
+    : null;
+  const statusRows = REPAIR_STATUS_ORDER.map((status) => ({
+    key: status,
+    label: humanize(status),
+    value: metrics.repairs.statusNow[status],
+  }));
+  const categoryRows = metrics.feedback
+    ? FEEDBACK_CATEGORY_ORDER.map((category) => ({
+        key: category,
+        label: humanize(category),
+        value: metrics.feedback?.byCategory[category] ?? 0,
+      }))
+    : null;
+  const statusDonut = metrics.feedback
+    ? FEEDBACK_STATUS_ORDER.map((status) => ({
+        key: status,
+        label: humanize(status),
+        value: metrics.feedback?.byStatus[status] ?? 0,
+      }))
+    : null;
+  const providerDonut = [
+    {
+      key: "SHOP",
+      label: "Shop",
+      value: metrics.providers.allTime.shop,
+    },
+    {
+      key: "INDEPENDENT",
+      label: "Independent",
+      value: metrics.providers.allTime.independent,
+    },
+  ];
+  const originDonut = [
+    {
+      key: "CUSTOMER_REQUEST",
+      label: "From customer request",
+      value: metrics.repairs.created.customerRequest,
+    },
+    {
+      key: "PROVIDER_CREATED",
+      label: "Provider created",
+      value: metrics.repairs.created.providerCreated,
+    },
+  ];
+  const requestFunnel = [
+    { key: "RECEIVED", label: "Received", value: metrics.requests.received },
+    {
+      key: "DECIDED",
+      label: "Decided",
+      value: metrics.requests.decided.total,
+    },
+    {
+      key: "ACCEPTED",
+      label: "Accepted",
+      value: metrics.requests.decided.accepted,
+    },
+    {
+      key: "DECLINED",
+      label: "Declined",
+      value: metrics.requests.decided.declined,
+    },
+  ];
+  const active = metrics.activity.distinctProviders;
+  const repeatShare =
+    active > 0
+      ? Math.round((metrics.activity.repeatProviders / active) * 100)
+      : null;
+
   return (
-    <ActivityFrame period={period} start={start} end={end}>
-      <PeriodSummary range={metrics.window} asOf={metrics.asOf} />
+    <ActivityShell period={period} start={start} end={end}>
+      <p className="text-sm text-muted-foreground">
+        Period (Asia/Manila): {metrics.window.startDate} to{" "}
+        {metrics.window.endDateExclusive} (end exclusive), {metrics.window.days}{" "}
+        days. Generated (Asia/Manila): {formatTimestamp(metrics.asOf)}.
+      </p>
       <CoverageNotes coverage={metrics.coverage} />
 
-      <div className="grid gap-4 md:grid-cols-2">
-        <Card className="space-y-3 p-5">
-          <DailyColumns
+      <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
+        <StatTile
+          label="Active providers (period)"
+          value={formatCount(metrics.activity.distinctProviders)}
+          status="ACCEPTED"
+          icon={UserGroupIcon}
+        />
+        <StatTile
+          label="Repairs created (period)"
+          value={formatCount(metrics.repairs.created.total)}
+          status="IN_PROGRESS"
+          icon={Wrench01Icon}
+        />
+        <StatTile
+          label="Requests received (period)"
+          value={formatCount(metrics.requests.received)}
+          status="SUBMITTED"
+          icon={Ticket01Icon}
+        />
+        <StatTile
+          label="Feedback submissions (period)"
+          value={
+            metrics.feedback
+              ? formatCount(metrics.feedback.total)
+              : "Unavailable"
+          }
+          status="AWAITING_APPROVAL"
+          icon={Message01Icon}
+        />
+      </div>
+
+      <div className="grid items-start gap-4 md:grid-cols-2 xl:grid-cols-3">
+        <ChartCard
+          title="Providers"
+          description="All-time Provider accounts by type"
+        >
+          <InlineStats
+            items={[
+              {
+                label: "Providers (all time)",
+                value: formatCount(metrics.providers.allTime.total),
+                detail: `+${metrics.providers.onboardedInPeriod.total} this period`,
+              },
+            ]}
+          />
+          <Donut
+            title="Providers by type"
+            rows={providerDonut}
+            emptyMessage="No providers yet"
+          />
+        </ChartCard>
+
+        <ChartCard
+          title="Active providers per day"
+          description="Distinct providers with activity on each Manila day"
+        >
+          <DailyChart
             title="Active providers per day"
-            days={metrics.activity.daily.map((day) => ({
-              date: day.date,
-              value: day.distinctProviders,
-            }))}
-            unit={{ singular: "active provider", plural: "active providers" }}
+            seriesLabel="Active providers"
+            rows={daily}
           />
-        </Card>
+        </ChartCard>
 
-        <Card className="space-y-3 p-5">
-          {metrics.feedback ? (
-            <DailyColumns
+        <ChartCard
+          title="Activity"
+          description="Providers active in the period and how many came back"
+        >
+          <InlineStats
+            items={[
+              {
+                label: "Active providers",
+                value: formatCount(metrics.activity.distinctProviders),
+              },
+              {
+                label: "Repeat providers (2 or more days)",
+                value: formatCount(metrics.activity.repeatProviders),
+              },
+            ]}
+          />
+          <RepeatShare percent={repeatShare} />
+        </ChartCard>
+
+        <ChartCard
+          title="Staff"
+          description="Current memberships, not windowed"
+        >
+          <InlineStats
+            items={[
+              {
+                label: "Active memberships (now)",
+                value: formatCount(metrics.staff.memberships),
+              },
+              {
+                label: "Shops with staff (now)",
+                value: formatCount(metrics.staff.shopsWithStaff),
+              },
+            ]}
+          />
+        </ChartCard>
+
+        <ChartCard
+          title="Repairs by status (now)"
+          description="Current Repair status, in lifecycle order"
+        >
+          <RankedChart title="Repairs by status (now)" rows={statusRows} />
+        </ChartCard>
+
+        <ChartCard
+          title="Repairs"
+          description="Repairs created, ready and completed in the period"
+        >
+          <InlineStats
+            items={[
+              {
+                label: "Reached READY",
+                value: formatCount(metrics.repairs.readyReached),
+              },
+              {
+                label: "Completed",
+                value: formatCount(metrics.repairs.completed),
+              },
+            ]}
+          />
+          <Donut
+            title="Repairs by origin, in period"
+            rows={originDonut}
+            emptyMessage="No repairs in this period"
+          />
+        </ChartCard>
+
+        <ChartCard
+          title="Requests"
+          description="Submitted requests, decisions and conversion"
+        >
+          <RankedChart title="Requests funnel" rows={requestFunnel} />
+          <InlineStats
+            items={[
+              {
+                label: "Conversion (submission cohort)",
+                value: formatPercent(metrics.requests.conversionPercent),
+              },
+              {
+                label: "Mean decision time",
+                value: formatDuration(metrics.requests.meanDecisionSeconds),
+              },
+            ]}
+          />
+        </ChartCard>
+
+        <ChartCard
+          title="Tracking"
+          description="Public tracking views and how many repairs were looked up"
+        >
+          <AdoptionGauge percent={metrics.tracking.adoptionPercent} />
+          <InlineStats
+            items={[
+              {
+                label: "Views in period",
+                value: formatCount(metrics.tracking.periodViews),
+              },
+              {
+                label: "Distinct repairs viewed in period",
+                value: formatCount(metrics.tracking.periodRepairsViewed),
+              },
+            ]}
+          />
+        </ChartCard>
+
+        <ChartCard
+          title="Feedback per day"
+          description="Feedback submissions on each Manila day"
+        >
+          {feedbackDaily ? (
+            <DailyChart
               title="Feedback per day"
-              days={metrics.feedback.daily.map((day) => ({
-                date: day.date,
-                value: day.count,
-              }))}
-              unit={{ singular: "submission", plural: "submissions" }}
+              seriesLabel="Submissions"
+              rows={feedbackDaily}
             />
           ) : (
-            <UnavailableChart title="Feedback per day" />
+            <UnavailableState />
           )}
-        </Card>
+        </ChartCard>
 
-        <Card className="space-y-3 p-5">
-          <CategoryBars
-            title="Repairs by status (now)"
-            rows={REPAIR_STATUS_ORDER.map((status) => ({
-              label: humanize(status),
-              value: metrics.repairs.statusNow[status],
-            }))}
-          />
-        </Card>
+        <ChartCard
+          title="Feedback by category"
+          description="Feedback submissions in the period, by category"
+        >
+          {categoryRows ? (
+            <RankedChart title="Feedback by category" rows={categoryRows} />
+          ) : (
+            <UnavailableState />
+          )}
+        </ChartCard>
 
-        <Card className="space-y-3 p-5">
-          {metrics.feedback ? (
-            <CategoryBars
-              title="Feedback by category"
-              rows={FEEDBACK_CATEGORY_ORDER.map((category) => ({
-                label: humanize(category),
-                value: metrics.feedback?.byCategory[category] ?? 0,
-              }))}
+        <ChartCard
+          title="Feedback by status"
+          description="Current status of feedback submitted in the period"
+        >
+          {statusDonut ? (
+            <Donut
+              title="Feedback by status"
+              rows={statusDonut}
+              emptyMessage="No feedback in this period"
             />
           ) : (
-            <UnavailableChart title="Feedback by category" />
+            <UnavailableState />
           )}
-        </Card>
+        </ChartCard>
       </div>
 
-      <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-        <MetricCard title="Providers">
-          <CountGroup
-            title="Onboarded in period"
-            counts={metrics.providers.onboardedInPeriod}
-          />
-          <CountGroup title="All time" counts={metrics.providers.allTime} />
-        </MetricCard>
-
-        <MetricCard title="Activity">
-          <Stat
-            label="Active providers"
-            value={formatCount(metrics.activity.distinctProviders)}
-          />
-          <Stat
-            label="Repeat providers (2 or more days)"
-            value={formatCount(metrics.activity.repeatProviders)}
-          />
-        </MetricCard>
-
-        <MetricCard title="Staff">
-          <Stat
-            label="Active memberships (now)"
-            value={formatCount(metrics.staff.memberships)}
-          />
-          <Stat
-            label="Shops with staff (now)"
-            value={formatCount(metrics.staff.shopsWithStaff)}
-          />
-        </MetricCard>
-
-        <MetricCard title="Repairs">
-          <Stat
-            label="Created in period"
-            value={formatCount(metrics.repairs.created.total)}
-          />
-          <Stat
-            label="From customer request"
-            value={formatCount(metrics.repairs.created.customerRequest)}
-          />
-          <Stat
-            label="Provider created"
-            value={formatCount(metrics.repairs.created.providerCreated)}
-          />
-          <Stat
-            label="Reached READY in period"
-            value={formatCount(metrics.repairs.readyReached)}
-          />
-          <Stat
-            label="Completed in period"
-            value={formatCount(metrics.repairs.completed)}
-          />
-          <CountGroup title="Status now" counts={metrics.repairs.statusNow} />
-        </MetricCard>
-
-        <MetricCard title="Requests">
-          <Stat
-            label="Received in period"
-            value={formatCount(metrics.requests.received)}
-          />
-          <Stat
-            label="Decided in period"
-            value={formatCount(metrics.requests.decided.total)}
-          />
-          <Stat
-            label="Accepted"
-            value={formatCount(metrics.requests.decided.accepted)}
-          />
-          <Stat
-            label="Declined"
-            value={formatCount(metrics.requests.decided.declined)}
-          />
-          <Stat
-            label="Pending (now)"
-            value={formatCount(metrics.requests.pendingNow)}
-          />
-          <Stat
-            label="Conversion (submission cohort)"
-            value={formatPercent(metrics.requests.conversionPercent)}
-          />
-          <Stat
-            label="Mean decision time"
-            value={formatDuration(metrics.requests.meanDecisionSeconds)}
-          />
-        </MetricCard>
-
-        <MetricCard title="Tracking">
-          <Stat
-            label="Views in period"
-            value={formatCount(metrics.tracking.periodViews)}
-          />
-          <Stat
-            label="Distinct repairs viewed in period"
-            value={formatCount(metrics.tracking.periodRepairsViewed)}
-          />
-          <Stat
-            label="Adoption (all time)"
-            value={formatPercent(metrics.tracking.adoptionPercent)}
-          />
-        </MetricCard>
-
-        <MetricCard title="Feedback">
-          {metrics.feedback ? (
-            <>
-              <Stat
-                label="Submissions in period"
-                value={formatCount(metrics.feedback.total)}
-              />
-              <CountGroup
-                title="By category"
-                counts={metrics.feedback.byCategory}
-              />
-              <CountGroup
-                title="By status"
-                counts={metrics.feedback.byStatus}
-              />
-            </>
-          ) : (
-            <p className="text-sm text-muted-foreground">
-              Unavailable for this period.
-            </p>
-          )}
-        </MetricCard>
-      </div>
-    </ActivityFrame>
+      <Card>
+        <details>
+          <summary className="cursor-pointer px-4 py-4 text-base leading-tight font-semibold sm:px-5">
+            All numbers
+          </summary>
+          <div className="overflow-x-auto px-4 pb-4 sm:px-5 sm:pb-5">
+            <table className="w-full text-sm">
+              <tbody>
+                {allNumberGroups(metrics).map((group) => (
+                  <AllNumbersGroup key={group.title} group={group} />
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </details>
+      </Card>
+    </ActivityShell>
   );
 }
 
-function ActivityFrame({
+// Every metric the visual cards show, as label/value pairs. Labels match the
+// cards, so the table is the same data in text form.
+function allNumberGroups(metrics: ValidationMetrics) {
+  const feedback = metrics.feedback;
+  const feedbackRows: [string, string][] = feedback
+    ? [
+        ["Submissions in period", formatCount(feedback.total)],
+        ...FEEDBACK_CATEGORY_ORDER.map((category): [string, string] => [
+          `Category: ${humanize(category)}`,
+          formatCount(feedback.byCategory[category]),
+        ]),
+        ...FEEDBACK_STATUS_ORDER.map((status): [string, string] => [
+          `Status: ${humanize(status)}`,
+          formatCount(feedback.byStatus[status]),
+        ]),
+      ]
+    : [["Feedback", "Unavailable for this period."]];
+
+  return [
+    {
+      title: "Providers",
+      rows: [
+        [
+          "Onboarded in period (total)",
+          formatCount(metrics.providers.onboardedInPeriod.total),
+        ],
+        [
+          "Onboarded in period (shop)",
+          formatCount(metrics.providers.onboardedInPeriod.shop),
+        ],
+        [
+          "Onboarded in period (independent)",
+          formatCount(metrics.providers.onboardedInPeriod.independent),
+        ],
+        ["All time (total)", formatCount(metrics.providers.allTime.total)],
+        ["All time (shop)", formatCount(metrics.providers.allTime.shop)],
+        [
+          "All time (independent)",
+          formatCount(metrics.providers.allTime.independent),
+        ],
+      ] as [string, string][],
+    },
+    {
+      title: "Activity",
+      rows: [
+        ["Active providers", formatCount(metrics.activity.distinctProviders)],
+        [
+          "Repeat providers (2 or more days)",
+          formatCount(metrics.activity.repeatProviders),
+        ],
+      ] as [string, string][],
+    },
+    {
+      title: "Staff",
+      rows: [
+        ["Active memberships (now)", formatCount(metrics.staff.memberships)],
+        ["Shops with staff (now)", formatCount(metrics.staff.shopsWithStaff)],
+      ] as [string, string][],
+    },
+    {
+      title: "Repairs",
+      rows: [
+        ["Created in period", formatCount(metrics.repairs.created.total)],
+        [
+          "From customer request",
+          formatCount(metrics.repairs.created.customerRequest),
+        ],
+        [
+          "Provider created",
+          formatCount(metrics.repairs.created.providerCreated),
+        ],
+        ["Reached READY in period", formatCount(metrics.repairs.readyReached)],
+        ["Completed in period", formatCount(metrics.repairs.completed)],
+        ...REPAIR_STATUS_ORDER.map((status): [string, string] => [
+          `Status now: ${humanize(status)}`,
+          formatCount(metrics.repairs.statusNow[status]),
+        ]),
+      ] as [string, string][],
+    },
+    {
+      title: "Requests",
+      rows: [
+        ["Received in period", formatCount(metrics.requests.received)],
+        ["Decided in period", formatCount(metrics.requests.decided.total)],
+        ["Accepted", formatCount(metrics.requests.decided.accepted)],
+        ["Declined", formatCount(metrics.requests.decided.declined)],
+        ["Pending (now)", formatCount(metrics.requests.pendingNow)],
+        [
+          "Conversion (submission cohort)",
+          formatPercent(metrics.requests.conversionPercent),
+        ],
+        [
+          "Mean decision time",
+          formatDuration(metrics.requests.meanDecisionSeconds),
+        ],
+      ] as [string, string][],
+    },
+    {
+      title: "Tracking",
+      rows: [
+        ["Views in period", formatCount(metrics.tracking.periodViews)],
+        [
+          "Distinct repairs viewed in period",
+          formatCount(metrics.tracking.periodRepairsViewed),
+        ],
+        [
+          "Adoption (all time)",
+          formatPercent(metrics.tracking.adoptionPercent),
+        ],
+      ] as [string, string][],
+    },
+    { title: "Feedback", rows: feedbackRows },
+  ];
+}
+
+function AllNumbersGroup({
+  group,
+}: {
+  group: { title: string; rows: [string, string][] };
+}) {
+  return (
+    <>
+      <tr>
+        <th
+          scope="colgroup"
+          colSpan={2}
+          className="pt-4 pb-1 text-left font-mono text-xs tracking-wider text-muted-foreground uppercase"
+        >
+          {group.title}
+        </th>
+      </tr>
+      {group.rows.map(([label, value]) => (
+        <tr key={label} className="border-b border-border last:border-b-0">
+          <th scope="row" className="py-2 pr-4 text-left font-normal">
+            {label}
+          </th>
+          <td className="py-2 text-right font-semibold tabular-nums">
+            {value}
+          </td>
+        </tr>
+      ))}
+    </>
+  );
+}
+
+function ActivityShell({
   period,
   start,
   end,
@@ -355,29 +671,25 @@ function ActivityFrame({
   period: Period;
   start?: string;
   end?: string;
-  children: React.ReactNode;
+  children: ReactNode;
 }) {
   return (
-    <div className="space-y-6">
-      <div className="flex flex-wrap items-end justify-between gap-3">
-        <div>
-          <p className="text-xs font-medium tracking-wide text-muted-foreground uppercase">
-            Operator view
-          </p>
-          <h1 className="mt-1 text-2xl font-semibold tracking-tight">
-            Validation metrics
-          </h1>
-        </div>
-        <Link
-          href={activityHref(period, start, end)}
-          className={cn(buttonVariants({ variant: "outline", size: "sm" }))}
-        >
-          Refresh
-        </Link>
-      </div>
-
-      <PeriodPicker period={period} start={start} end={end} />
-
+    <div className="space-y-8">
+      <PageHeader
+        eyebrow="Internal operations"
+        title="Validation metrics"
+        actions={
+          <>
+            <PeriodPicker period={period} start={start} end={end} />
+            <Link
+              href={activityHref(period, start, end)}
+              className={buttonVariants({ variant: "outline", size: "sm" })}
+            >
+              Refresh
+            </Link>
+          </>
+        }
+      />
       {children}
     </div>
   );
@@ -397,7 +709,7 @@ function PeriodPicker({
       method="get"
       action="/internal/activity"
       aria-label="Metrics period"
-      className="grid gap-3 rounded-xl border border-border bg-card p-4 sm:grid-cols-4 sm:items-end"
+      className="flex flex-wrap items-end gap-2"
     >
       <div className="grid gap-1.5">
         <Label htmlFor="metrics-period">Period</Label>
@@ -405,7 +717,7 @@ function PeriodPicker({
           id="metrics-period"
           name="period"
           defaultValue={period}
-          className="h-9 rounded-md border border-input bg-background px-3 text-sm"
+          className="h-9 min-w-32 rounded-lg border border-input bg-card px-3 text-sm shadow-xs outline-none focus-visible:border-ring"
         >
           {PERIOD_OPTIONS.map((option) => (
             <option key={option.value} value={option.value}>
@@ -416,60 +728,28 @@ function PeriodPicker({
       </div>
       <div className="grid gap-1.5">
         <Label htmlFor="metrics-start">Start date</Label>
-        <input
+        <Input
           id="metrics-start"
           name="start"
           type="date"
           defaultValue={start ?? ""}
-          className="h-9 rounded-md border border-input bg-background px-3 text-sm"
+          className="h-9 w-40"
         />
       </div>
       <div className="grid gap-1.5">
         <Label htmlFor="metrics-end">End date (exclusive)</Label>
-        <input
+        <Input
           id="metrics-end"
           name="end"
           type="date"
           defaultValue={end ?? ""}
-          className="h-9 rounded-md border border-input bg-background px-3 text-sm"
+          className="h-9 w-40"
         />
       </div>
-      <div>
-        <button
-          type="submit"
-          className={cn(buttonVariants({ variant: "outline", size: "sm" }))}
-        >
-          Show period
-        </button>
-      </div>
+      <Button type="submit" variant="outline" size="sm">
+        Show period
+      </Button>
     </form>
-  );
-}
-
-function PeriodSummary({
-  range,
-  asOf,
-}: {
-  range: ValidationMetrics["window"];
-  asOf: string;
-}) {
-  return (
-    <Card className="grid gap-3 p-4 text-sm sm:grid-cols-3">
-      <div>
-        <p className="text-muted-foreground">Period (Asia/Manila)</p>
-        <p className="font-medium">
-          {range.startDate} to {range.endDateExclusive} (end exclusive)
-        </p>
-      </div>
-      <div>
-        <p className="text-muted-foreground">Days</p>
-        <p className="font-medium">{range.days}</p>
-      </div>
-      <div>
-        <p className="text-muted-foreground">Generated (Asia/Manila)</p>
-        <p className="font-medium">{formatTimestamp(asOf)}</p>
-      </div>
-    </Card>
   );
 }
 
@@ -480,83 +760,179 @@ function CoverageNotes({
 }) {
   const { feedback } = coverage;
   return (
-    <Card className="space-y-2 p-4 text-sm">
-      <p className="font-medium">Coverage</p>
-      <ul className="list-disc space-y-1 pl-5 text-muted-foreground">
-        <li>
-          Domain counts: {humanize(coverage.domain.coverage)}, snapshot{" "}
-          {humanize(coverage.domain.snapshot)}. Observed up to{" "}
-          {formatTimestamp(coverage.domain.observedEndUtc)}.
-        </li>
-        <li>
-          {feedback.status === "AVAILABLE" &&
-          feedback.asOfStart &&
-          feedback.asOfEnd ? (
-            <>
-              Feedback: {humanize(feedback.coverage)}, generated{" "}
-              {formatTimestamp(feedback.asOfStart)} to{" "}
-              {formatTimestamp(feedback.asOfEnd)} in {feedback.batches}{" "}
-              {feedback.batches === 1 ? "batch" : "batches"}.
-            </>
-          ) : (
-            "Feedback: unavailable for this period."
-          )}
-        </li>
-        <li>Retention policy: Approved (#87, 2026-10-31).</li>
-      </ul>
-    </Card>
+    <ul className="list-disc space-y-1 pl-5 text-sm text-muted-foreground">
+      <li>
+        Domain counts: {humanize(coverage.domain.coverage)}, snapshot{" "}
+        {humanize(coverage.domain.snapshot)}. Observed up to{" "}
+        {formatTimestamp(coverage.domain.observedEndUtc)}.
+      </li>
+      <li>
+        {feedback.status === "AVAILABLE" &&
+        feedback.asOfStart &&
+        feedback.asOfEnd ? (
+          <>
+            Feedback: {humanize(feedback.coverage)}, generated{" "}
+            {formatTimestamp(feedback.asOfStart)} to{" "}
+            {formatTimestamp(feedback.asOfEnd)} in {feedback.batches}{" "}
+            {feedback.batches === 1 ? "batch" : "batches"}.
+          </>
+        ) : (
+          "Feedback: unavailable for this period."
+        )}
+      </li>
+      <li>Retention policy: Approved (#87, 2026-10-31).</li>
+    </ul>
   );
 }
 
-function MetricCard({
+function ChartCard({
   title,
+  description,
   children,
 }: {
   title: string;
-  children: React.ReactNode;
+  description: string;
+  children: ReactNode;
 }) {
   return (
-    <Card className="space-y-3 p-5">
-      <h2 className="text-sm font-semibold">{title}</h2>
-      {children}
+    <Card>
+      <CardHeader className="px-4 pt-4 pb-0 sm:px-5 sm:pt-5">
+        <h2 className="text-base leading-tight font-semibold">{title}</h2>
+        <CardDescription>{description}</CardDescription>
+      </CardHeader>
+      <CardContent className="space-y-4 px-4 pb-4 sm:px-5 sm:pb-5">
+        {children}
+      </CardContent>
     </Card>
   );
 }
 
-function UnavailableChart({ title }: { title: string }) {
+function DailyChart({
+  title,
+  seriesLabel,
+  rows,
+}: {
+  title: string;
+  seriesLabel: string;
+  rows: ChartRow[];
+}) {
+  if (!hasActivity(rows)) {
+    return <NoneState message="No activity in this period" />;
+  }
+
   return (
-    <>
-      <h2 className="text-sm font-semibold">{title}</h2>
-      <p className="text-sm text-muted-foreground">
-        Unavailable for this period.
-      </p>
-    </>
+    <DayBarChart
+      seriesLabel={seriesLabel}
+      summary={dailySummary(title, rows)}
+      data={rows}
+    />
   );
 }
 
-function Stat({ label, value }: { label: string; value: string }) {
+function RankedChart({
+  title,
+  rows,
+}: {
+  title: string;
+  rows: { key: string; label: string; value: number }[];
+}) {
+  if (!hasActivity(rows)) {
+    return <NoneState message="No activity in this period" />;
+  }
+
   return (
-    <div className="flex items-baseline justify-between gap-3">
-      <span className="text-sm text-muted-foreground">{label}</span>
-      <span className="text-base font-semibold tabular-nums">{value}</span>
+    <CategoryBarChart
+      summary={rankedSummary(title, rows)}
+      data={rows.map((row) => ({ ...row, color: "var(--chart-cat-1)" }))}
+    />
+  );
+}
+
+function Donut({
+  title,
+  rows,
+  emptyMessage,
+}: {
+  title: string;
+  rows: { key: string; label: string; value: number }[];
+  emptyMessage: string;
+}) {
+  // Slots keep their place in the full list; zero slices are not drawn.
+  const slices = categorical(rows).filter((row) => row.value > 0);
+
+  if (slices.length === 0) {
+    return <NoneState message={emptyMessage} />;
+  }
+
+  return <DonutChart summary={breakdownSummary(title, slices)} data={slices} />;
+}
+
+function RepeatShare({ percent }: { percent: number | null }) {
+  if (percent === null) {
+    return <NoneValue label="Repeat share" />;
+  }
+
+  return (
+    <GaugeChart
+      summary={percentSummary("Repeat share", percent)}
+      label="Repeat share"
+      percent={percent}
+    />
+  );
+}
+
+function AdoptionGauge({ percent }: { percent: number | null }) {
+  if (percent === null) {
+    return <NoneValue label="Adoption (all time)" />;
+  }
+
+  return (
+    <GaugeChart
+      summary={percentSummary("Adoption (all time)", percent)}
+      label="Adoption (all time)"
+      percent={percent}
+    />
+  );
+}
+
+function NoneValue({ label }: { label: string }) {
+  return (
+    <div className="py-6">
+      <p className="text-2xl font-semibold tabular-nums">N/A</p>
+      <p className="text-xs text-muted-foreground">{label}</p>
     </div>
   );
 }
 
-function CountGroup({
-  title,
-  counts,
+// An empty chart area is one muted line, not a block filling the card.
+function NoneState({ message }: { message: string }) {
+  return <p className="py-6 text-sm text-muted-foreground">{message}</p>;
+}
+
+function UnavailableState() {
+  return (
+    <p className="py-6 text-sm text-muted-foreground">
+      Unavailable for this period.
+    </p>
+  );
+}
+
+// Compact numbers for a chart card: no border, icon or stripe.
+function InlineStats({
+  items,
 }: {
-  title: string;
-  counts: Record<string, number>;
+  items: { label: string; value: string; detail?: string }[];
 }) {
   return (
-    <div className="space-y-2 pt-1">
-      <p className="text-xs font-medium tracking-wide text-muted-foreground uppercase">
-        {title}
-      </p>
-      {Object.entries(counts).map(([key, count]) => (
-        <Stat key={key} label={humanize(key)} value={formatCount(count)} />
+    <div className="grid grid-cols-2 gap-x-6 gap-y-3">
+      {items.map((item) => (
+        <div key={item.label}>
+          <p className="text-2xl font-semibold tabular-nums">{item.value}</p>
+          <p className="text-xs text-muted-foreground">{item.label}</p>
+          {item.detail ? (
+            <p className="text-xs text-muted-foreground">{item.detail}</p>
+          ) : null}
+        </div>
       ))}
     </div>
   );

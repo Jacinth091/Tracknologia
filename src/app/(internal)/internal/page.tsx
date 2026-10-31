@@ -1,5 +1,24 @@
 import { notFound, redirect } from "next/navigation";
-import Link from "next/link";
+import {
+  Clock01Icon,
+  Message01Icon,
+  Store01Icon,
+  Wrench01Icon,
+} from "@hugeicons/core-free-icons";
+import { PageHeader } from "@/components/shared/page-header";
+import {
+  Card,
+  CardContent,
+  CardDescription,
+  CardHeader,
+  CardTitle,
+} from "@/components/ui/card";
+import {
+  Empty,
+  EmptyDescription,
+  EmptyHeader,
+  EmptyTitle,
+} from "@/components/ui/empty";
 import {
   getValidationMetrics,
   MetricsError,
@@ -8,10 +27,13 @@ import {
   type ValidationMetrics,
 } from "@/features/internal-operations";
 import { InternalServiceUnavailable } from "./_components/internal-service-unavailable";
-import { DailyColumns } from "./_components/charts";
-import { Card } from "@/components/ui/card";
-import { buttonVariants } from "@/components/ui/button";
-import { cn } from "@/lib/utils";
+import {
+  dailySeries,
+  dailySummary,
+  hasActivity,
+} from "./_components/chart-data";
+import { DayBarChart } from "./_components/metric-charts";
+import { StatTile } from "./_components/stat-tile";
 
 function formatCount(value: number) {
   return value.toLocaleString("en-PH");
@@ -56,66 +78,89 @@ export default async function InternalPage() {
         .filter(([status]) => status !== "COMPLETED")
         .reduce((sum, [, count]) => sum + count, 0)
     : 0;
+  const daily = metrics
+    ? dailySeries(
+        metrics.activity.daily.map((day) => ({
+          date: day.date,
+          value: day.distinctProviders,
+        })),
+      )
+    : [];
 
   return (
-    <section className="space-y-3">
-      <h1 className="text-2xl font-semibold tracking-tight">
-        Internal operations
-      </h1>
-      <p className="max-w-prose text-sm text-muted-foreground">
-        This private area is limited to enabled internal operators, and operator
-        access is recorded in the append-only internal access audit.
-      </p>
+    <div className="space-y-8">
+      <PageHeader
+        eyebrow="Internal operations"
+        title="Overview"
+        description="This private area is limited to enabled internal operators, and operator access is recorded in the append-only internal access audit."
+      />
       {metrics ? (
         <>
-          <div className="grid grid-cols-2 gap-4 lg:grid-cols-4">
-            <Card className="space-y-1 p-5">
-              <p className="text-sm text-muted-foreground">
-                Providers (all time)
-              </p>
-              <p className="text-2xl font-semibold tabular-nums">
-                {formatCount(metrics.providers.allTime.total)}
-              </p>
-            </Card>
-            <Card className="space-y-1 p-5">
-              <p className="text-sm text-muted-foreground">
-                Open repairs (now)
-              </p>
-              <p className="text-2xl font-semibold tabular-nums">
-                {formatCount(openRepairs)}
-              </p>
-            </Card>
-            <Card className="space-y-1 p-5">
-              <p className="text-sm text-muted-foreground">
-                Pending requests (now)
-              </p>
-              <p className="text-2xl font-semibold tabular-nums">
-                {formatCount(metrics.requests.pendingNow)}
-              </p>
-            </Card>
-            <Card className="space-y-1 p-5">
-              <p className="text-sm text-muted-foreground">
-                New feedback (now)
-              </p>
-              <p className="text-2xl font-semibold tabular-nums">
-                {metrics.feedback
-                  ? formatCount(metrics.feedback.byStatus.NEW)
-                  : "Unavailable"}
-              </p>
-            </Card>
-          </div>
-          <Card className="space-y-3 p-5">
-            <DailyColumns
-              title="Active providers, last 7 days"
-              days={metrics.activity.daily.map((day) => ({
-                date: day.date,
-                value: day.distinctProviders,
-              }))}
-              unit={{
-                singular: "active provider",
-                plural: "active providers",
-              }}
+          <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
+            <StatTile
+              href="/internal/activity"
+              label="Providers (all time)"
+              value={formatCount(metrics.providers.allTime.total)}
+              status="ACCEPTED"
+              icon={Store01Icon}
             />
+            <StatTile
+              href="/internal/activity"
+              label="Open repairs (now)"
+              value={formatCount(openRepairs)}
+              status="IN_PROGRESS"
+              icon={Wrench01Icon}
+            />
+            <StatTile
+              href="/internal/activity"
+              label="Pending requests (now)"
+              value={formatCount(metrics.requests.pendingNow)}
+              status="SUBMITTED"
+              icon={Clock01Icon}
+            />
+            <StatTile
+              href="/internal/feedback?status=NEW"
+              label="New feedback (now)"
+              value={
+                metrics.feedback
+                  ? formatCount(metrics.feedback.byStatus.NEW)
+                  : "Unavailable"
+              }
+              status="AWAITING_APPROVAL"
+              icon={Message01Icon}
+            />
+          </div>
+
+          <Card>
+            <CardHeader className="px-4 pt-4 pb-0 sm:px-5 sm:pt-5">
+              <CardTitle className="text-base">
+                Active providers, last 7 days
+              </CardTitle>
+              <CardDescription>
+                Providers with a repair, decision or status change each day
+              </CardDescription>
+            </CardHeader>
+            <CardContent className="px-2 pb-4 sm:px-3 sm:pb-5">
+              {hasActivity(daily) ? (
+                <DayBarChart
+                  seriesLabel="Active providers"
+                  summary={dailySummary("Active providers, last 7 days", daily)}
+                  data={daily}
+                />
+              ) : (
+                <Empty className="min-h-48 p-6">
+                  <EmptyHeader>
+                    <EmptyTitle>
+                      No provider activity in the last 7 days
+                    </EmptyTitle>
+                    <EmptyDescription>
+                      Activity appears here once providers create repairs,
+                      decide requests or change status.
+                    </EmptyDescription>
+                  </EmptyHeader>
+                </Empty>
+              )}
+            </CardContent>
           </Card>
         </>
       ) : (
@@ -125,26 +170,6 @@ export default async function InternalPage() {
           </p>
         </Card>
       )}
-      <div className="flex flex-wrap gap-2">
-        <Link
-          href="/internal/feedback"
-          className={cn(
-            buttonVariants({ variant: "outline", size: "sm" }),
-            "inline-flex",
-          )}
-        >
-          Feedback Inbox
-        </Link>
-        <Link
-          href="/internal/activity"
-          className={cn(
-            buttonVariants({ variant: "outline", size: "sm" }),
-            "inline-flex",
-          )}
-        >
-          Validation metrics
-        </Link>
-      </div>
-    </section>
+    </div>
   );
 }

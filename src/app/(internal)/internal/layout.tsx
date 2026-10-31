@@ -5,6 +5,7 @@ import { signOutAction } from "@/app/(auth)/actions";
 import { BrandLogo } from "@/components/shared/brand-logo";
 import { Button } from "@/components/ui/button";
 import { requireInternalOperator } from "@/features/internal-operations";
+import { InternalNav } from "./_components/internal-nav";
 import { InternalServiceUnavailable } from "./_components/internal-service-unavailable";
 
 // Private, per-request surface: never cache or index internal pages.
@@ -37,14 +38,12 @@ export default async function InternalLayout({
   return (
     <div className="min-h-screen flex flex-col bg-background text-foreground">
       <header className="border-b border-border bg-card">
-        <div className="mx-auto flex h-16 max-w-5xl items-center gap-6 px-4 sm:px-6">
+        <div className="mx-auto flex h-16 max-w-5xl items-center gap-4 px-4 sm:gap-6 sm:px-6">
           <Link href="/internal" className="shrink-0 rounded-sm">
             <BrandLogo />
           </Link>
-          <span className="text-sm font-medium text-muted-foreground">
-            Internal operations
-          </span>
-          <form action={signOutAction} className="ml-auto">
+          <InternalNav />
+          <form action={signOutAction} className="shrink-0">
             <Button variant="outline" size="sm" type="submit">
               Sign Out
             </Button>

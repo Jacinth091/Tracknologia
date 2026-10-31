@@ -1,12 +1,22 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { renderToStaticMarkup } from "react-dom/server";
 
-// Mocked: the access guard, the metrics read and framework navigation. The
-// page renders for real with the fixture.
+// Mocked: the access guard, the metrics read, the chart component and framework
+// navigation. The page renders for real with the fixture.
 const feature = vi.hoisted(() => ({
   getValidationMetrics: vi.fn(),
   recordSensitiveInternalAccess: vi.fn(),
   requireInternalOperator: vi.fn(),
+}));
+
+type DayChartProps = {
+  seriesLabel: string;
+  summary: string;
+  data: { label: string; value: number }[];
+};
+
+const charts = vi.hoisted(() => ({
+  DayBarChart: vi.fn((_props: DayChartProps) => "DAY_BAR_CHART"),
 }));
 
 vi.mock("@/features/internal-operations", () => ({
@@ -33,11 +43,21 @@ vi.mock("next/navigation", () => ({
 }));
 
 vi.mock("next/link", () => ({
-  default: ({ children }: { children: unknown }) => children,
+  default: ({
+    href,
+    children,
+  }: {
+    href: string;
+    children: React.ReactNode;
+  }) => <a href={href}>{children}</a>,
 }));
 
 vi.mock("./_components/internal-service-unavailable", () => ({
   InternalServiceUnavailable: () => "UNAVAILABLE_SCREEN",
+}));
+
+vi.mock("./_components/metric-charts", () => ({
+  DayBarChart: charts.DayBarChart,
 }));
 
 import { MetricsError } from "@/features/internal-operations";
@@ -85,22 +105,44 @@ beforeEach(() => {
   feature.getValidationMetrics.mockResolvedValue(fixture);
 });
 
-describe("internal home headline numbers", () => {
-  it("shows the four tiles and the seven-day provider chart", async () => {
+describe("internal overview headline numbers", () => {
+  it("shows the four tiles and passes the seven-day rows to the chart", async () => {
     const html = await renderHome();
 
     expect(html).toContain("Providers (all time)");
-    expect(html).toContain(">21</p>");
+    expect(html).toContain(">21<");
     expect(html).toContain("Open repairs (now)");
-    expect(html).toContain(">18</p>");
+    expect(html).toContain(">18<");
     expect(html).toContain("Pending requests (now)");
-    expect(html).toContain(">5</p>");
+    expect(html).toContain(">5<");
     expect(html).toContain("New feedback (now)");
-    expect(html).toContain(">7</p>");
-    expect(html).toContain(
-      'aria-label="Active providers, last 7 days, Oct 24 to Oct 30, peak 3 on Oct 27"',
+    expect(html).toContain(">7<");
+    expect(html).toContain('href="/internal/feedback?status=NEW"');
+
+    const [chart] = charts.DayBarChart.mock.calls.map(([props]) => props);
+    expect(chart.seriesLabel).toBe("Active providers");
+    expect(chart.summary).toBe(
+      "Active providers, last 7 days, Oct 24 to Oct 30, peak 3 on Oct 27",
     );
+    expect(chart.data[3]).toEqual({ label: "Oct 27", value: 3 });
     expect(feature.recordSensitiveInternalAccess).not.toHaveBeenCalled();
+  });
+
+  it("shows the empty state instead of an all-zero chart", async () => {
+    feature.getValidationMetrics.mockResolvedValue({
+      ...fixture,
+      activity: {
+        daily: fixture.activity.daily.map((day) => ({
+          ...day,
+          distinctProviders: 0,
+        })),
+      },
+    });
+
+    const html = await renderHome();
+
+    expect(html).toContain("No provider activity in the last 7 days");
+    expect(charts.DayBarChart).not.toHaveBeenCalled();
   });
 
   it("shows Unavailable for new feedback when the summary is null", async () => {
@@ -111,22 +153,21 @@ describe("internal home headline numbers", () => {
 
     const html = await renderHome();
 
-    expect(html).toContain(">Unavailable</p>");
+    expect(html).toContain(">Unavailable<");
     expect(html).not.toContain("UNAVAILABLE_SCREEN");
   });
 
-  it("keeps the links and shows a notice when the numbers fail", async () => {
+  it("keeps the header and shows a notice when the numbers fail", async () => {
     feature.getValidationMetrics.mockRejectedValue(
       new MetricsError("unavailable", "UNAVAILABLE"),
     );
 
     const html = await renderHome();
 
+    expect(html).toContain("Overview");
     expect(html).toContain(
       "Numbers are unavailable right now. Try again in a moment.",
     );
-    expect(html).toContain("Feedback Inbox");
-    expect(html).toContain("Validation metrics");
     expect(html).not.toContain("Providers (all time)");
     expect(html).not.toContain("UNAVAILABLE_SCREEN");
     expect(feature.recordSensitiveInternalAccess).toHaveBeenCalledTimes(1);

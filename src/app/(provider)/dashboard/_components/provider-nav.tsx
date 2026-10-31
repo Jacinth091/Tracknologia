@@ -153,6 +153,7 @@ export function ProviderNav({
             </DropdownMenuItem>
             <DropdownMenuSeparator />
             <DropdownMenuItem
+              nativeButton
               render={<button type="submit" form="provider-sign-out" />}
             >
               Sign Out

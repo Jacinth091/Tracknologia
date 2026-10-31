@@ -9,7 +9,7 @@ import {
 import { getAppOrigin } from "@/lib/config/server";
 import { createClient } from "@/lib/supabase/server";
 
-import { PageHeader } from "../_components/page-header";
+import { PageHeader } from "@/components/shared/page-header";
 import { SettingsClient } from "./_components/settings-client";
 
 export const metadata: Metadata = {
