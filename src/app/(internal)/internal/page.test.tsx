@@ -100,6 +100,7 @@ describe("internal home headline numbers", () => {
     expect(html).toContain(
       'aria-label="Active providers, last 7 days, Oct 24 to Oct 30, peak 3 on Oct 27"',
     );
+    expect(feature.recordSensitiveInternalAccess).not.toHaveBeenCalled();
   });
 
   it("shows Unavailable for new feedback when the summary is null", async () => {
@@ -114,10 +115,31 @@ describe("internal home headline numbers", () => {
     expect(html).not.toContain("UNAVAILABLE_SCREEN");
   });
 
-  it("renders the unavailable screen when the metrics read fails", async () => {
+  it("keeps the links and shows a notice when the numbers fail", async () => {
     feature.getValidationMetrics.mockRejectedValue(
       new MetricsError("unavailable", "UNAVAILABLE"),
     );
+
+    const html = await renderHome();
+
+    expect(html).toContain(
+      "Numbers are unavailable right now. Try again in a moment.",
+    );
+    expect(html).toContain("Feedback Inbox");
+    expect(html).toContain("Validation metrics");
+    expect(html).not.toContain("Providers (all time)");
+    expect(html).not.toContain("UNAVAILABLE_SCREEN");
+    expect(feature.recordSensitiveInternalAccess).toHaveBeenCalledTimes(1);
+    expect(feature.recordSensitiveInternalAccess).toHaveBeenCalledWith(
+      "INTERNAL_ACCESS_VIEW",
+    );
+  });
+
+  it("renders the unavailable screen when the numbers fail and the audit fails", async () => {
+    feature.getValidationMetrics.mockRejectedValue(
+      new MetricsError("unavailable", "UNAVAILABLE"),
+    );
+    feature.recordSensitiveInternalAccess.mockResolvedValue(false);
 
     expect(await renderHome()).toBe("UNAVAILABLE_SCREEN");
   });
@@ -128,5 +150,6 @@ describe("internal home headline numbers", () => {
     );
 
     await expect(renderHome()).rejects.toThrow("notFound");
+    expect(feature.recordSensitiveInternalAccess).not.toHaveBeenCalled();
   });
 });
