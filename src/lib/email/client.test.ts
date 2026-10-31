@@ -10,6 +10,7 @@ type SmtpSettings = {
 
 const mocks = vi.hoisted(() => ({
   sendMail: vi.fn(),
+  close: vi.fn(),
   createTransport: vi.fn(),
   consoleError: vi.spyOn(console, "error").mockImplementation(() => undefined),
   email: {
@@ -40,7 +41,10 @@ import { sendEmail } from "./client";
 
 beforeEach(() => {
   vi.clearAllMocks();
-  mocks.createTransport.mockReturnValue({ sendMail: mocks.sendMail });
+  mocks.createTransport.mockReturnValue({
+    sendMail: mocks.sendMail,
+    close: mocks.close,
+  });
   mocks.email.smtp = {
     host: "smtp.gmail.com",
     port: 587,
@@ -62,12 +66,16 @@ describe("sendEmail", () => {
     });
 
     expect(result).toEqual({ success: true, id: "<msg-1@smtp.gmail.com>" });
-    expect(mocks.createTransport).toHaveBeenCalledWith({
-      host: "smtp.gmail.com",
-      port: 587,
-      secure: false,
-      auth: { user: "project@gmail.com", pass: "app_password_test" },
-    });
+    expect(mocks.createTransport).toHaveBeenCalledWith(
+      expect.objectContaining({
+        host: "smtp.gmail.com",
+        port: 587,
+        secure: false,
+        requireTLS: true,
+        auth: { user: "project@gmail.com", pass: "app_password_test" },
+      }),
+    );
+    expect(mocks.close).toHaveBeenCalled();
     expect(mocks.sendMail).toHaveBeenCalledWith(
       expect.objectContaining({
         from: "Tracknologia <project@gmail.com>",
@@ -76,6 +84,30 @@ describe("sendEmail", () => {
         html: "<p>Invite</p>",
       }),
     );
+  });
+
+  it("uses implicit TLS on port 465 without a STARTTLS requirement, and never disables certificate checks", async () => {
+    mocks.email.smtp = {
+      host: "smtp.gmail.com",
+      port: 465,
+      secure: true,
+      user: "project@gmail.com",
+      password: "app_password_test",
+    };
+    mocks.sendMail.mockResolvedValue({ messageId: "<msg-2@smtp.gmail.com>" });
+
+    await sendEmail({
+      to: "staff@example.com",
+      subject: "Invitation",
+      html: "<p>Invite</p>",
+    });
+
+    const options = mocks.createTransport.mock.calls[0][0];
+    expect(options).toEqual(
+      expect.objectContaining({ port: 465, secure: true, requireTLS: false }),
+    );
+    expect(options).not.toHaveProperty("ignoreTLS");
+    expect(options).not.toHaveProperty("tls");
   });
 
   it("maps an SMTP failure to provider_error and logs only the error code", async () => {
