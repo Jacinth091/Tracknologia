@@ -362,6 +362,9 @@ describe("updatePasswordAction", () => {
       data: {},
       error: { message: sentinel, status: 500 },
     });
+    // The grant check runs first, so this test needs a valid grant to reach
+    // the Auth failure it is about.
+    grantRecoverySession("user-1");
 
     const result = await updatePasswordAction(null, resetFormData());
 
