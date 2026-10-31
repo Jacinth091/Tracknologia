@@ -27,9 +27,15 @@ beforeEach(() => {
 });
 
 describe("auth callback route (#126)", () => {
-  it("opens the recovery flow marker after a password-recovery exchange", async () => {
+  it("opens the recovery flow and sets a grant after a recent recovery request", async () => {
     mocks.exchangeCodeForSession.mockResolvedValue({
-      data: { user: { id: "user-1", email: "owner@shop.com" } },
+      data: {
+        user: {
+          id: "user-1",
+          email: "owner@shop.com",
+          recovery_sent_at: new Date().toISOString(),
+        },
+      },
       error: null,
     });
 
@@ -41,6 +47,48 @@ describe("auth callback route (#126)", () => {
     expect(response.status).toBe(307);
     expect(response.headers.get("location")).toBe(
       `${ORIGIN}/reset-password?flow=recovery`,
+    );
+    const setCookie = response.headers.get("set-cookie") ?? "";
+    expect(setCookie).toContain("tracknologia_recovery_grant=");
+    expect(setCookie).toContain("Path=/reset-password");
+  });
+
+  it("sets no grant for a recovery-routed code without recovery_sent_at", async () => {
+    mocks.exchangeCodeForSession.mockResolvedValue({
+      data: { user: { id: "user-1", email: "owner@shop.com" } },
+      error: null,
+    });
+
+    const response = await callbackRoute(
+      requestFor("?code=confirm-code&next=%2Freset-password"),
+    );
+
+    expect(response.headers.get("set-cookie")).toBeNull();
+    expect(response.headers.get("location")).toBe(
+      `${ORIGIN}/reset-password?callback_error=auth_callback_failed`,
+    );
+  });
+
+  it("sets no grant when the recovery request is older than an hour", async () => {
+    const twoHoursAgo = new Date(Date.now() - 2 * 60 * 60 * 1000);
+    mocks.exchangeCodeForSession.mockResolvedValue({
+      data: {
+        user: {
+          id: "user-1",
+          email: "owner@shop.com",
+          recovery_sent_at: twoHoursAgo.toISOString(),
+        },
+      },
+      error: null,
+    });
+
+    const response = await callbackRoute(
+      requestFor("?code=old-code&next=%2Freset-password"),
+    );
+
+    expect(response.headers.get("set-cookie")).toBeNull();
+    expect(response.headers.get("location")).toBe(
+      `${ORIGIN}/reset-password?callback_error=auth_callback_failed`,
     );
   });
 

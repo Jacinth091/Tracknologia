@@ -6,6 +6,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 // state resolution runs for real.
 const feature = vi.hoisted(() => ({
   getUser: vi.fn(),
+  hasRecoveryGrant: vi.fn(),
 }));
 
 const navigation = vi.hoisted(() => ({
@@ -14,7 +15,11 @@ const navigation = vi.hoisted(() => ({
   }),
 }));
 
-vi.mock("@/features/auth", () => feature);
+// The pure masking helper runs for real; the grant and session seams are mocked.
+vi.mock("@/features/auth", async () => ({
+  ...feature,
+  maskEmail: (await import("@/features/auth/mask-email")).maskEmail,
+}));
 
 vi.mock("next/navigation", () => navigation);
 
@@ -37,6 +42,7 @@ function openResetPage(searchParams: { flow?: string } = {}) {
 beforeEach(() => {
   vi.clearAllMocks();
   feature.getUser.mockResolvedValue(null);
+  feature.hasRecoveryGrant.mockResolvedValue(false);
 });
 
 describe("reset password page states (#126)", () => {
@@ -48,11 +54,12 @@ describe("reset password page states (#126)", () => {
     expect(navigation.redirect).not.toHaveBeenCalled();
   });
 
-  it("shows the password form after the recovery exchange", async () => {
+  it("shows the password form after the recovery exchange, naming the account by masked email", async () => {
     feature.getUser.mockResolvedValue({
       id: "user-1",
       email: "owner@shop.com",
     });
+    feature.hasRecoveryGrant.mockResolvedValue(true);
 
     const html = renderToStaticMarkup(
       await openResetPage({ flow: "recovery" }),
@@ -60,7 +67,22 @@ describe("reset password page states (#126)", () => {
 
     expect(html).toContain("Set New Password");
     expect(html).toContain("reset password form");
+    expect(html).toContain("Setting a new password for");
+    expect(html).toContain("o•••@shop.com");
+    expect(html).not.toContain("owner@shop.com");
     expect(navigation.redirect).not.toHaveBeenCalled();
+  });
+
+  it("refuses the form for a signed-in marker visit without a recovery grant", async () => {
+    feature.getUser.mockResolvedValue({
+      id: "user-1",
+      email: "owner@shop.com",
+    });
+    feature.hasRecoveryGrant.mockResolvedValue(false);
+
+    await expect(openResetPage({ flow: "recovery" })).rejects.toThrow(
+      "redirect:/dashboard",
+    );
   });
 
   it("does not open the form as a silent password change on a plain signed-in visit", async () => {
