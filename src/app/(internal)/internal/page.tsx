@@ -1,12 +1,21 @@
 import { notFound, redirect } from "next/navigation";
 import Link from "next/link";
 import {
+  getValidationMetrics,
+  MetricsError,
   recordSensitiveInternalAccess,
   requireInternalOperator,
+  type ValidationMetrics,
 } from "@/features/internal-operations";
 import { InternalServiceUnavailable } from "./_components/internal-service-unavailable";
+import { DailyColumns } from "./_components/charts";
+import { Card } from "@/components/ui/card";
 import { buttonVariants } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
+
+function formatCount(value: number) {
+  return value.toLocaleString("en-PH");
+}
 
 export default async function InternalPage() {
   // The layout guard is not sufficient by itself: every sensitive internal
@@ -25,12 +34,28 @@ export default async function InternalPage() {
     return <InternalServiceUnavailable />;
   }
 
-  // Required audit must succeed before any protected content renders.
-  const audited = await recordSensitiveInternalAccess("INTERNAL_ACCESS_VIEW");
+  // The metrics read writes the one INTERNAL_ACCESS_VIEW row before it reads
+  // any number, so a successful read needs no second audit here.
+  let metrics: ValidationMetrics | null = null;
+  try {
+    metrics = await getValidationMetrics({ mode: "7d" });
+  } catch (error) {
+    if (error instanceof MetricsError && error.code === "FORBIDDEN") {
+      notFound();
+    }
+    // The numbers failed, but the links still need a required audit first.
+    const audited = await recordSensitiveInternalAccess("INTERNAL_ACCESS_VIEW");
 
-  if (!audited) {
-    return <InternalServiceUnavailable />;
+    if (!audited) {
+      return <InternalServiceUnavailable />;
+    }
   }
+
+  const openRepairs = metrics
+    ? Object.entries(metrics.repairs.statusNow)
+        .filter(([status]) => status !== "COMPLETED")
+        .reduce((sum, [, count]) => sum + count, 0)
+    : 0;
 
   return (
     <section className="space-y-3">
@@ -41,6 +66,65 @@ export default async function InternalPage() {
         This private area is limited to enabled internal operators, and operator
         access is recorded in the append-only internal access audit.
       </p>
+      {metrics ? (
+        <>
+          <div className="grid grid-cols-2 gap-4 lg:grid-cols-4">
+            <Card className="space-y-1 p-5">
+              <p className="text-sm text-muted-foreground">
+                Providers (all time)
+              </p>
+              <p className="text-2xl font-semibold tabular-nums">
+                {formatCount(metrics.providers.allTime.total)}
+              </p>
+            </Card>
+            <Card className="space-y-1 p-5">
+              <p className="text-sm text-muted-foreground">
+                Open repairs (now)
+              </p>
+              <p className="text-2xl font-semibold tabular-nums">
+                {formatCount(openRepairs)}
+              </p>
+            </Card>
+            <Card className="space-y-1 p-5">
+              <p className="text-sm text-muted-foreground">
+                Pending requests (now)
+              </p>
+              <p className="text-2xl font-semibold tabular-nums">
+                {formatCount(metrics.requests.pendingNow)}
+              </p>
+            </Card>
+            <Card className="space-y-1 p-5">
+              <p className="text-sm text-muted-foreground">
+                New feedback (now)
+              </p>
+              <p className="text-2xl font-semibold tabular-nums">
+                {metrics.feedback
+                  ? formatCount(metrics.feedback.byStatus.NEW)
+                  : "Unavailable"}
+              </p>
+            </Card>
+          </div>
+          <Card className="space-y-3 p-5">
+            <DailyColumns
+              title="Active providers, last 7 days"
+              days={metrics.activity.daily.map((day) => ({
+                date: day.date,
+                value: day.distinctProviders,
+              }))}
+              unit={{
+                singular: "active provider",
+                plural: "active providers",
+              }}
+            />
+          </Card>
+        </>
+      ) : (
+        <Card className="p-5">
+          <p className="text-sm text-muted-foreground">
+            Numbers are unavailable right now. Try again in a moment.
+          </p>
+        </Card>
+      )}
       <div className="flex flex-wrap gap-2">
         <Link
           href="/internal/feedback"

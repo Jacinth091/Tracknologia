@@ -7,6 +7,7 @@ import {
   type ProviderContext,
 } from "@/features/auth";
 import { signOutAction } from "@/app/(auth)/actions";
+import { requireInternalOperator } from "@/features/internal-operations";
 import Link from "next/link";
 import { Button } from "@/components/ui/button";
 import { redirect } from "next/navigation";
@@ -64,6 +65,12 @@ export default async function DashboardLayout({
   }
 
   if (!context) {
+    // Internal operators hold a login with no Provider; send them to /internal
+    // instead of Provider onboarding; other outcomes still go to onboarding.
+    const access = await requireInternalOperator();
+    if (access.status === "ALLOWED") {
+      redirect("/internal");
+    }
     redirect("/onboarding");
   }
 

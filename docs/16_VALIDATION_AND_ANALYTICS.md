@@ -88,6 +88,14 @@ as `N/A`, never `0`, and shows an unavailable Feedback section as "Unavailable".
 Its header states the Manila period, the generation time, and the coverage
 labels the report returns. It shows no Provider, customer, or record identifiers.
 
+Server-rendered charts (no client script, no new query) show the same data as
+the count tables beside them: daily Active providers and Feedback columns, and
+Repairs by status and Feedback by category bars. `/internal` shows four headline
+numbers and the seven-day Active providers chart from the same 7-day read. Each
+chart has a text summary for screen readers, and a zero period shows "No activity
+in this period" rather than an empty chart. An unavailable Feedback section shows
+"Unavailable" in place of its charts.
+
 ## Provider metrics
 
 ### Provider creation and type split

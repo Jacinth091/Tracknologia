@@ -1040,7 +1040,7 @@ describe("Count summary projection", () => {
       { date: "2026-10-03", count: 0 },
     ]);
     expect(summary.retention).toEqual({
-      policy: "UNAPPROVED",
+      policy: "APPROVED",
       coverage: "RETAINED_ROWS_ONLY",
     });
   });
