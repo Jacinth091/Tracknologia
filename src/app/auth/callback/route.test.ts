@@ -51,6 +51,9 @@ describe("auth callback route (#126)", () => {
     const setCookie = response.headers.get("set-cookie") ?? "";
     expect(setCookie).toContain("tracknologia_recovery_grant=");
     expect(setCookie).toContain("Path=/reset-password");
+    expect(setCookie).toContain("HttpOnly");
+    expect(setCookie).toMatch(/SameSite=lax/i);
+    expect(setCookie).toContain("Max-Age=600");
   });
 
   it("sets no grant for a recovery-routed code without recovery_sent_at", async () => {

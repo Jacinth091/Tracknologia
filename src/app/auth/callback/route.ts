@@ -40,7 +40,11 @@ export async function GET(request: Request) {
         const response = NextResponse.redirect(
           `${origin}/reset-password?flow=recovery`,
         );
-        response.cookies.set(grantCookie);
+        response.cookies.set(
+          grantCookie.name,
+          grantCookie.value,
+          grantCookie.options,
+        );
         return response;
       }
       return NextResponse.redirect(`${origin}${safeTarget}`);
