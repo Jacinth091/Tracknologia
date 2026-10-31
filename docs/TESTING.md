@@ -274,9 +274,9 @@ internal operator mapping. It then:
 3. removes the default privileges for `anon`, `authenticated` and
    `service_role` before the restore. Without this, restored tables silently
    regain the grants that the migrations revoked, because `pg_dump` does not
-   record revocations. Then restores with `psql --single-transaction
-   -v ON_ERROR_STOP=1`, in the order schema, `session_replication_role =
-   replica`, data, and puts the default privileges back afterwards;
+   record revocations. It then restores in one transaction with
+   `psql --single-transaction` (stopping on the first error), in the order
+   schema, replica mode, data, and puts the default privileges back afterwards;
 4. verifies with SQL and fails on the first mismatch: fixture rows and values,
    RLS on the Provider-owned and feedback tables, `anon` denial on
    `feedback_submissions` and `repairs`, `authenticated` denial on
