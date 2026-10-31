@@ -141,6 +141,15 @@ export default async function TrackRepairPage({
               Send feedback
             </Link>
           </p>
+
+          <p className="px-2 text-center text-sm text-muted-foreground">
+            <Link
+              href="/privacy"
+              className="font-medium text-foreground underline underline-offset-4"
+            >
+              Privacy notice
+            </Link>
+          </p>
         </div>
       </main>
     </div>

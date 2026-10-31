@@ -234,6 +234,11 @@ Tradeoff (C-03, accepted): the wrapper means that before the page hydrates, or
 without JavaScript, the form does not submit through the server action, and the
 lost-response handling is unavailable.
 
+Privacy notice: the approved text lives once in `ui/feedback-privacy-notice.tsx`.
+The form shows it inside the "How we handle your feedback" box and links to
+`/privacy`, whose Section 1 renders the same component, open. Changing the text
+needs a new owner decision on #87.
+
 Placement (C-04): `ui/` is deliberate. Two route groups (public and Provider)
 import the form, and the feature barrel is server-only. It is not a pattern for
 other features to copy.

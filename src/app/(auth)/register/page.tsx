@@ -55,6 +55,14 @@ export default async function RegisterPage({
           Sign in
         </Link>
       </CardFooter>
+      <p className="pb-6 text-center text-xs text-muted-foreground">
+        <Link
+          href="/privacy"
+          className="font-medium text-foreground underline underline-offset-4"
+        >
+          Privacy notice
+        </Link>
+      </p>
     </Card>
   );
 }

@@ -2,6 +2,7 @@
 
 import { HugeiconsIcon } from "@hugeicons/react";
 import { Alert02Icon } from "@hugeicons/core-free-icons";
+import Link from "next/link";
 import { useActionState, useState } from "react";
 
 import { Alert, AlertDescription } from "@/components/ui/alert";
@@ -18,6 +19,7 @@ import {
   type FeedbackCategory,
   type FeedbackFormState,
 } from "../types";
+import { FeedbackPrivacyNotice } from "./feedback-privacy-notice";
 
 // Category labels and prompts, and all participant copy below, were
 // owner-approved on 2026-10-30 (#87). Prompts are guidance only; one message
@@ -325,40 +327,21 @@ function FeedbackFields({
         )}
       </Button>
 
-      <FeedbackPrivacyNotice />
-    </form>
-  );
-}
+      <details className="rounded-xl border border-border bg-muted/40 p-4 text-sm text-muted-foreground">
+        <summary className="cursor-pointer font-medium text-foreground">
+          How we handle your feedback
+        </summary>
+        <div className="mt-3">
+          <FeedbackPrivacyNotice />
+        </div>
+      </details>
 
-// Owner-approved on 2026-10-30 (#87 decision 8). Changing this text needs a new
-// owner decision.
-function FeedbackPrivacyNotice() {
-  return (
-    <details className="rounded-xl border border-border bg-muted/40 p-4 text-sm text-muted-foreground">
-      <summary className="cursor-pointer font-medium text-foreground">
-        How we handle your feedback
-      </summary>
-      <div className="mt-3 space-y-3 leading-relaxed">
-        <p>
-          <strong>What we collect:</strong> the kind of feedback, your title and
-          message, which page you sent it from, whether you&apos;re a customer
-          or a Provider (and your Provider role), and when you sent it. We
-          don&apos;t ask for your name, email, phone number or tracking codes.
-          Please don&apos;t put them in your message.
-        </p>
-        <p>
-          <strong>Who can read it:</strong> only the Tracknologia team. Other
-          customers and Providers can&apos;t.
-        </p>
-        <p>
-          <strong>How long we keep it:</strong> within 90 days we review
-          feedback and remove any personal details we find, or delete it if it
-          isn&apos;t useful. After that we keep it to help improve Tracknologia.
-          Removed details may stay in backups for a limited time. We use a
-          temporary coded key, not your IP address, to stop spam. We can&apos;t
-          reply to every message.
-        </p>
-      </div>
-    </details>
+      <Link
+        href="/privacy"
+        className="text-sm font-medium text-foreground underline underline-offset-4"
+      >
+        Privacy notice
+      </Link>
+    </form>
   );
 }
