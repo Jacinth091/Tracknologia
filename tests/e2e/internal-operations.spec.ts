@@ -2,6 +2,7 @@ import { expect, test } from "@playwright/test";
 import { randomUUID } from "node:crypto";
 import { runLocalSql, sqlUuidLiteral } from "../helpers/local-postgres";
 import {
+  baseURL,
   cleanupActors,
   cleanupInternalOperator,
   createServiceClient,
@@ -228,5 +229,92 @@ test.describe("E2E-08 Internal operator access", () => {
       await cleanupInternalOperator(admin, operator.userId);
       await cleanupActors(admin, seededActors);
     }
+  });
+
+  test("the activity page admits only enabled operators", async ({
+    browser,
+  }) => {
+    const admin = createServiceClient();
+    const operator = await seedInternalOperator(admin);
+    const seededActors: TestActor[] = [];
+
+    try {
+      // 1. Anonymous visitors return to login carrying the activity destination.
+      const anonymousContext = await browser.newContext();
+      const anonymousPage = await anonymousContext.newPage();
+      await anonymousPage.goto("/internal/activity");
+      await expect(anonymousPage).toHaveURL(
+        /\/login\?redirectTo=%2Finternal%2Factivity$/,
+      );
+      await anonymousContext.close();
+
+      // 2. Every Provider-backed role gets the shared internal 404.
+      for (const options of providerWithoutMapping) {
+        const actor = await seedActor(admin, options);
+        seededActors.push(actor);
+
+        const context = await browser.newContext();
+        const page = await context.newPage();
+        await loginAndCaptureState(page, actor);
+        const denied = await page.goto("/internal/activity");
+        expect(denied?.status()).toBe(404);
+        await expect(
+          page.getByRole("heading", { name: "Validation metrics" }),
+        ).toHaveCount(0);
+        await context.close();
+      }
+
+      // 3. The enabled operator sees the picker and a chosen period round-trips
+      //    through the GET form. The form also submits empty start/end fields.
+      const operatorContext = await browser.newContext();
+      const operatorPage = await operatorContext.newPage();
+      await operatorPage.goto("/login?redirectTo=%2Finternal%2Factivity");
+      await operatorPage.locator('input[name="email"]').fill(operator.email);
+      await operatorPage
+        .locator('input[name="password"]')
+        .fill(operator.password);
+      await operatorPage
+        .getByRole("button", { name: "Sign in", exact: true })
+        .click();
+      await expect(operatorPage).toHaveURL(/\/internal\/activity$/, {
+        timeout: 20_000,
+      });
+
+      const heading = operatorPage.getByRole("heading", {
+        name: "Validation metrics",
+        exact: true,
+      });
+      await expect(heading).toBeVisible();
+      await expect(operatorPage.locator("#metrics-period")).toHaveValue("7d");
+
+      await operatorPage.locator("#metrics-period").selectOption("30d");
+      await operatorPage
+        .getByRole("button", { name: "Show period", exact: true })
+        .click();
+      await expect(operatorPage).toHaveURL(/[?&]period=30d(&|$)/);
+      await expect(operatorPage.locator("#metrics-period")).toHaveValue("30d");
+      await expect(heading).toBeVisible();
+
+      // 4. Revocation applies to the same session on the next request.
+      await revokeInternalOperator(admin, operator.userId);
+      const afterRevoke = await operatorPage.goto("/internal/activity");
+      expect(afterRevoke?.status()).toBe(404);
+      await expect(heading).toHaveCount(0);
+      await operatorContext.close();
+    } finally {
+      await cleanupInternalOperator(admin, operator.userId);
+      await cleanupActors(admin, seededActors);
+    }
+  });
+
+  test("the health endpoint answers anonymous probes with no cache or cookie", async ({
+    request,
+  }) => {
+    const response = await request.get(`${baseURL}/api/health`);
+
+    expect(response.status()).toBe(200);
+    expect(await response.text()).toBe('{"status":"healthy"}');
+    expect(response.headers()["cache-control"]).toContain("no-store");
+    expect(response.headers()["set-cookie"]).toBeUndefined();
   });
 });
