@@ -121,9 +121,9 @@ export default function PrivacyPage() {
             </p>
             <p>
               When a tracking page is viewed, we record only the time, to count
-              how often tracking is used. We keep that for as long as the repair.
-              To stop abuse, we limit lookups with a temporary coded key, not
-              your IP address.
+              how often tracking is used. We keep that for as long as the
+              repair. To stop abuse, we limit lookups with a temporary coded
+              key, not your IP address.
             </p>
           </PrivacySection>
 
