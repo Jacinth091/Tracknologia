@@ -5,6 +5,7 @@ import { renderToStaticMarkup } from "react-dom/server";
 // navigation. The page renders for real with the fixture.
 const feature = vi.hoisted(() => ({
   getValidationMetrics: vi.fn(),
+  getNewFeedbackCount: vi.fn(),
   recordSensitiveInternalAccess: vi.fn(),
   requireInternalOperator: vi.fn(),
 }));
@@ -31,6 +32,18 @@ vi.mock("@/features/internal-operations", () => ({
   getValidationMetrics: feature.getValidationMetrics,
   recordSensitiveInternalAccess: feature.recordSensitiveInternalAccess,
   requireInternalOperator: feature.requireInternalOperator,
+}));
+
+vi.mock("@/features/feedback", () => ({
+  FeedbackError: class extends Error {
+    constructor(
+      message: string,
+      readonly code: string,
+    ) {
+      super(message);
+    }
+  },
+  getNewFeedbackCount: feature.getNewFeedbackCount,
 }));
 
 vi.mock("next/navigation", () => ({
@@ -61,6 +74,7 @@ vi.mock("./_components/metric-charts", () => ({
 }));
 
 import { MetricsError } from "@/features/internal-operations";
+import { FeedbackError } from "@/features/feedback";
 import InternalPage from "./page";
 
 const fixture = {
@@ -87,7 +101,7 @@ const fixture = {
     ],
   },
   feedback: {
-    byStatus: { NEW: 7, REVIEWING: 2, PLANNED: 1, RESOLVED: 1, DISMISSED: 0 },
+    byStatus: { NEW: 1, REVIEWING: 2, PLANNED: 1, RESOLVED: 1, DISMISSED: 0 },
   },
 };
 
@@ -103,6 +117,7 @@ beforeEach(() => {
   });
   feature.recordSensitiveInternalAccess.mockResolvedValue(true);
   feature.getValidationMetrics.mockResolvedValue(fixture);
+  feature.getNewFeedbackCount.mockResolvedValue(2);
 });
 
 describe("internal overview headline numbers", () => {
@@ -116,7 +131,8 @@ describe("internal overview headline numbers", () => {
     expect(html).toContain("Pending requests (now)");
     expect(html).toContain(">5<");
     expect(html).toContain("New feedback (now)");
-    expect(html).toContain(">7<");
+    expect(html).toContain(">2<");
+    expect(feature.getNewFeedbackCount).toHaveBeenCalledTimes(1);
     expect(html).toContain('href="/internal/feedback?status=NEW"');
 
     const [chart] = charts.DayBarChart.mock.calls.map(([props]) => props);
@@ -145,7 +161,7 @@ describe("internal overview headline numbers", () => {
     expect(charts.DayBarChart).not.toHaveBeenCalled();
   });
 
-  it("shows Unavailable for new feedback when the summary is null", async () => {
+  it("keeps the current backlog available when period feedback is unavailable", async () => {
     feature.getValidationMetrics.mockResolvedValue({
       ...fixture,
       feedback: null,
@@ -153,8 +169,30 @@ describe("internal overview headline numbers", () => {
 
     const html = await renderHome();
 
-    expect(html).toContain(">Unavailable<");
+    expect(html).toContain(">2<");
+    expect(html).not.toContain(">Unavailable<");
     expect(html).not.toContain("UNAVAILABLE_SCREEN");
+  });
+
+  it("shows an empty backlog as zero", async () => {
+    feature.getNewFeedbackCount.mockResolvedValue(0);
+    expect(await renderHome()).toContain(">0<");
+  });
+
+  it("keeps other metrics visible when the backlog count is unavailable", async () => {
+    feature.getNewFeedbackCount.mockRejectedValue(
+      new FeedbackError("unavailable", "UNAVAILABLE"),
+    );
+    const html = await renderHome();
+    expect(html).toContain(">Unavailable<");
+    expect(html).toContain("Providers (all time)");
+  });
+
+  it("denies the page when access is revoked before the backlog read", async () => {
+    feature.getNewFeedbackCount.mockRejectedValue(
+      new FeedbackError("forbidden", "FORBIDDEN"),
+    );
+    await expect(renderHome()).rejects.toThrow("notFound");
   });
 
   it("keeps the header and shows a notice when the numbers fail", async () => {
