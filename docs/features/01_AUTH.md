@@ -107,6 +107,12 @@ src/app/(auth)/
 
 ## Security requirements
 
+Staff signup creates only the authenticated account, with email and password.
+The invitation code is entered during onboarding, where Providers validates and
+accepts the invitation before granting membership. Shared invitation links still
+preselect Staff and carry their code through the existing HttpOnly onboarding
+cookie; the registration form does not ask the user to paste a code.
+
 - Do not trust client-supplied `userId`, `providerId`, or `role` when they can be derived from the authenticated session.
 - A valid Supabase session is not sufficient authorization by itself.
 - Provider ownership must be checked server-side.

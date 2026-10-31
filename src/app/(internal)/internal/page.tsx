@@ -1,4 +1,6 @@
 import { notFound, redirect } from "next/navigation";
+import Link from "next/link";
+import { HugeiconsIcon } from "@hugeicons/react";
 import {
   Clock01Icon,
   Message01Icon,
@@ -6,6 +8,7 @@ import {
   Wrench01Icon,
 } from "@hugeicons/core-free-icons";
 import { PageHeader } from "@/components/shared/page-header";
+import { buttonVariants } from "@/components/ui/button";
 import {
   Card,
   CardContent,
@@ -13,12 +16,6 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
-import {
-  Empty,
-  EmptyDescription,
-  EmptyHeader,
-  EmptyTitle,
-} from "@/components/ui/empty";
 import {
   getValidationMetrics,
   MetricsError,
@@ -92,7 +89,15 @@ export default async function InternalPage() {
       <PageHeader
         eyebrow="Internal operations"
         title="Overview"
-        description="This private area is limited to enabled internal operators, and operator access is recorded in the append-only internal access audit."
+        description="A quick look at Providers, repairs, and participant feedback."
+        actions={
+          <Link
+            href="/internal/feedback?status=NEW"
+            className={buttonVariants()}
+          >
+            Review feedback
+          </Link>
+        }
       />
       {metrics ? (
         <>
@@ -133,9 +138,19 @@ export default async function InternalPage() {
 
           <Card>
             <CardHeader className="px-4 pt-4 pb-0 sm:px-5 sm:pt-5">
-              <CardTitle className="text-base">
-                Active providers, last 7 days
-              </CardTitle>
+              <div className="flex flex-wrap items-center justify-between gap-3">
+                <CardTitle>
+                  <h2 className="text-base font-semibold">
+                    Active providers, last 7 days
+                  </h2>
+                </CardTitle>
+                <Link
+                  href="/internal/activity"
+                  className="text-sm font-medium underline underline-offset-4"
+                >
+                  View validation metrics
+                </Link>
+              </div>
               <CardDescription>
                 Providers with a repair, decision or status change each day
               </CardDescription>
@@ -148,17 +163,23 @@ export default async function InternalPage() {
                   data={daily}
                 />
               ) : (
-                <Empty className="min-h-48 p-6">
-                  <EmptyHeader>
-                    <EmptyTitle>
+                <div className="mx-2 flex items-start gap-3 rounded-lg bg-muted/40 px-4 py-5 sm:mx-3">
+                  <HugeiconsIcon
+                    icon={Clock01Icon}
+                    strokeWidth={1.8}
+                    className="mt-0.5 size-5 shrink-0 text-muted-foreground"
+                    aria-hidden="true"
+                  />
+                  <div className="space-y-1">
+                    <p className="text-sm font-medium">
                       No provider activity in the last 7 days
-                    </EmptyTitle>
-                    <EmptyDescription>
+                    </p>
+                    <p className="max-w-prose text-sm leading-relaxed text-muted-foreground">
                       Activity appears here once providers create repairs,
                       decide requests or change status.
-                    </EmptyDescription>
-                  </EmptyHeader>
-                </Empty>
+                    </p>
+                  </div>
+                </div>
               )}
             </CardContent>
           </Card>
@@ -170,6 +191,10 @@ export default async function InternalPage() {
           </p>
         </Card>
       )}
+      <p className="border-t border-border pt-4 text-xs leading-relaxed text-muted-foreground">
+        Restricted to enabled internal operators. Access is recorded in the
+        append-only internal access audit.
+      </p>
     </div>
   );
 }

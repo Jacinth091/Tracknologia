@@ -6,12 +6,8 @@ import { getInvitationForOnboarding } from "@/features/providers";
 import { createClient } from "@/lib/supabase/server";
 import { redirect } from "next/navigation";
 import { cookies } from "next/headers";
-import {
-  Card,
-  CardContent,
-  CardDescription,
-  CardHeader,
-} from "@/components/ui/card";
+import { Button } from "@/components/ui/button";
+import { signOutAction } from "@/app/(auth)/actions";
 import { OnboardingClient } from "./_components/onboarding-client";
 
 export const metadata: Metadata = {
@@ -42,18 +38,20 @@ export default async function OnboardingPage({
   const cookieInviteToken = cookieStore.get("tracknologia_staff_invite")?.value;
 
   const userMetadata = user.userMetadata ?? {};
-  const intent = userMetadata.intent as
-    "INDEPENDENT" | "SHOP" | "STAFF" | undefined;
-  const providerType =
-    (userMetadata.provider_type as "INDEPENDENT" | "SHOP" | undefined) ??
-    (intent === "SHOP"
-      ? "SHOP"
-      : intent === "INDEPENDENT"
-        ? "INDEPENDENT"
-        : undefined);
+  const intent = userMetadata.intent;
+  const providerType = userMetadata.provider_type;
   const inviteToken = invite || cookieInviteToken;
+  const initialAccountIntent = inviteToken
+    ? "STAFF"
+    : intent === "SHOP" || intent === "INDEPENDENT" || intent === "STAFF"
+      ? intent
+      : providerType === "SHOP" || providerType === "INDEPENDENT"
+        ? providerType
+        : undefined;
   const initialDisplayName =
-    (userMetadata.display_name as string | undefined) ?? undefined;
+    typeof userMetadata.display_name === "string"
+      ? userMetadata.display_name
+      : undefined;
   const initialEmail = user.email || undefined;
 
   // If staff invitation token is present, resolve the Shop information
@@ -63,50 +61,37 @@ export default async function OnboardingPage({
   }
 
   return (
-    <main className="flex min-h-screen items-center justify-center bg-muted/30 px-4 py-10">
-      <div className="w-full max-w-xl space-y-6">
-        <div className="flex justify-center">
-          <Link href="/" className="inline-block rounded-sm">
-            <BrandLogo className="h-8" />
+    <div className="min-h-screen bg-background">
+      <header className="border-b border-border bg-card">
+        <div className="mx-auto flex h-16 max-w-5xl items-center justify-between gap-4 px-4 sm:px-6">
+          <Link href="/" className="shrink-0 rounded-sm">
+            <BrandLogo />
           </Link>
+          <form action={signOutAction}>
+            <Button type="submit" variant="ghost">
+              Sign out
+            </Button>
+          </form>
         </div>
-        <Card>
-          <CardHeader className="space-y-2 text-center">
-            <p className="font-mono text-[11px] uppercase tracking-[0.16em] text-muted-foreground">
-              Provider setup
-            </p>
-            <h1 className="text-2xl font-bold tracking-tight">
-              {providerType === "SHOP"
-                ? "Set Up Your Repair Shop"
-                : providerType === "INDEPENDENT"
-                  ? "Set Up Your Independent Profile"
-                  : shopDetails || intent === "STAFF" || inviteToken
-                    ? "Complete Staff Profile"
-                    : "Provider Setup & Onboarding"}
-            </h1>
-            <CardDescription>
-              {providerType === "SHOP"
-                ? "Configure your shop details and storefront location to get started"
-                : providerType === "INDEPENDENT"
-                  ? "Configure your repair brand and service area to get started"
-                  : shopDetails
-                    ? `Join ${shopDetails.shopName} as shop staff`
-                    : intent === "STAFF" || inviteToken
-                      ? "Complete your staff profile to connect to your repair shop"
-                      : "Choose your operating model to set up your profile or join as shop staff"}
-            </CardDescription>
-          </CardHeader>
-          <CardContent>
-            <OnboardingClient
-              defaultInviteToken={inviteToken}
-              initialProviderType={providerType}
-              initialDisplayName={initialDisplayName}
-              initialEmail={initialEmail}
-              shopDetails={shopDetails}
-            />
-          </CardContent>
-        </Card>
-      </div>
-    </main>
+      </header>
+      <main className="mx-auto max-w-5xl px-4 py-8 sm:px-6 sm:py-12">
+        <OnboardingClient
+          defaultInviteToken={inviteToken}
+          initialAccountIntent={initialAccountIntent}
+          initialDisplayName={initialDisplayName}
+          initialEmail={initialEmail}
+          shopDetails={shopDetails}
+        />
+        <p className="mt-6 text-center text-sm text-muted-foreground">
+          How we use your information:{" "}
+          <Link
+            href="/privacy"
+            className="text-foreground underline underline-offset-4"
+          >
+            Privacy notice
+          </Link>
+        </p>
+      </main>
+    </div>
   );
 }

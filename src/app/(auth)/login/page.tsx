@@ -1,7 +1,5 @@
 import type { Metadata } from "next";
 import Link from "next/link";
-import { HugeiconsIcon } from "@hugeicons/react";
-import { Login03Icon } from "@hugeicons/core-free-icons";
 import {
   Card,
   CardContent,
@@ -32,33 +30,34 @@ export default async function LoginPage({
 
   return (
     <Card>
-      <CardHeader>
-        <CardTitle className="flex items-center gap-2.5">
-          <span className="inline-flex size-8 shrink-0 items-center justify-center rounded-lg border border-border bg-muted">
-            <HugeiconsIcon
-              icon={Login03Icon}
-              strokeWidth={1.8}
-              className="size-4"
-              aria-hidden="true"
-            />
-          </span>
-          Welcome back
+      <CardHeader className="space-y-1 text-center">
+        <CardTitle>
+          <h1 className="text-2xl font-bold tracking-tight">Sign in</h1>
         </CardTitle>
         <CardDescription>
-          Sign in with your email and password to continue
+          Enter the email and password for your account.
         </CardDescription>
       </CardHeader>
       <CardContent>
         <LoginForm redirectTo={safeRedirectTo} />
       </CardContent>
-      <CardFooter className="justify-center border-t border-border/50 pt-4 text-xs text-muted-foreground">
-        Don&apos;t have an account?{" "}
-        <Link
-          href="/register"
-          className="ml-1 font-medium text-foreground underline-offset-4 hover:underline"
-        >
-          Register as a Provider
-        </Link>
+      <CardFooter className="justify-center border-t border-border/50 pt-4 text-sm text-muted-foreground">
+        <span>
+          New here?{" "}
+          <Link
+            href="/register"
+            className="font-medium text-foreground underline-offset-4 hover:underline"
+          >
+            Create an account
+          </Link>
+          {" · "}
+          <Link
+            href="/privacy"
+            className="font-medium text-foreground underline-offset-4 hover:underline"
+          >
+            Privacy
+          </Link>
+        </span>
       </CardFooter>
     </Card>
   );

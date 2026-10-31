@@ -1,3 +1,4 @@
+import { PublicFooter } from "@/components/shared/public-footer";
 import { PublicHeader } from "@/components/shared/public-header";
 import { FeedbackForm } from "@/features/feedback/ui/feedback-form";
 import type { Metadata } from "next";
@@ -38,6 +39,8 @@ export default async function PublicFeedbackPage() {
           />
         </div>
       </main>
+
+      <PublicFooter />
     </div>
   );
 }

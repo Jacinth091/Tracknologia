@@ -151,6 +151,9 @@ export function ProviderNav({
             <DropdownMenuItem render={<Link href="/dashboard/settings" />}>
               Settings
             </DropdownMenuItem>
+            <DropdownMenuItem render={<Link href="/privacy" />}>
+              Privacy notice
+            </DropdownMenuItem>
             <DropdownMenuSeparator />
             <DropdownMenuItem
               nativeButton

@@ -1,4 +1,4 @@
-import { renderToStaticMarkup } from "react-dom/server";
+import { renderToReadableStream, renderToStaticMarkup } from "react-dom/server";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import { ProviderNav } from "@/app/(provider)/dashboard/_components/provider-nav";
@@ -24,6 +24,9 @@ vi.mock("react", async (importOriginal) => ({
   useActionState: actionState,
 }));
 vi.mock("next/navigation", () => ({ usePathname: pathname }));
+vi.mock("next/headers", () => ({
+  cookies: vi.fn(async () => ({ getAll: () => [] })),
+}));
 vi.mock("next/server", async (importOriginal) => ({
   ...(await importOriginal<typeof import("next/server")>()),
   connection,
@@ -301,9 +304,11 @@ describe("feedback entry links", () => {
       vi.fn(),
       false,
     ]);
-    const track = renderToStaticMarkup(
-      await TrackRepairPage({ searchParams: Promise.resolve({}) }),
-    );
+    const track = await new Response(
+      await renderToReadableStream(
+        await TrackRepairPage({ searchParams: Promise.resolve({}) }),
+      ),
+    ).text();
     const receipt = renderToStaticMarkup(
       <RepairRequestForm
         providerSlug="river"
@@ -332,9 +337,11 @@ describe("privacy notice links", () => {
         serviceModes={[]}
       />,
     );
-    const track = renderToStaticMarkup(
-      await TrackRepairPage({ searchParams: Promise.resolve({}) }),
-    );
+    const track = await new Response(
+      await renderToReadableStream(
+        await TrackRepairPage({ searchParams: Promise.resolve({}) }),
+      ),
+    ).text();
 
     for (const html of [feedback, request, track]) {
       expect(html).toMatch(
@@ -391,7 +398,9 @@ describe("feedback pages", () => {
     expect(randomUUID).not.toHaveBeenCalled();
 
     release();
-    const html = renderToStaticMarkup(await pending);
+    const html = await new Response(
+      await renderToReadableStream(await pending),
+    ).text();
 
     expect(connection).toHaveBeenCalledTimes(1);
     expect(randomUUID).toHaveBeenCalledTimes(1);
@@ -400,9 +409,15 @@ describe("feedback pages", () => {
   });
 
   it("gives each public visit its own nonce", async () => {
-    const first = hiddenNonce(renderToStaticMarkup(await PublicFeedbackPage()));
+    const first = hiddenNonce(
+      await new Response(
+        await renderToReadableStream(await PublicFeedbackPage()),
+      ).text(),
+    );
     const second = hiddenNonce(
-      renderToStaticMarkup(await PublicFeedbackPage()),
+      await new Response(
+        await renderToReadableStream(await PublicFeedbackPage()),
+      ).text(),
     );
 
     expect(first).toMatch(UUID_PATTERN);

@@ -227,7 +227,7 @@ test.describe("E2E-08 Internal operator access", () => {
     }
   });
 
-  test("an enabled operator signing in at plain /login lands on /internal", async ({
+  test("an operator lands on /internal and can navigate and sign out from a phone", async ({
     browser,
   }) => {
     const admin = createServiceClient();
@@ -236,16 +236,73 @@ test.describe("E2E-08 Internal operator access", () => {
     try {
       const context = await browser.newContext();
       const page = await context.newPage();
+      await page.setViewportSize({ width: 375, height: 812 });
       await page.goto("/login");
+      const backLink = await page
+        .getByRole("link", { name: "Back to home", exact: true })
+        .boundingBox();
+      const signInHeading = await page
+        .getByRole("heading", { name: "Sign in", exact: true })
+        .boundingBox();
+      if (!backLink || !signInHeading)
+        throw new Error("Sign-in content must be visible");
+      expect(backLink.y).toBeLessThan(48);
+      expect(backLink.height).toBeGreaterThanOrEqual(44);
+      expect(signInHeading.y).toBeLessThan(220);
       await page.locator('input[name="email"]').fill(operator.email);
       await page.locator('input[name="password"]').fill(operator.password);
-      await page
-        .getByRole("button", { name: "Sign in to Dashboard", exact: true })
-        .click();
+      await page.getByRole("button", { name: "Sign in", exact: true }).click();
       await expect(page).toHaveURL(/\/internal$/, { timeout: 20_000 });
       await expect(
         page.getByRole("heading", { name: "Overview" }).first(),
       ).toBeVisible();
+      await page.setViewportSize({ width: 1280, height: 900 });
+      const desktopNav = page.getByRole("navigation", {
+        name: "Internal navigation",
+      });
+      await expect(
+        desktopNav.getByRole("link", { name: "Overview", exact: true }),
+      ).toHaveAttribute("aria-current", "page");
+      await expect(
+        page.getByRole("button", { name: "Open navigation" }),
+      ).toBeHidden();
+
+      await page.setViewportSize({ width: 375, height: 812 });
+      await expect(desktopNav).toBeHidden();
+      expect(
+        await page
+          .locator("header")
+          .evaluate((header) => header.scrollWidth <= header.clientWidth),
+      ).toBe(true);
+      await page.getByRole("button", { name: "Open navigation" }).click();
+      const drawer = page.getByRole("dialog", {
+        name: "Navigation",
+        exact: true,
+      });
+      await expect(drawer).toBeVisible();
+      await drawer.getByRole("link", { name: "Feedback", exact: true }).click();
+      await expect(page).toHaveURL(/\/internal\/feedback$/);
+      await expect(drawer).toBeHidden();
+      await page.getByRole("button", { name: "Open navigation" }).click();
+      await expect(
+        drawer.getByRole("link", { name: "Feedback", exact: true }),
+      ).toHaveAttribute("aria-current", "page");
+      await page.keyboard.press("Escape");
+      await expect(drawer).toBeHidden();
+      await page.getByRole("button", { name: "Account menu" }).click();
+      const menuItems = page.getByRole("menuitem");
+      await expect(menuItems).toHaveCount(2);
+      await expect(
+        page.getByRole("menuitem", { name: "Sign Out", exact: true }),
+      ).toBeVisible();
+      const menuWidths = await menuItems.evaluateAll((items) =>
+        items.map((item) => item.getBoundingClientRect().width),
+      );
+      expect(Math.max(...menuWidths) - Math.min(...menuWidths)).toBeLessThan(1);
+      await page
+        .getByRole("menuitem", { name: "Sign Out", exact: true })
+        .click();
+      await expect(page).toHaveURL(/\/login$/);
       await context.close();
     } finally {
       await cleanupInternalOperator(admin, operator.userId);
@@ -316,6 +373,36 @@ test.describe("E2E-08 Internal operator access", () => {
       await expect(operatorPage).toHaveURL(/[?&]period=30d(&|$)/);
       await expect(operatorPage.locator("#metrics-period")).toHaveValue("30d");
       await expect(heading).toBeVisible();
+
+      await operatorPage
+        .getByRole("link", { name: "Clear filters", exact: true })
+        .click();
+      await expect(operatorPage).toHaveURL(/\/internal\/activity$/);
+      await expect(operatorPage.locator("#metrics-period")).toHaveValue("7d");
+      await expect(operatorPage.locator("#metrics-start")).toHaveValue("");
+      await expect(operatorPage.locator("#metrics-end")).toHaveValue("");
+
+      await operatorPage.locator("#metrics-period").selectOption("custom");
+      await operatorPage.locator("#metrics-start").fill("2026-10-01");
+      await operatorPage.locator("#metrics-end").fill("2026-10-08");
+      await operatorPage
+        .getByRole("link", { name: "Clear filters", exact: true })
+        .click();
+      await expect(operatorPage.locator("#metrics-period")).toHaveValue("7d");
+      await expect(operatorPage.locator("#metrics-start")).toHaveValue("");
+      await expect(operatorPage.locator("#metrics-end")).toHaveValue("");
+
+      await operatorPage.getByText("All numbers", { exact: true }).click();
+      const numbers = operatorPage.locator("details").filter({
+        has: operatorPage.getByText("All numbers", { exact: true }),
+      });
+      await expect(numbers.locator("dl")).toHaveCount(7);
+      await operatorPage.setViewportSize({ width: 375, height: 812 });
+      expect(
+        await numbers.evaluate(
+          (section) => section.scrollWidth <= section.clientWidth,
+        ),
+      ).toBe(true);
 
       // 4. Revocation applies to the same session on the next request.
       await revokeInternalOperator(admin, operator.userId);

@@ -39,18 +39,20 @@ export function StatTile({
         data-status={status}
         className="status-badge absolute inset-x-0 top-0 h-1 bg-current"
       />
-      <CardHeader className="gap-3 p-4 sm:p-5">
+      <CardHeader className="flex-row items-center justify-between gap-3 space-y-0 p-4 sm:p-5">
+        <div className="min-w-0 space-y-2">
+          <CardDescription>{label}</CardDescription>
+          <CardTitle className="text-3xl tabular-nums">{value}</CardTitle>
+          {detail ? (
+            <p className="text-xs text-muted-foreground">{detail}</p>
+          ) : null}
+        </div>
         <span
           data-status={status}
-          className="status-badge flex size-9 items-center justify-center rounded-lg"
+          className="status-badge flex size-9 shrink-0 items-center justify-center rounded-lg"
         >
           <HugeiconsIcon icon={icon} aria-hidden="true" className="size-4" />
         </span>
-        <CardDescription>{label}</CardDescription>
-        <CardTitle className="text-3xl tabular-nums">{value}</CardTitle>
-        {detail ? (
-          <p className="text-xs text-muted-foreground">{detail}</p>
-        ) : null}
       </CardHeader>
     </Card>
   );

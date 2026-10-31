@@ -179,7 +179,11 @@ function FeedbackFields({
   );
 
   return (
-    <form action={formAction} className="space-y-6" aria-busy={pending}>
+    <form
+      action={formAction}
+      className="space-y-5 rounded-xl border border-border bg-card p-5 sm:p-6"
+      aria-busy={pending}
+    >
       {rejected && !hasFieldErrors && (
         <Alert variant="destructive" role="alert">
           <HugeiconsIcon icon={Alert02Icon} aria-hidden="true" />
@@ -202,7 +206,7 @@ function FeedbackFields({
           {FEEDBACK_CATEGORIES.map((value) => (
             <label
               key={value}
-              className="flex min-h-11 cursor-pointer items-center gap-3 rounded-xl border border-border bg-card px-3 text-sm font-medium text-foreground transition-colors has-checked:border-foreground has-checked:bg-secondary has-focus-visible:ring-[3px] has-focus-visible:ring-ring"
+              className="flex min-h-11 cursor-pointer items-center gap-3 rounded-lg border border-border bg-card px-3 text-sm font-medium text-foreground transition-colors hover:bg-muted/50 has-checked:border-foreground has-checked:bg-muted has-focus-visible:ring-2 has-focus-visible:ring-ring"
             >
               <input
                 type="radio"
@@ -312,36 +316,38 @@ function FeedbackFields({
         )}
       </div>
 
-      <Button
-        type="submit"
-        disabled={pending}
-        className="min-h-11 w-full sm:w-auto"
-      >
-        {pending ? (
-          <>
-            <LoadingSpinner className="size-4" />
-            <span>Sending...</span>
-          </>
-        ) : (
-          "Send feedback"
-        )}
-      </Button>
+      <div className="flex flex-wrap items-center justify-between gap-3 border-t border-border pt-5">
+        <Button
+          type="submit"
+          disabled={pending}
+          className="min-h-11 w-full sm:w-auto"
+        >
+          {pending ? (
+            <>
+              <LoadingSpinner className="size-4" />
+              <span>Sending...</span>
+            </>
+          ) : (
+            "Send feedback"
+          )}
+        </Button>
 
-      <details className="rounded-xl border border-border bg-muted/40 p-4 text-sm text-muted-foreground">
-        <summary className="cursor-pointer font-medium text-foreground">
+        <Link
+          href="/privacy"
+          className="inline-flex min-h-11 items-center text-sm font-medium text-foreground underline underline-offset-4 outline-none focus-visible:ring-2 focus-visible:ring-ring sm:min-h-9"
+        >
+          Privacy notice
+        </Link>
+      </div>
+
+      <details className="border-t border-border pt-4 text-sm text-muted-foreground">
+        <summary className="cursor-pointer rounded-sm font-medium text-foreground outline-none focus-visible:ring-2 focus-visible:ring-ring">
           How we handle your feedback
         </summary>
         <div className="mt-3">
           <FeedbackPrivacyNotice />
         </div>
       </details>
-
-      <Link
-        href="/privacy"
-        className="text-sm font-medium text-foreground underline underline-offset-4"
-      >
-        Privacy notice
-      </Link>
     </form>
   );
 }

@@ -176,7 +176,7 @@ INSERT providers + INSERT provider_user_profiles + INSERT provider_memberships (
 ```text
 Shop Owner creates Staff invitation (generates raw token, persists SHA-256 digest in token_hash)
        ↓
-Staff receives raw token via invite link
+Staff receives raw token via invitation link or code
        ↓
 Staff creates Supabase identity / logs in
        ↓

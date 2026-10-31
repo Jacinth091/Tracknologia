@@ -1,9 +1,7 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { notFound, redirect } from "next/navigation";
-import { signOutAction } from "@/app/(auth)/actions";
 import { BrandLogo } from "@/components/shared/brand-logo";
-import { Button } from "@/components/ui/button";
 import { requireInternalOperator } from "@/features/internal-operations";
 import { InternalNav } from "./_components/internal-nav";
 import { InternalServiceUnavailable } from "./_components/internal-service-unavailable";
@@ -43,11 +41,6 @@ export default async function InternalLayout({
             <BrandLogo />
           </Link>
           <InternalNav />
-          <form action={signOutAction} className="shrink-0">
-            <Button variant="outline" size="sm" type="submit">
-              Sign Out
-            </Button>
-          </form>
         </div>
       </header>
 

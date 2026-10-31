@@ -1,6 +1,10 @@
 import type { ReactNode } from "react";
 import { renderToStaticMarkup } from "react-dom/server";
-import { describe, expect, it, vi } from "vitest";
+import { beforeEach, describe, expect, it, vi } from "vitest";
+
+const cookies = vi.hoisted(() => vi.fn());
+
+vi.mock("next/headers", () => ({ cookies }));
 
 vi.mock("next/link", () => ({
   default: ({
@@ -25,9 +29,19 @@ vi.mock("next/link", () => ({
 
 import { PublicHeader } from "./public-header";
 
+function cookiesNamed(...names: string[]) {
+  cookies.mockResolvedValue({
+    getAll: () => names.map((name) => ({ name, value: "value" })),
+  });
+}
+
 describe("PublicHeader", () => {
-  it("links the logo home and offers Track a repair and Sign In", () => {
-    const html = renderToStaticMarkup(<PublicHeader />);
+  beforeEach(() => {
+    cookiesNamed();
+  });
+
+  it("links the logo home and offers Track a repair and Sign In", async () => {
+    const html = renderToStaticMarkup(await PublicHeader({}));
 
     expect(html).toContain('aria-label="Main navigation"');
     expect(html).toMatch(/<a href="\/"[^>]*>/);
@@ -35,22 +49,21 @@ describe("PublicHeader", () => {
     expect(html).toMatch(/<a href="\/login"[^>]*>Sign In<\/a>/);
   });
 
-  it("marks the current page with aria-current", () => {
-    const html = renderToStaticMarkup(<PublicHeader current="track" />);
+  it("marks the current page with aria-current", async () => {
+    const html = renderToStaticMarkup(await PublicHeader({ current: "track" }));
 
     expect(html).toMatch(
       /<a href="\/track"[^>]*aria-current="page"[^>]*>Track a repair<\/a>/,
     );
-    expect(
-      renderToStaticMarkup(<PublicHeader />).includes('aria-current="page"'),
-    ).toBe(false);
+    const plain = renderToStaticMarkup(await PublicHeader({}));
+    expect(plain.includes('aria-current="page"')).toBe(false);
   });
 
-  it("renders extra links first, hidden below the small breakpoint", () => {
+  it("renders extra links first, hidden below the small breakpoint", async () => {
     const html = renderToStaticMarkup(
-      <PublicHeader
-        extraLinks={[{ href: "#providers", label: "For providers" }]}
-      />,
+      await PublicHeader({
+        extraLinks: [{ href: "#providers", label: "For providers" }],
+      }),
     );
 
     expect(html.indexOf("For providers")).toBeLessThan(
@@ -59,5 +72,30 @@ describe("PublicHeader", () => {
     expect(html).toMatch(
       /<a href="#providers" class="hidden [^"]*">For providers<\/a>/,
     );
+  });
+
+  it("shows Dashboard and links the logo there when an auth cookie exists", async () => {
+    cookiesNamed("sb-abcdefgh-auth-token");
+    const html = renderToStaticMarkup(await PublicHeader({}));
+
+    expect(html).toMatch(/<a href="\/dashboard"[^>]*>/);
+    expect(html).toMatch(/<a href="\/dashboard"[^>]*>Dashboard<\/a>/);
+    expect(html).not.toContain("Sign In");
+  });
+
+  it("treats chunked auth cookies as signed in", async () => {
+    cookiesNamed("sb-abcdefgh-auth-token.0", "sb-abcdefgh-auth-token.1");
+    const html = renderToStaticMarkup(await PublicHeader({}));
+
+    expect(html).toMatch(/<a href="\/dashboard"[^>]*>Dashboard<\/a>/);
+    expect(html).not.toContain("Sign In");
+  });
+
+  it("ignores cookies that are not Supabase auth tokens", async () => {
+    cookiesNamed("theme", "sb-abcdefgh-refresh");
+    const html = renderToStaticMarkup(await PublicHeader({}));
+
+    expect(html).toMatch(/<a href="\/login"[^>]*>Sign In<\/a>/);
+    expect(html).not.toContain("Dashboard");
   });
 });

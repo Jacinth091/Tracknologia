@@ -1,14 +1,9 @@
 import type { Metadata } from "next";
 
 import { PageHeader } from "@/components/shared/page-header";
+import { PublicFooter } from "@/components/shared/public-footer";
 import { PublicHeader } from "@/components/shared/public-header";
-import {
-  Card,
-  CardContent,
-  CardDescription,
-  CardHeader,
-  CardTitle,
-} from "@/components/ui/card";
+import { PublicRecoveryPanel } from "@/components/shared/public-recovery-panel";
 import { getPublicProvider } from "@/features/providers";
 
 import { RepairRequestForm } from "./_components/repair-request-form";
@@ -28,26 +23,12 @@ export default async function PublicRepairRequestPage({
 
   if (!provider) {
     return (
-      <div className="flex min-h-screen flex-col bg-muted/30">
+      <div className="flex min-h-screen flex-col bg-background">
         <PublicHeader />
-        <main className="flex-1 px-4 py-12 sm:px-6">
-          <div className="mx-auto max-w-xl space-y-6">
-            <Card>
-              <CardHeader>
-                <CardTitle>Repair Requests unavailable</CardTitle>
-                <CardDescription>
-                  Provider does not exist or is not accepting new Requests.
-                </CardDescription>
-              </CardHeader>
-              <CardContent>
-                <p className="text-sm text-muted-foreground">
-                  Check link or contact Provider directly for current service
-                  options.
-                </p>
-              </CardContent>
-            </Card>
-          </div>
+        <main className="flex flex-1 items-center px-4 py-10 sm:px-6 sm:py-16">
+          <PublicRecoveryPanel kind="request-unavailable" />
         </main>
+        <PublicFooter />
       </div>
     );
   }
@@ -79,6 +60,8 @@ export default async function PublicRepairRequestPage({
           />
         </div>
       </main>
+
+      <PublicFooter />
     </div>
   );
 }

@@ -15,10 +15,6 @@ import { LoadingSpinner } from "@/components/ui/loading-spinner";
 
 export function LoginForm({ redirectTo }: { redirectTo: string }) {
   const [state, formAction, isPending] = useActionState(loginAction, null);
-  // Keep the Provider dashboard wording; other internal destinations get
-  // neutral copy because they do not lead to the dashboard.
-  const submitLabel =
-    redirectTo === "/dashboard" ? "Sign in to Dashboard" : "Sign in";
 
   return (
     <form action={formAction} aria-busy={isPending} className="space-y-4">
@@ -84,7 +80,7 @@ export function LoginForm({ redirectTo }: { redirectTo: string }) {
             Signing in...
           </span>
         ) : (
-          submitLabel
+          "Sign in"
         )}
       </Button>
     </form>

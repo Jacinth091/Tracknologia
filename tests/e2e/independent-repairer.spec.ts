@@ -23,22 +23,31 @@ test.describe("E2E-04 Independent Repairer", () => {
     try {
       // 1. Real registration as an Independent Provider (no pre-seeded Provider).
       await page.goto("/register");
-      await page.getByRole("radio", { name: "Independent" }).click();
+      await page.getByText("Independent", { exact: true }).click();
+      await expect(
+        page.getByRole("radio", { name: "Independent", exact: true }),
+      ).toBeChecked();
       await page.locator('input[name="email"]').fill(indEmail);
       await page.locator('input[name="password"]').fill(indPassword);
       await page.locator('input[name="confirmPassword"]').fill(indPassword);
       await page
-        .getByRole("button", { name: "Create Account & Continue" })
+        .getByRole("button", { name: "Create account", exact: true })
         .click();
 
       // Registration redirects into onboarding because no Provider exists yet.
       await page.waitForURL(/\/onboarding/, { timeout: 20_000 });
       await expect(
-        page.getByRole("heading", { name: "Set Up Your Independent Profile" }),
+        page.getByRole("heading", { name: "Set up your independent profile" }),
       ).toBeVisible();
 
       // 2. The Independent flow has no mandatory shop address.
       await expect(page.getByText("Repair Shop Profile")).not.toBeVisible();
+      await expect(
+        page.getByText("How will you use Tracknologia?"),
+      ).toHaveCount(0);
+      await page
+        .getByText("About & location (optional)", { exact: true })
+        .click();
       const addressField = page.getByLabel("Public Address (Optional)");
       await expect(addressField).toBeVisible();
       expect(await addressField.getAttribute("required")).toBeNull();
@@ -50,11 +59,22 @@ test.describe("E2E-04 Independent Repairer", () => {
         .fill(displayName);
       await page.getByLabel("Service Area (Optional)").fill("Metro Cebu");
       await page.locator('input[name="serviceModes"][value="MEETUP"]').check();
+      const otherDetails = page.getByLabel("Other arrangement details", {
+        exact: true,
+      });
+      await expect(otherDetails).not.toBeVisible();
+      const otherMode = page.locator(
+        'input[name="serviceModes"][value="OTHER"]',
+      );
+      await otherMode.check();
+      await expect(otherDetails).toBeVisible();
+      await otherMode.uncheck();
+      await expect(otherDetails).not.toBeVisible();
       await page
         .locator('input[name="serviceModes"][value="HOME_SERVICE"]')
         .check();
       await page
-        .getByRole("button", { name: "Complete Setup & Go to Dashboard" })
+        .getByRole("button", { name: "Create workspace", exact: true })
         .click();
 
       await page.waitForURL(/\/dashboard/, { timeout: 20_000 });

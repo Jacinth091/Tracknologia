@@ -9,6 +9,7 @@ import {
   Wrench01Icon,
 } from "@hugeicons/core-free-icons";
 import { PageHeader } from "@/components/shared/page-header";
+import { PublicFooter } from "@/components/shared/public-footer";
 import { PublicHeader } from "@/components/shared/public-header";
 import { buttonVariants } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -178,6 +179,8 @@ export default function PrivacyPage() {
           </p>
         </div>
       </main>
+
+      <PublicFooter />
     </div>
   );
 }

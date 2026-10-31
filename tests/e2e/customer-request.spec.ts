@@ -67,8 +67,25 @@ test.describe("E2E-02 Customer Request", () => {
       await loginAndCaptureState(page, owner);
 
       await page.goto("/dashboard/requests");
-      await page.getByRole("link", { name: "Review Request" }).click();
+      await page.setViewportSize({ width: 375, height: 812 });
+      const requestLink = page.getByRole("link", { name: "Review Request" });
+      await expect(
+        requestLink.getByText("Samsung Galaxy S24", { exact: true }),
+      ).toBeVisible();
+      await expect(
+        requestLink.getByText("Screen cracked", { exact: true }),
+      ).toBeVisible();
+      await expect(
+        requestLink.getByText(customerName, { exact: true }),
+      ).toBeVisible();
+      expect(
+        await page.evaluate(
+          () => document.documentElement.scrollWidth <= window.innerWidth,
+        ),
+      ).toBe(true);
+      await requestLink.click();
       await page.waitForURL(/\/dashboard\/requests\/[0-9a-f-]{36}$/);
+      await page.setViewportSize({ width: 1280, height: 800 });
 
       // Capture the exact on-the-wire accept request (headers + body) so the
       // very same Server-Action can be replayed after processing.

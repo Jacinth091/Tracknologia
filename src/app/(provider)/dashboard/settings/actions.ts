@@ -45,10 +45,7 @@ export async function updateProviderProfileAction(
     contactPhone: formData.get("contactPhone")?.toString() || undefined,
     publicAddress: formData.get("publicAddress")?.toString() || undefined,
     serviceArea: formData.get("serviceArea")?.toString() || undefined,
-    supportedDevices: (formData.get("supportedDevices")?.toString() ?? "")
-      .split(",")
-      .map((device) => device.trim())
-      .filter(Boolean),
+    supportedDevices: formData.getAll("supportedDevices"),
     acceptingRequests: formData.get("acceptingRequests") === "on",
   };
   const parsed = updateProviderProfileSchema.safeParse(input);

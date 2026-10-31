@@ -97,6 +97,31 @@ describe("Feedback detail page times", () => {
 });
 
 describe("Feedback detail page review aids", () => {
+  it("keeps participant wording separate from triage and ordered history", async () => {
+    const message =
+      "An unbroken device label: " + "x".repeat(350) + "\nSecond line";
+    const detail = detailAt(INSTANT);
+    detail.original.message = message;
+    feature.getInternalFeedback.mockResolvedValue(detail);
+    const html = renderToStaticMarkup(
+      await FeedbackDetailPage({
+        params: Promise.resolve({ feedbackId: FEEDBACK_ID }),
+      }),
+    );
+
+    expect(html).toContain(message);
+    expect(
+      [...html.matchAll(/<h2[^>]*>(.*?)<\/h2>/g)].map(([, title]) => title),
+    ).toEqual([
+      "Participant submission",
+      "Review &amp; triage",
+      "Status history",
+    ]);
+    expect(html).toContain("Read-only.");
+    expect(html).toContain("<ol");
+    expect(html.match(/<time\b/g)).toHaveLength(2);
+  });
+
   function detailWithOriginal(overrides: Record<string, unknown>) {
     const detail = detailAt(INSTANT);
     return { ...detail, original: { ...detail.original, ...overrides } };

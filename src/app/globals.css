@@ -77,8 +77,8 @@
   --chart-3: #6b6455;
   --chart-4: #45403a;
   --chart-5: #141414;
-  --chart-cat-1: #8a6100;
-  --chart-cat-2: #2a78d6;
+  --chart-cat-1: var(--foreground);
+  --chart-cat-2: #8a8a8a;
   --chart-cat-3: #e87ba4;
   --chart-cat-4: #6250d6;
   --chart-cat-5: #1baf7a;
@@ -115,8 +115,8 @@
   --chart-3: #c9bc9c;
   --chart-4: #b5ac98;
   --chart-5: #fbf6e9;
-  --chart-cat-1: #b8860b;
-  --chart-cat-2: #3987e5;
+  --chart-cat-1: var(--foreground);
+  --chart-cat-2: #8a8a8a;
   --chart-cat-3: #d55181;
   --chart-cat-4: #9085e9;
   --chart-cat-5: #199e70;

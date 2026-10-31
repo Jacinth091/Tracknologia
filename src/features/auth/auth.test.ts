@@ -556,6 +556,20 @@ describe("Auth - Validation Schemas & Registration Secrets", () => {
     expect(invalidEmail.success).toBe(false);
   });
 
+  it("allows a Staff account before its invitation is entered during onboarding", () => {
+    const result = registerSchema.safeParse({
+      intent: "STAFF",
+      email: "staff@example.test",
+      password: "Password123!",
+      confirmPassword: "Password123!",
+    });
+    expect(result.success).toBe(true);
+    if (result.success) {
+      expect(result.data.intent).toBe("STAFF");
+      expect(result.data.inviteToken).toBeUndefined();
+    }
+  });
+
   it("validates registration inputs correctly", () => {
     const valid = registerSchema.safeParse({
       email: "owner@shop.com",

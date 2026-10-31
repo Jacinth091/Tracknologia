@@ -69,6 +69,10 @@ reduced-motion preference. Gauges use already-fetched status fields; they do not
 poll or imply live updates. Compact gauges appear in Provider lists; larger
 gauges appear in details, public tracking, and submitted Request receipts.
 
+On phones, auth content starts near the top with compact page padding instead of
+centering the whole form vertically. The desktop two-column auth layout retains
+its centered form and brand panel.
+
 The identity covers landing, auth, onboarding, public request/tracking/feedback,
 and the Provider workspace. The Provider workspace uses a compact 64px header:
 wordmark, inline desktop navigation (Dashboard, Requests, Repairs, Shop-only
@@ -80,7 +84,33 @@ item with `aria-current="page"`. Shared inputs and primary actions have larger
 phone targets; long device names and reference codes wrap. Native account-role
 radios support keyboard selection.
 
+## Provider onboarding
+
+Onboarding follows the account type chosen at registration: Independent, Shop
+Owner, or Shop Staff. An invitation opens the Staff flow. The account-type chooser
+is reserved for accounts with no recorded signup type; a Staff account without its
+invite token stays in the Staff flow and can enter its code.
+
+Staff enter a manual invitation code only on onboarding, after creating their
+account. Registration collects email and password and uses Create account for
+every account type. A shared invitation link still carries its code automatically
+into onboarding without a second prompt.
+
+The setup page has one heading and a compact brand header with Sign out. Owner
+forms group personal details, the public business profile, and services, with
+section labels beside the fields on desktop and above them on phones. Optional
+public contact and location fields use expandable sections that open when their
+validation fails. Other arrangement details appear when that Service Mode is
+selected. Staff see their shop invitation and personal fields. Setup keeps the
+existing feature operations, required fields, and authorization checks.
+
 ## Public customer area
+
+Unavailable public Repair Request links use a branded recovery panel with neutral
+wording for a missing Provider or one not accepting requests. It offers tracking
+and home links without exposing private Provider details. The root `not-found`
+page uses the same visual treatment with a 404 illustration and recovery links;
+it renders without authentication or cookie reads.
 
 ### Tracknologia landing
 
@@ -138,13 +168,73 @@ Only valid `REQ-` references can prefill from a URL; `TRK-` credentials remain i
 the POST-backed form. Status descriptions and Service Mode handover wording
 continue to come from the Tracking feature.
 
+## Internal validation metrics
+
+The metrics page separates its title/Refresh action from a responsive period
+filter panel. Period and generation details sit below the controls; snapshot,
+retention, and coverage notes are available under Data coverage & retention.
+Charts follow Providers & activity, Requests & repairs, Customer tracking, and
+Feedback, combining related measurements rather than one mixed card grid.
+Current-state, period, and all-time labels and chart values retain their existing
+meanings. All numbers expands into seven named groups with aligned labels and
+values, two columns on desktop and one on phones. Requests precede Repairs, and
+scope guidance explains period, current snapshot, and unavailable calculations.
+
+Clear filters on metrics returns to the default seven-day view and removes custom
+dates. Graphs use foreground Ink for the primary series and neutral gray for the
+second categorical series; dark mode uses its foreground equivalent. Bars and
+arcs have clear boundaries, and donut values sit outside their slices.
+
+The internal Overview uses compact headline tiles and a short activity empty
+state, with direct links to feedback review and full metrics. Feedback Inbox uses
+the same header scale, a grouped filter form with Clear filters, and a submission
+list whose source, participant class, timestamp, status, and privacy/priority flags
+wrap independently on phones. Counts describe only the loaded page, not a global
+inbox total. Operator audit and feedback privacy notes remain visible as supporting
+text.
+
+Feedback review places the read-only participant submission beside Review &
+triage on desktop, stacking them in that order on phones. Original wording wraps
+within its panel; status and priority badges summarize the current review, with
+chronological status history below. Privacy warnings, validation, and stale-review
+protection remain in place.
+
+The internal header follows the Provider workspace pattern: inline desktop
+navigation, a phone navigation drawer that closes on selection, and an account
+dropdown containing Privacy notice and Sign Out. It identifies this workspace as
+Internal operations / Operator without displaying a Provider identity.
+
 ## Authenticated Provider area
+
+Provider overview, lists, team, and feedback pages use direct page headings
+without repeated section eyebrows. The heading remains the primary wayfinding
+label; other surfaces can retain their contextual labels.
+
+### Settings
+
+Settings uses a vertical tab menu beside a shared content column on desktop,
+and a horizontal tab row above the content on smaller screens. Tab orientation
+and keyboard navigation follow the displayed layout. Profile, Business, and
+Service modes panels use the same available width. The Business form groups
+identity, contact/location, and services; Other arrangement details appear when
+that mode is selected. Staff keep access to their own profile, with Provider
+configuration restricted to Owners.
+
+Settings and onboarding use the same Supported devices checkboxes. Settings
+preselects saved categories, including any existing custom labels, and saves all
+checked values. Unchecking every category clears the list. The request-acceptance
+switch is controlled so saving and revalidation do not change an uncontrolled
+Switch default.
 
 ### Dashboard
 
 Four stat tiles — Active, Waiting, Ready, and Completed — each carry a hugeicons
 icon and status accent and link to the matching filtered Repair list. `Create
 Repair` is the single primary action.
+
+The tiles use compact horizontal icon/count groups. The shared request-link
+panel keeps the full selectable URL, Copy/Open controls, acceptance badge, and
+Settings link together with wrapping appropriate to sidebars and phone screens.
 
 Below the tiles, **Needs attention** groups `READY` repairs (ready for handover),
 `AWAITING_APPROVAL` repairs, and `SUBMITTED` Repair Requests, capped at five rows
@@ -161,13 +251,29 @@ Do not force shop-only widgets such as branch/staff workload onto Independent Re
 Repairs and Requests use one dense bordered list. Each row is a single link:
 
 ```text
-[gauge]  Lenovo IdeaPad 3 · Battery issue        [IN_PROGRESS]
+[gauge]  Lenovo IdeaPad 3                       [IN_PROGRESS]
+         Battery issue
          TN-2026-00125 · Juan Dela Cruz · Updated 10:32
 ```
 
-Device and reported problem stay bold; the meta line is Geist Mono. Rows keep
-larger phone targets. Status filters preserve the current search query (`q`) and
+Device identity is emphasized separately from the reported problem, and each
+can wrap to two lines. Codes retain Geist Mono; customer and timestamp metadata
+wrap independently in the body typeface. Status badges stay visible, with
+keyboard focus on the full row. Pagination controls and status filters keep
+phone-sized targets. Status filters preserve the current search query (`q`) and
 mark the active filter with the yellow underline.
+
+### Team and feedback
+
+The invitation form uses a visible Staff Email label and a full-width action,
+avoiding a squeezed field/button row in the desktop sidebar. Member names and
+roles wrap, and dates use readable body text. Generated invitation codes wrap
+within their panel. Existing recipient, expiry, and removal rules still apply.
+
+Provider feedback uses a centered form column. The shared public/Provider form
+has one defined surface, clear category selection, a grouped send/privacy row,
+and a separated privacy disclosure. Approved notice wording, retry handling,
+and personal-details warnings are unchanged.
 
 Repair search accepts common customer/device punctuation. Invalid bounded input
 is preserved in the field and receives an inline validation message rather than

@@ -12,7 +12,8 @@ import {
   EmptyTitle,
 } from "@/components/ui/empty";
 import { Badge } from "@/components/ui/badge";
-import { buttonVariants } from "@/components/ui/button";
+import { Button, buttonVariants } from "@/components/ui/button";
+import { PageHeader } from "@/components/shared/page-header";
 import { Card } from "@/components/ui/card";
 import { Label } from "@/components/ui/label";
 import { listInternalFeedback, FeedbackError } from "@/features/feedback";
@@ -135,171 +136,206 @@ export default async function FeedbackInboxPage({
 
   return (
     <div className="space-y-6">
-      <div>
-        <p className="text-xs font-medium tracking-wide text-muted-foreground uppercase">
-          Operator triage
-        </p>
-        <h1 className="mt-1 text-2xl font-semibold tracking-tight">
-          Feedback Inbox
-        </h1>
-        <p className="mt-1 max-w-prose text-sm text-muted-foreground">
-          Participant submissions only. Customer and Provider business records
-          stay out of this area by design.
-        </p>
-      </div>
+      <PageHeader
+        eyebrow="Internal operations"
+        title="Feedback Inbox"
+        description="Review participant reports, suggestions, and privacy follow-ups."
+      />
 
       <form
         method="get"
         action="/internal/feedback"
         aria-label="Feedback filters"
-        className="grid gap-3 rounded-xl border border-border bg-card p-4 sm:grid-cols-3 sm:items-end"
+        className="space-y-4 rounded-xl border border-border bg-card p-4 sm:p-5"
       >
-        <div className="grid gap-1.5">
-          <Label htmlFor="filter-status">Status</Label>
-          <select
-            id="filter-status"
-            name="status"
-            defaultValue={current.status ?? ""}
-            className="h-9 rounded-md border border-input bg-background px-3 text-sm"
-          >
-            <option value="">All statuses</option>
-            {STATUS_OPTIONS.map((option) => (
-              <option key={option.value} value={option.value}>
-                {option.label}
-              </option>
-            ))}
-          </select>
+        <div className="grid gap-3 sm:grid-cols-3">
+          <div className="grid min-w-0 gap-1.5">
+            <Label htmlFor="filter-status">Status</Label>
+            <select
+              id="filter-status"
+              name="status"
+              defaultValue={current.status ?? ""}
+              className="h-11 w-full min-w-0 rounded-lg border border-input bg-card px-3 text-sm outline-none focus-visible:ring-2 focus-visible:ring-ring sm:h-9"
+            >
+              <option value="">All statuses</option>
+              {STATUS_OPTIONS.map((option) => (
+                <option key={option.value} value={option.value}>
+                  {option.label}
+                </option>
+              ))}
+            </select>
+          </div>
+          <div className="grid min-w-0 gap-1.5">
+            <Label htmlFor="filter-category">Category</Label>
+            <select
+              id="filter-category"
+              name="category"
+              defaultValue={current.category ?? ""}
+              className="h-11 w-full min-w-0 rounded-lg border border-input bg-card px-3 text-sm outline-none focus-visible:ring-2 focus-visible:ring-ring sm:h-9"
+            >
+              <option value="">All categories</option>
+              {CATEGORY_OPTIONS.map((option) => (
+                <option key={option.value} value={option.value}>
+                  {option.label}
+                </option>
+              ))}
+            </select>
+          </div>
+          <div className="grid min-w-0 gap-1.5">
+            <Label htmlFor="filter-source">Source</Label>
+            <select
+              id="filter-source"
+              name="source"
+              defaultValue={current.source ?? ""}
+              className="h-11 w-full min-w-0 rounded-lg border border-input bg-card px-3 text-sm outline-none focus-visible:ring-2 focus-visible:ring-ring sm:h-9"
+            >
+              <option value="">All sources</option>
+              {SOURCE_OPTIONS.map((option) => (
+                <option key={option.value} value={option.value}>
+                  {option.label}
+                </option>
+              ))}
+            </select>
+          </div>
         </div>
-        <div className="grid gap-1.5">
-          <Label htmlFor="filter-category">Category</Label>
-          <select
-            id="filter-category"
-            name="category"
-            defaultValue={current.category ?? ""}
-            className="h-9 rounded-md border border-input bg-background px-3 text-sm"
-          >
-            <option value="">All categories</option>
-            {CATEGORY_OPTIONS.map((option) => (
-              <option key={option.value} value={option.value}>
-                {option.label}
-              </option>
-            ))}
-          </select>
-        </div>
-        <div className="grid gap-1.5">
-          <Label htmlFor="filter-source">Source</Label>
-          <select
-            id="filter-source"
-            name="source"
-            defaultValue={current.source ?? ""}
-            className="h-9 rounded-md border border-input bg-background px-3 text-sm"
-          >
-            <option value="">All sources</option>
-            {SOURCE_OPTIONS.map((option) => (
-              <option key={option.value} value={option.value}>
-                {option.label}
-              </option>
-            ))}
-          </select>
-        </div>
-        <div className="flex items-center gap-2 sm:col-span-3">
-          <input
-            id="filter-due"
-            type="checkbox"
-            name="due"
-            value="1"
-            defaultChecked={current.due === "1"}
-            className="size-4 accent-primary"
-          />
-          <Label htmlFor="filter-due">Due for review (90+ days)</Label>
-        </div>
-        <div className="sm:col-span-3">
-          <button
-            type="submit"
-            className={cn(buttonVariants({ variant: "outline", size: "sm" }))}
-          >
-            Apply filters
-          </button>
+        <div className="flex flex-col gap-4 border-t border-border pt-4 sm:flex-row sm:items-center sm:justify-between">
+          <div className="flex items-center gap-2">
+            <input
+              id="filter-due"
+              type="checkbox"
+              name="due"
+              value="1"
+              defaultChecked={current.due === "1"}
+              className="size-4 accent-foreground"
+            />
+            <Label htmlFor="filter-due">Due for review (90+ days)</Label>
+          </div>
+          <div className="flex gap-2">
+            {/* eslint-disable-next-line @next/next/no-html-link-for-pages -- Reload resets uncontrolled fields, including same-URL navigation. */}
+            <a
+              href="/internal/feedback"
+              className={buttonVariants({
+                variant: "outline",
+                className: "flex-1 sm:flex-none",
+              })}
+            >
+              Clear filters
+            </a>
+            <Button type="submit" className="flex-1 sm:flex-none">
+              Apply filters
+            </Button>
+          </div>
         </div>
       </form>
 
-      {page.items.length === 0 ? (
-        <Empty className="rounded-xl border border-border bg-card p-8">
-          <EmptyHeader>
-            <EmptyMedia variant="icon">
-              <HugeiconsIcon icon={Message01Icon} aria-hidden="true" />
-            </EmptyMedia>
-            <EmptyTitle>No matching feedback</EmptyTitle>
-            <EmptyDescription>
-              New participant submissions appear here for operator review.
-            </EmptyDescription>
-          </EmptyHeader>
-        </Empty>
-      ) : (
-        <Card className="overflow-hidden p-0">
-          <ul className="divide-y divide-border">
-            {page.items.map((item) => (
-              <li key={item.id}>
-                <Link
-                  href={`/internal/feedback/${item.id}`}
-                  className="flex items-center gap-3 px-4 py-3 transition-colors hover:bg-muted/50 sm:px-5 sm:py-3.5"
-                  aria-label={`Open feedback: ${item.title || humanize(item.category)}`}
-                >
-                  <div className="min-w-0 flex-1">
-                    <p className="line-clamp-1 text-sm font-semibold text-foreground">
-                      {item.title || humanize(item.category)}
-                    </p>
-                    <p className="mt-0.5 truncate text-xs text-muted-foreground">
-                      {humanize(item.category)} · {humanize(item.source)} ·{" "}
-                      {humanize(item.participantClass)} ·{" "}
-                      {formatSubmittedAt(item.createdAt)}
-                    </p>
-                  </div>
-                  <div className="flex shrink-0 items-center gap-2">
-                    {item.mayContainContactDetails && (
-                      <Badge variant="outline">
-                        May contain personal details
-                      </Badge>
-                    )}
-                    {item.priority !== "NORMAL" && (
-                      <span
-                        className={cn(
-                          "rounded-full border px-2.5 py-1 text-xs font-semibold",
-                          PRIORITY_BADGE[item.priority],
-                        )}
-                      >
-                        {humanize(item.priority)}
-                      </span>
-                    )}
-                    <span
-                      className="status-badge shrink-0 rounded-full border px-2.5 py-1 text-xs font-semibold"
-                      aria-label={`Status: ${humanize(item.status)}`}
-                    >
-                      {humanize(item.status)}
-                    </span>
-                    <HugeiconsIcon
-                      icon={ArrowRight01Icon}
-                      aria-hidden="true"
-                      className="size-4 text-muted-foreground"
-                    />
-                  </div>
-                </Link>
-              </li>
-            ))}
-          </ul>
-        </Card>
-      )}
-
-      {page.nextCursor ? (
-        <div className="flex justify-end">
-          <Link
-            href={inboxHref(current, page.nextCursor)}
-            className={cn(buttonVariants({ variant: "outline", size: "sm" }))}
-          >
-            Older submissions
-          </Link>
+      <section className="space-y-3" aria-labelledby="feedback-results-heading">
+        <div className="flex flex-wrap items-center justify-between gap-2">
+          <h2 id="feedback-results-heading" className="text-lg font-semibold">
+            {raw.cursor ? "Earlier submissions" : "Latest submissions"}
+          </h2>
+          <p className="text-sm text-muted-foreground">
+            {page.items.length} shown
+          </p>
         </div>
-      ) : null}
+        {page.items.length === 0 ? (
+          <Empty className="rounded-xl border border-border bg-card p-8">
+            <EmptyHeader>
+              <EmptyMedia variant="icon">
+                <HugeiconsIcon icon={Message01Icon} aria-hidden="true" />
+              </EmptyMedia>
+              <EmptyTitle>No matching feedback</EmptyTitle>
+              <EmptyDescription>
+                New participant submissions appear here for operator review.
+              </EmptyDescription>
+            </EmptyHeader>
+          </Empty>
+        ) : (
+          <Card className="overflow-hidden p-0">
+            <ul className="divide-y divide-border">
+              {page.items.map((item) => (
+                <li key={item.id}>
+                  <Link
+                    href={`/internal/feedback/${item.id}`}
+                    className="group block px-4 py-4 transition-colors hover:bg-muted/50 focus-visible:outline-2 focus-visible:outline-offset-[-2px] focus-visible:outline-ring sm:px-5"
+                    aria-label={`Open feedback: ${item.title || humanize(item.category)}`}
+                  >
+                    <div className="flex items-start gap-3">
+                      <div className="min-w-0 flex-1">
+                        <p className="line-clamp-2 text-sm font-semibold text-foreground">
+                          {item.title || humanize(item.category)}
+                        </p>
+                        <div className="mt-2 flex flex-wrap gap-x-3 gap-y-1 text-xs leading-relaxed text-muted-foreground">
+                          <span>{humanize(item.category)}</span>
+                          <span>{humanize(item.source)}</span>
+                          <span>
+                            {item.participantClass ===
+                            "PUBLIC_SELF_REPORTED_CUSTOMER"
+                              ? "Customer (self-reported)"
+                              : humanize(item.participantClass)}
+                          </span>
+                          <time dateTime={item.createdAt}>
+                            {formatSubmittedAt(item.createdAt)}
+                          </time>
+                        </div>
+                      </div>
+                      <div className="flex shrink-0 items-center gap-2">
+                        <Badge
+                          variant={
+                            item.status === "NEW" ? "default" : "outline"
+                          }
+                          aria-label={`Status: ${humanize(item.status)}`}
+                        >
+                          {humanize(item.status)}
+                        </Badge>
+                        <HugeiconsIcon
+                          icon={ArrowRight01Icon}
+                          aria-hidden="true"
+                          className="size-4 text-muted-foreground group-hover:text-foreground"
+                        />
+                      </div>
+                    </div>
+                    {(item.mayContainContactDetails ||
+                      item.priority !== "NORMAL") && (
+                      <div className="mt-3 flex flex-wrap gap-2">
+                        {item.mayContainContactDetails && (
+                          <Badge variant="outline">
+                            May contain personal details
+                          </Badge>
+                        )}
+                        {item.priority !== "NORMAL" && (
+                          <span
+                            className={cn(
+                              "rounded-full border px-2.5 py-1 text-xs font-semibold",
+                              PRIORITY_BADGE[item.priority],
+                            )}
+                          >
+                            {humanize(item.priority)}
+                          </span>
+                        )}
+                      </div>
+                    )}
+                  </Link>
+                </li>
+              ))}
+            </ul>
+          </Card>
+        )}
+
+        {page.nextCursor ? (
+          <div className="flex justify-end">
+            <Link
+              href={inboxHref(current, page.nextCursor)}
+              className={cn(buttonVariants({ variant: "outline", size: "sm" }))}
+            >
+              Older submissions
+            </Link>
+          </div>
+        ) : null}
+      </section>
+      <p className="border-t border-border pt-4 text-xs leading-relaxed text-muted-foreground">
+        Participant submissions only. Customer and Provider business records
+        stay out of this area by design.
+      </p>
     </div>
   );
 }

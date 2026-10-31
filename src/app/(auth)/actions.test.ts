@@ -7,6 +7,7 @@ const mocks = vi.hoisted(() => ({
   createClient: vi.fn(),
   redirect: vi.fn(),
   cookies: vi.fn(),
+  setCookie: vi.fn(),
   consoleError: vi.spyOn(console, "error").mockImplementation(() => undefined),
 }));
 
@@ -48,6 +49,7 @@ function loginFormData(redirectTo?: string) {
 
 beforeEach(() => {
   vi.clearAllMocks();
+  mocks.cookies.mockResolvedValue({ set: mocks.setCookie });
   mocks.createClient.mockResolvedValue({
     auth: {
       signUp: mocks.signUp,
@@ -90,6 +92,58 @@ describe("loginAction", () => {
 });
 
 describe("registerAction", () => {
+  it("creates a Staff login without requiring an invitation code at signup", async () => {
+    mocks.signUp.mockResolvedValue({
+      data: { user: { id: "staff-1" }, session: null },
+      error: null,
+    });
+    const form = registerFormData();
+    form.set("intent", "STAFF");
+
+    const result = await registerAction(null, form);
+
+    expect(result.error).toBeUndefined();
+    expect(result.success).toBeDefined();
+    expect(mocks.signUp).toHaveBeenCalledWith(
+      expect.objectContaining({
+        options: expect.objectContaining({
+          data: { intent: "STAFF", provider_type: undefined },
+        }),
+      }),
+    );
+    expect(mocks.setCookie).not.toHaveBeenCalled();
+  });
+
+  it("carries a shared-link invitation to onboarding without putting it in Auth metadata", async () => {
+    mocks.signUp.mockResolvedValue({
+      data: { user: { id: "staff-1" }, session: null },
+      error: null,
+    });
+    const form = registerFormData();
+    form.set("intent", "STAFF");
+    const token = `inv_${"a".repeat(48)}`;
+    form.set("inviteToken", token);
+
+    await registerAction(null, form);
+
+    expect(mocks.setCookie).toHaveBeenCalledWith(
+      "tracknologia_staff_invite",
+      token,
+      expect.objectContaining({
+        httpOnly: true,
+        sameSite: "lax",
+        path: "/onboarding",
+      }),
+    );
+    expect(mocks.signUp).toHaveBeenCalledWith(
+      expect.objectContaining({
+        options: expect.objectContaining({
+          data: { intent: "STAFF", provider_type: undefined },
+        }),
+      }),
+    );
+  });
+
   it("does not expose an unknown production Supabase sentinel", async () => {
     const sentinel = "SUPABASE_SIGNUP_SENTINEL_f829";
     mocks.signUp.mockResolvedValue({

@@ -92,7 +92,6 @@ export default async function RepairRequestsPage({
   return (
     <div className="space-y-6">
       <PageHeader
-        eyebrow="Customer intake"
         title="Repair Requests"
         description="Review incoming requests and decide which repairs to take on."
       />
@@ -112,7 +111,7 @@ export default async function RepairRequestsPage({
               href={href}
               aria-current={active ? "page" : undefined}
               className={cn(
-                "relative shrink-0 px-3 py-2.5 text-sm font-medium whitespace-nowrap transition-colors",
+                "relative inline-flex min-h-11 shrink-0 items-center px-3 py-2.5 text-sm font-medium whitespace-nowrap transition-colors outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring",
                 active
                   ? "text-foreground after:absolute after:inset-x-3 after:bottom-0 after:h-0.5 after:bg-primary"
                   : "text-muted-foreground hover:text-foreground",
@@ -150,39 +149,48 @@ export default async function RepairRequestsPage({
                   <Link
                     href={`/dashboard/requests/${request.id}`}
                     aria-label={`Review Request: ${device}`}
-                    className="flex items-center gap-3 px-4 py-3 transition-colors hover:bg-muted/50 sm:px-5 sm:py-3.5"
+                    className="flex items-start gap-3 px-4 py-4 transition-colors outline-none hover:bg-muted/50 focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring sm:px-5"
                   >
                     <StatusGauge
                       status={request.status}
-                      className="size-7 shrink-0"
+                      className="mt-0.5 size-7 shrink-0"
                     />
                     <div className="min-w-0 flex-1">
-                      <p className="line-clamp-1 text-sm font-bold break-words text-foreground">
-                        {device}
-                        <span className="font-normal text-muted-foreground">
-                          {" · "}
-                          {request.reportedProblem}
+                      <div className="flex flex-wrap items-start justify-between gap-2">
+                        <p className="min-w-0 flex-1 basis-40 line-clamp-2 text-sm font-semibold leading-snug text-foreground wrap-anywhere">
+                          {device}
+                        </p>
+                        <span
+                          data-status={request.status}
+                          className="status-badge shrink-0 rounded-full border px-2.5 py-1 text-xs font-semibold"
+                        >
+                          {request.status.charAt(0) +
+                            request.status.slice(1).toLowerCase()}
                         </span>
+                      </div>
+                      <p className="mt-1 line-clamp-2 text-sm leading-relaxed text-muted-foreground wrap-anywhere">
+                        {request.reportedProblem}
                       </p>
-                      <p className="mt-0.5 truncate font-mono text-xs text-muted-foreground">
-                        {request.referenceCode} · {request.customerName} ·
-                        Submitted {formatSubmittedAt(request.submittedAt)}
-                      </p>
+                      <div className="mt-2 flex flex-wrap items-baseline gap-x-3 gap-y-1 text-xs leading-relaxed text-muted-foreground">
+                        <span className="font-mono wrap-anywhere">
+                          {request.referenceCode}
+                        </span>
+                        <span className="wrap-anywhere">
+                          {request.customerName}
+                        </span>
+                        <time
+                          dateTime={request.submittedAt}
+                          className="tabular-nums"
+                        >
+                          Submitted {formatSubmittedAt(request.submittedAt)}
+                        </time>
+                      </div>
                     </div>
-                    <div className="flex shrink-0 items-center gap-2">
-                      <span
-                        data-status={request.status}
-                        className="status-badge shrink-0 rounded-full border px-2.5 py-1 text-xs font-semibold"
-                      >
-                        {request.status.charAt(0) +
-                          request.status.slice(1).toLowerCase()}
-                      </span>
-                      <HugeiconsIcon
-                        icon={ArrowRight01Icon}
-                        aria-hidden="true"
-                        className="size-4 text-muted-foreground"
-                      />
-                    </div>
+                    <HugeiconsIcon
+                      icon={ArrowRight01Icon}
+                      aria-hidden="true"
+                      className="mt-1 size-4 shrink-0 text-muted-foreground"
+                    />
                   </Link>
                 </li>
               );
@@ -195,7 +203,7 @@ export default async function RepairRequestsPage({
       requestPage.hasPrevious ||
       requestPage.hasNext ? (
         <nav
-          className="flex items-center justify-between gap-3"
+          className="grid grid-cols-[auto_minmax(0,1fr)_auto] items-center gap-2"
           aria-label="Repair Request pagination"
         >
           {requestPage.hasPrevious ? (
@@ -203,7 +211,7 @@ export default async function RepairRequestsPage({
               href={repairRequestInboxHref(status, requestPage.page - 1)}
               className={cn(
                 buttonVariants({ variant: "outline", size: "sm" }),
-                "min-w-24",
+                "min-h-11 min-w-20 sm:min-h-8 sm:min-w-24",
               )}
             >
               Previous
@@ -212,7 +220,7 @@ export default async function RepairRequestsPage({
             <span
               className={cn(
                 buttonVariants({ variant: "outline", size: "sm" }),
-                "pointer-events-none min-w-24 opacity-50",
+                "pointer-events-none min-h-11 min-w-20 opacity-50 sm:min-h-8 sm:min-w-24",
               )}
               aria-disabled="true"
             >
@@ -220,7 +228,7 @@ export default async function RepairRequestsPage({
             </span>
           )}
 
-          <span className="text-sm tabular-nums text-muted-foreground">
+          <span className="text-center text-xs leading-relaxed tabular-nums text-muted-foreground sm:text-sm">
             Page {requestPage.page} ·{" "}
             {requestPage.items.length > 0
               ? `Showing ${rangeStart}–${rangeEnd}`
@@ -232,7 +240,7 @@ export default async function RepairRequestsPage({
               href={repairRequestInboxHref(status, requestPage.page + 1)}
               className={cn(
                 buttonVariants({ variant: "outline", size: "sm" }),
-                "min-w-24",
+                "min-h-11 min-w-20 sm:min-h-8 sm:min-w-24",
               )}
             >
               Next
@@ -241,7 +249,7 @@ export default async function RepairRequestsPage({
             <span
               className={cn(
                 buttonVariants({ variant: "outline", size: "sm" }),
-                "pointer-events-none min-w-24 opacity-50",
+                "pointer-events-none min-h-11 min-w-20 opacity-50 sm:min-h-8 sm:min-w-24",
               )}
               aria-disabled="true"
             >
