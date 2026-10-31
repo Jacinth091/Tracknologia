@@ -116,7 +116,10 @@ describe("inviteStaffAction in production without email", () => {
     expect(first.inviteUrl).toBe(`/register?invite=${first.token}`);
     expect(mocks.createTransport).not.toHaveBeenCalled();
 
-    const logged = spies.flatMap((spy) => spy.mock.calls).flat().map(String);
+    const logged = spies
+      .flatMap((spy) => spy.mock.calls)
+      .flat()
+      .map(String);
     const output = logged.join(" ");
     expect(output).not.toContain(first.token ?? "");
     expect(output).not.toContain("/register?invite=");
@@ -143,7 +146,10 @@ describe("inviteStaffAction in production without email", () => {
     expect(second.inviteUrl).toBeUndefined();
     expect(mocks.createTransport).not.toHaveBeenCalled();
 
-    const output = spies.flatMap((spy) => spy.mock.calls).flat().join(" ");
+    const output = spies
+      .flatMap((spy) => spy.mock.calls)
+      .flat()
+      .join(" ");
     expect(output).not.toContain(first.token ?? "");
   });
 });

@@ -38,12 +38,7 @@ function renderTeam(state: InviteStaffState | null) {
     false,
   ]);
   return renderToStaticMarkup(
-    <TeamClient
-      isOwner
-      isShop
-      members={[]}
-      invitations={[PENDING]}
-    />,
+    <TeamClient isOwner isShop members={[]} invitations={[PENDING]} />,
   );
 }
 
