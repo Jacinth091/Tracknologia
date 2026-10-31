@@ -89,9 +89,9 @@ describe("CategoryBars", () => {
       <CategoryBars title="Repairs by status (now)" rows={rows} />,
     );
 
-    const waiting = html.indexOf("Waiting for parts");
-    const progress = html.indexOf("In progress");
-    const ready = html.indexOf("Ready");
+    const waiting = html.indexOf('title="Waiting for parts: 2"');
+    const progress = html.indexOf('title="In progress: 8"');
+    const ready = html.indexOf('title="Ready: 4"');
     expect(waiting).toBeLessThan(progress);
     expect(progress).toBeLessThan(ready);
   });

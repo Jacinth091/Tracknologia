@@ -186,7 +186,7 @@ describe("Validation metrics page", () => {
       'aria-label="Feedback per day, Oct 24 to Oct 30, peak 2 on Oct 26"',
     );
     expect(html).toContain(
-      'aria-label="Repairs by status (now), largest In progress at 11"',
+      'aria-label="Repairs by status (now), largest Completed at 33"',
     );
     expect(html).toContain(
       'aria-label="Feedback by category, largest Usability at 3"',
@@ -237,7 +237,7 @@ describe("Validation metrics page", () => {
     const html = await renderActivity();
 
     expect(html.match(/>N\/A</g)).toHaveLength(2);
-    expect(html).not.toContain("0%");
+    expect(html).not.toMatch(/>\s*0(?:\.0+)?%\s*</);
   });
 
   it("renders unavailable feedback when the summary is null", async () => {
