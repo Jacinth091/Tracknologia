@@ -3,15 +3,9 @@ import Link from "next/link";
 import { notFound, redirect } from "next/navigation";
 import type { ReactNode } from "react";
 import {
-  CheckmarkCircle02Icon,
-  Clock01Icon,
   Message01Icon,
-  Search01Icon,
-  Store01Icon,
-  Tick02Icon,
   Ticket01Icon,
   UserGroupIcon,
-  UserIcon,
   Wrench01Icon,
 } from "@hugeicons/core-free-icons";
 import { PageHeader } from "@/components/shared/page-header";
@@ -22,12 +16,6 @@ import {
   CardDescription,
   CardHeader,
 } from "@/components/ui/card";
-import {
-  Empty,
-  EmptyDescription,
-  EmptyHeader,
-  EmptyTitle,
-} from "@/components/ui/empty";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import {
@@ -330,20 +318,20 @@ export default async function ActivityPage({
         />
       </div>
 
-      <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
+      <div className="grid items-start gap-4 md:grid-cols-2 xl:grid-cols-3">
         <ChartCard
           title="Providers"
           description="All-time Provider accounts by type"
         >
-          <div className="grid gap-3">
-            <StatTile
-              label="Providers (all time)"
-              value={formatCount(metrics.providers.allTime.total)}
-              detail={`+${metrics.providers.onboardedInPeriod.total} this period`}
-              status="ACCEPTED"
-              icon={Store01Icon}
-            />
-          </div>
+          <InlineStats
+            items={[
+              {
+                label: "Providers (all time)",
+                value: formatCount(metrics.providers.allTime.total),
+                detail: `+${metrics.providers.onboardedInPeriod.total} this period`,
+              },
+            ]}
+          />
           <Donut
             title="Providers by type"
             rows={providerDonut}
@@ -366,20 +354,18 @@ export default async function ActivityPage({
           title="Activity"
           description="Providers active in the period and how many came back"
         >
-          <div className="grid grid-cols-2 gap-3">
-            <StatTile
-              label="Active providers"
-              value={formatCount(metrics.activity.distinctProviders)}
-              status="IN_PROGRESS"
-              icon={UserGroupIcon}
-            />
-            <StatTile
-              label="Repeat providers (2 or more days)"
-              value={formatCount(metrics.activity.repeatProviders)}
-              status="SUBMITTED"
-              icon={UserGroupIcon}
-            />
-          </div>
+          <InlineStats
+            items={[
+              {
+                label: "Active providers",
+                value: formatCount(metrics.activity.distinctProviders),
+              },
+              {
+                label: "Repeat providers (2 or more days)",
+                value: formatCount(metrics.activity.repeatProviders),
+              },
+            ]}
+          />
           <RepeatShare percent={repeatShare} />
         </ChartCard>
 
@@ -387,20 +373,18 @@ export default async function ActivityPage({
           title="Staff"
           description="Current memberships, not windowed"
         >
-          <div className="grid grid-cols-2 gap-3">
-            <StatTile
-              label="Active memberships (now)"
-              value={formatCount(metrics.staff.memberships)}
-              status="COMPLETED"
-              icon={UserIcon}
-            />
-            <StatTile
-              label="Shops with staff (now)"
-              value={formatCount(metrics.staff.shopsWithStaff)}
-              status="COMPLETED"
-              icon={UserIcon}
-            />
-          </div>
+          <InlineStats
+            items={[
+              {
+                label: "Active memberships (now)",
+                value: formatCount(metrics.staff.memberships),
+              },
+              {
+                label: "Shops with staff (now)",
+                value: formatCount(metrics.staff.shopsWithStaff),
+              },
+            ]}
+          />
         </ChartCard>
 
         <ChartCard
@@ -414,20 +398,18 @@ export default async function ActivityPage({
           title="Repairs"
           description="Repairs created, ready and completed in the period"
         >
-          <div className="grid grid-cols-2 gap-3">
-            <StatTile
-              label="Reached READY"
-              value={formatCount(metrics.repairs.readyReached)}
-              status="READY"
-              icon={CheckmarkCircle02Icon}
-            />
-            <StatTile
-              label="Completed"
-              value={formatCount(metrics.repairs.completed)}
-              status="COMPLETED"
-              icon={Tick02Icon}
-            />
-          </div>
+          <InlineStats
+            items={[
+              {
+                label: "Reached READY",
+                value: formatCount(metrics.repairs.readyReached),
+              },
+              {
+                label: "Completed",
+                value: formatCount(metrics.repairs.completed),
+              },
+            ]}
+          />
           <Donut
             title="Repairs by origin, in period"
             rows={originDonut}
@@ -440,20 +422,18 @@ export default async function ActivityPage({
           description="Submitted requests, decisions and conversion"
         >
           <RankedChart title="Requests funnel" rows={requestFunnel} />
-          <div className="grid grid-cols-2 gap-3">
-            <StatTile
-              label="Conversion (submission cohort)"
-              value={formatPercent(metrics.requests.conversionPercent)}
-              status="SUBMITTED"
-              icon={Ticket01Icon}
-            />
-            <StatTile
-              label="Mean decision time"
-              value={formatDuration(metrics.requests.meanDecisionSeconds)}
-              status="SUBMITTED"
-              icon={Clock01Icon}
-            />
-          </div>
+          <InlineStats
+            items={[
+              {
+                label: "Conversion (submission cohort)",
+                value: formatPercent(metrics.requests.conversionPercent),
+              },
+              {
+                label: "Mean decision time",
+                value: formatDuration(metrics.requests.meanDecisionSeconds),
+              },
+            ]}
+          />
         </ChartCard>
 
         <ChartCard
@@ -461,20 +441,18 @@ export default async function ActivityPage({
           description="Public tracking views and how many repairs were looked up"
         >
           <AdoptionGauge percent={metrics.tracking.adoptionPercent} />
-          <div className="grid grid-cols-2 gap-3">
-            <StatTile
-              label="Views in period"
-              value={formatCount(metrics.tracking.periodViews)}
-              status="IN_PROGRESS"
-              icon={Search01Icon}
-            />
-            <StatTile
-              label="Distinct repairs viewed in period"
-              value={formatCount(metrics.tracking.periodRepairsViewed)}
-              status="IN_PROGRESS"
-              icon={Wrench01Icon}
-            />
-          </div>
+          <InlineStats
+            items={[
+              {
+                label: "Views in period",
+                value: formatCount(metrics.tracking.periodViews),
+              },
+              {
+                label: "Distinct repairs viewed in period",
+                value: formatCount(metrics.tracking.periodRepairsViewed),
+              },
+            ]}
+          />
         </ChartCard>
 
         <ChartCard
@@ -879,16 +857,14 @@ function Donut({
   rows: { key: string; label: string; value: number }[];
   emptyMessage: string;
 }) {
-  if (!hasActivity(rows)) {
+  // Slots keep their place in the full list; zero slices are not drawn.
+  const slices = categorical(rows).filter((row) => row.value > 0);
+
+  if (slices.length === 0) {
     return <NoneState message={emptyMessage} />;
   }
 
-  return (
-    <DonutChart
-      summary={breakdownSummary(title, rows)}
-      data={categorical(rows)}
-    />
-  );
+  return <DonutChart summary={breakdownSummary(title, slices)} data={slices} />;
 }
 
 function RepeatShare({ percent }: { percent: number | null }) {
@@ -921,30 +897,43 @@ function AdoptionGauge({ percent }: { percent: number | null }) {
 
 function NoneValue({ label }: { label: string }) {
   return (
-    <div className="flex h-[200px] flex-col items-center justify-center gap-1">
-      <p className="text-3xl font-semibold tabular-nums">N/A</p>
-      <p className="text-sm text-muted-foreground">{label}</p>
+    <div className="py-6">
+      <p className="text-2xl font-semibold tabular-nums">N/A</p>
+      <p className="text-xs text-muted-foreground">{label}</p>
     </div>
   );
 }
 
+// An empty chart area is one muted line, not a block filling the card.
 function NoneState({ message }: { message: string }) {
-  return (
-    <Empty className="min-h-48 p-6">
-      <EmptyHeader>
-        <EmptyTitle>{message}</EmptyTitle>
-      </EmptyHeader>
-    </Empty>
-  );
+  return <p className="py-6 text-sm text-muted-foreground">{message}</p>;
 }
 
 function UnavailableState() {
   return (
-    <Empty className="min-h-48 p-6">
-      <EmptyHeader>
-        <EmptyTitle>Unavailable</EmptyTitle>
-        <EmptyDescription>Unavailable for this period.</EmptyDescription>
-      </EmptyHeader>
-    </Empty>
+    <p className="py-6 text-sm text-muted-foreground">
+      Unavailable for this period.
+    </p>
+  );
+}
+
+// Compact numbers for a chart card: no border, icon or stripe.
+function InlineStats({
+  items,
+}: {
+  items: { label: string; value: string; detail?: string }[];
+}) {
+  return (
+    <div className="grid grid-cols-2 gap-x-6 gap-y-3">
+      {items.map((item) => (
+        <div key={item.label}>
+          <p className="text-2xl font-semibold tabular-nums">{item.value}</p>
+          <p className="text-xs text-muted-foreground">{item.label}</p>
+          {item.detail ? (
+            <p className="text-xs text-muted-foreground">{item.detail}</p>
+          ) : null}
+        </div>
+      ))}
+    </div>
   );
 }
