@@ -321,6 +321,29 @@ describe("feedback entry links", () => {
   });
 });
 
+describe("privacy notice links", () => {
+  it("links the privacy page from the feedback, request and tracking forms", async () => {
+    const feedback = renderForm(null);
+    const request = renderToStaticMarkup(
+      <RepairRequestForm
+        providerSlug="river"
+        providerName="River Repair"
+        supportedDevices={[]}
+        serviceModes={[]}
+      />,
+    );
+    const track = renderToStaticMarkup(
+      await TrackRepairPage({ searchParams: Promise.resolve({}) }),
+    );
+
+    for (const html of [feedback, request, track]) {
+      expect(html).toMatch(
+        /<a\b[^>]*href="\/privacy"[^>]*>Privacy notice<\/a>/,
+      );
+    }
+  });
+});
+
 describe("Provider feedback navigation", () => {
   it.each([
     ["Shop Owner", true],
