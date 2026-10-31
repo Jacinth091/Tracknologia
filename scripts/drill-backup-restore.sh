@@ -23,8 +23,11 @@
 #     (except schema_migrations, which the dump excludes) and every table in
 #     the supabase_migrations schema. This matches a fresh project's empty
 #     Auth and migration-history schemas.
-#  5. Restores with psql --single-transaction -v ON_ERROR_STOP=1: schema, then
-#     session_replication_role = replica, then data.
+#  5. Removes the default privileges for anon, authenticated and service_role
+#     (pg_dump never writes "anon was revoked", so restored tables would get
+#     ALL back otherwise). Restores with psql --single-transaction
+#     -v ON_ERROR_STOP=1: schema, then session_replication_role = replica, then
+#     data. Afterwards it puts the Supabase default privileges back.
 #  6. Verifies with SQL and fails on the first mismatch, then prints a summary.
 #
 # Dumps live only in a temporary directory that is deleted on exit.
@@ -184,6 +187,17 @@ END
 $$;
 SQL
 
+# pg_dump writes grants only relative to the built-in default ACL, never
+# "anon was revoked". Under the project's default privileges, restored tables
+# would silently get ALL back for anon and authenticated, so drop those
+# defaults first. The dump's own GRANT and REVOKE lines then decide the result.
+log "removing default privileges before the schema restore"
+psql_stdin <<'SQL'
+ALTER DEFAULT PRIVILEGES FOR ROLE postgres IN SCHEMA public REVOKE ALL ON TABLES FROM anon, authenticated, service_role;
+ALTER DEFAULT PRIVILEGES FOR ROLE postgres IN SCHEMA public REVOKE ALL ON SEQUENCES FROM anon, authenticated, service_role;
+ALTER DEFAULT PRIVILEGES FOR ROLE postgres IN SCHEMA public REVOKE ALL ON FUNCTIONS FROM anon, authenticated, service_role;
+SQL
+
 log "restoring: schema, then data with replica triggers"
 {
   cat "$dump_dir/schema.sql"
@@ -191,6 +205,15 @@ log "restoring: schema, then data with replica triggers"
   cat "$dump_dir/data.sql"
 } | docker exec -i "$db_container" psql -X -q -v ON_ERROR_STOP=1 \
   --single-transaction -U postgres -d postgres
+
+# Put the project's default privileges back, as on the original project, so
+# later migrations behave the same. Restored objects keep the dump's grants.
+log "restoring the project's default privileges"
+psql_stdin <<'SQL'
+ALTER DEFAULT PRIVILEGES IN SCHEMA public GRANT ALL ON TABLES TO anon, authenticated, service_role;
+ALTER DEFAULT PRIVILEGES IN SCHEMA public GRANT ALL ON FUNCTIONS TO anon, authenticated, service_role;
+ALTER DEFAULT PRIVILEGES IN SCHEMA public GRANT ALL ON SEQUENCES TO anon, authenticated, service_role;
+SQL
 
 verify() {
   local name="$1" expected="$2" actual="$3"
@@ -222,6 +245,8 @@ verify "anon cannot SELECT feedback_submissions" "f" \
   "$(psql_query "SELECT has_table_privilege('anon', 'public.feedback_submissions', 'SELECT');")"
 verify "anon cannot SELECT repairs" "f" \
   "$(psql_query "SELECT has_table_privilege('anon', 'public.repairs', 'SELECT');")"
+verify "authenticated cannot SELECT feedback_submissions" "f" \
+  "$(psql_query "SELECT has_table_privilege('authenticated', 'public.feedback_submissions', 'SELECT');")"
 verify "RPC EXECUTE grants unchanged" "$grants_before" "$(grant_snapshot)"
 
 expected_migrations="$(ls supabase/migrations/*.sql | wc -l | tr -d ' ')"
