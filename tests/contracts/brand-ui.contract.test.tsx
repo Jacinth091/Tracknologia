@@ -23,6 +23,9 @@ vi.mock("react", async (importOriginal) => ({
   useActionState: actionState,
 }));
 vi.mock("next/navigation", () => ({ usePathname: pathname }));
+vi.mock("next/headers", () => ({
+  cookies: vi.fn(async () => ({ getAll: () => [] })),
+}));
 vi.mock("@/app/(auth)/actions", () => ({
   registerAction: vi.fn(),
   signOutAction: vi.fn(),
