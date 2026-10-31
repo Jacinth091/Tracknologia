@@ -243,6 +243,50 @@ have no internal mapping. The E2E fixture reaches the local database through
 `tests/helpers/local-postgres.ts`, which refuses non-loopback Supabase URLs and
 non-local Docker endpoints before any SQL runs.
 
+The same spec also covers the `/internal/activity` surface: anonymous return to
+login; 404 for Provider OWNER, STAFF and INDEPENDENT accounts and for a revoked
+operator; and an enabled operator who sees the period picker and round-trips a
+chosen period through the GET form. A `/api/health` test checks the anonymous
+contract: 200, body exactly `{"status":"healthy"}`, `no-store`, and no
+`set-cookie`. A privacy test seeds canary customer name, phone and internal
+notes on a Repair Request and Repair, plus a canary Feedback message. It asserts
+that no canary appears in the rendered `/internal/activity` HTML or in any
+app-origin response body, for the default window and a 30-day window. It then
+confirms the feedback canary is shown on the authorized
+`/internal/feedback/<id>` page, so the absence check is meaningful. The test
+deletes its rows and operator through the fixtures and `runLocalSql`.
+
+## Backup and restore drill
+
+`scripts/drill-backup-restore.sh` (`pnpm drill:backup-restore`) is the CI proof
+for the manual backup routine in
+[OPERATIONS.md](OPERATIONS.md#manual-backups-free-plan). The Database integration
+job runs it after the DB suite passes, on the same disposable local Supabase
+stack, with `DRILL_DISPOSABLE=1`.
+
+It seeds a fixed fixture: a Provider with an OWNER, an accepted Request, a
+Repair with status history, a Feedback submission with a review event, and an
+internal operator mapping. It then:
+
+1. dumps roles, schema and data with `supabase db dump --local`;
+2. wipes the restored scope in place (public schema, Auth users, migration
+   history);
+3. restores with `psql --single-transaction -v ON_ERROR_STOP=1`, in the order
+   schema, `session_replication_role = replica`, data;
+4. verifies with SQL and fails on the first mismatch: fixture rows and values,
+   RLS on the Provider-owned and feedback tables, `anon` denial, RPC EXECUTE
+   grants unchanged, the migration history count equal to the number of files
+   in `supabase/migrations/`, and the operator mapping.
+
+The script refuses any API host other than `127.0.0.1` or `localhost`, and it
+refuses to run without `DRILL_DISPOSABLE=1`. Dumps go to a temporary directory
+that is deleted on exit. They never enter the repository or CI artifacts.
+
+Scope: the drill proves the dump-and-restore mechanics on the local stack. It
+does not replay `roles.sql`, because the roles already exist in that cluster.
+Restoring into a fresh Supabase project is covered by the runbook steps in
+OPERATIONS.md, not by this drill.
+
 ## Load & resilience harness
 
 Plan 10 adds a zero-dependency load harness under `scripts/load/` that runs

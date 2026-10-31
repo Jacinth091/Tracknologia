@@ -101,6 +101,67 @@ the old application is incompatible
 rollback increases inconsistency/risk
 ```
 
+## Manual backups (free plan)
+
+The Supabase free plan has no hosted backups. The pilot accepts this risk
+explicitly: the recovery point (RPO) is the time since the last manual dump, so
+data written after that dump is lost if the database fails. Migrations are
+forward-only, so schema problems are fixed forward. Dumps cover data loss, not
+rollback.
+
+### Routine
+
+Take a dump:
+
+- before launch;
+- weekly during the pilot;
+- before every migration deploy.
+
+```bash
+# DATABASE_URL is the connection string from the Supabase dashboard. It holds
+# the database password: keep it out of shell history, files and Git.
+supabase db dump --db-url "$DATABASE_URL" -f roles.sql --role-only
+supabase db dump --db-url "$DATABASE_URL" -f schema.sql
+supabase db dump --db-url "$DATABASE_URL" -f data.sql --use-copy --data-only \
+  -s public,auth,supabase_migrations -x auth.schema_migrations
+```
+
+Handling:
+
+- Store each dump privately and encrypted. Never commit a dump, a connection
+  string or a decrypted file to Git.
+- Dumps hold customer, Provider and Auth data. Treat them as personal data.
+- Keep the last 2–3 dumps and delete older ones, consistent with the notice's
+  "backups for a limited time" wording.
+
+### Restore
+
+Restoring replaces data in the target. Restore only into a fresh project or a
+reset database, never over a live project without an owner decision to roll
+data back:
+
+```bash
+psql --single-transaction --variable ON_ERROR_STOP=1 \
+  --file roles.sql --file schema.sql \
+  --command 'SET session_replication_role = replica' \
+  --file data.sql --dbname "$TARGET_DATABASE_URL"
+```
+
+Then check:
+
+1. `select count(*) from supabase_migrations.schema_migrations;` equals the
+   number of files in `supabase/migrations/`.
+2. RLS is enabled on the Provider-owned and feedback tables, and `anon` cannot
+   select from `public.feedback_submissions`.
+3. The expected operators are enabled in `public.internal_operators`.
+4. Reset custom role passwords and recreate any replication subscriptions, as
+   Supabase's backup guide requires after a restore.
+
+The CI drill proves these steps on a disposable local stack. It runs
+`scripts/drill-backup-restore.sh` in the Database integration job, and it does
+not replay `roles.sql`, because the roles already exist in that cluster. See
+[TESTING.md](TESTING.md#backup-and-restore-drill).
+
 ## Stabilization window
 
 For several days after each release:
