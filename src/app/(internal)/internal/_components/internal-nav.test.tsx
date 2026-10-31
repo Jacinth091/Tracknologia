@@ -8,6 +8,10 @@ vi.mock("next/navigation", () => ({
   usePathname: () => navigation.pathname,
 }));
 
+vi.mock("@/app/(auth)/actions", () => ({
+  signOutAction: vi.fn(),
+}));
+
 vi.mock("next/link", () => ({
   default: ({
     href,
