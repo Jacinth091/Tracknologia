@@ -55,7 +55,7 @@ export function FeedbackTriageForm({
     currentStatus === "RESOLVED" || currentStatus === "DISMISSED";
 
   return (
-    <form action={formAction} className="space-y-4">
+    <form action={formAction} className="space-y-5">
       <input type="hidden" name="feedbackId" value={feedbackId} />
       <input type="hidden" name="expectedRowVersion" value={latestVersion} />
 
@@ -71,14 +71,14 @@ export function FeedbackTriageForm({
       )}
 
       <div className="grid gap-4 sm:grid-cols-2">
-        <div className="grid gap-1.5">
+        <div className="grid min-w-0 gap-1.5">
           <Label htmlFor="triage-status">Status</Label>
           <select
             id="triage-status"
             name="status"
             defaultValue={currentStatus}
             disabled={pending}
-            className="h-9 rounded-md border border-input bg-background px-3 text-sm"
+            className="h-11 w-full min-w-0 rounded-lg border border-input bg-background px-3 text-sm outline-none focus-visible:border-ring focus-visible:ring-2 focus-visible:ring-ring sm:h-9"
           >
             {FEEDBACK_STATUSES.map((value) => (
               <option key={value} value={value}>
@@ -87,14 +87,14 @@ export function FeedbackTriageForm({
             ))}
           </select>
         </div>
-        <div className="grid gap-1.5">
+        <div className="grid min-w-0 gap-1.5">
           <Label htmlFor="triage-priority">Priority</Label>
           <select
             id="triage-priority"
             name="priority"
             defaultValue={currentPriority}
             disabled={pending}
-            className="h-9 rounded-md border border-input bg-background px-3 text-sm"
+            className="h-11 w-full min-w-0 rounded-lg border border-input bg-background px-3 text-sm outline-none focus-visible:border-ring focus-visible:ring-2 focus-visible:ring-ring sm:h-9"
           >
             {FEEDBACK_PRIORITIES.map((value) => (
               <option key={value} value={value}>
@@ -107,12 +107,14 @@ export function FeedbackTriageForm({
 
       <div className="space-y-2">
         <Label htmlFor="triage-notes">Internal notes</Label>
-        <p className="text-xs text-muted-foreground">
+        <p id="triage-notes-help" className="text-xs text-muted-foreground">
           Leave empty to clear the stored notes.
         </p>
         <Textarea
           id="triage-notes"
           name="internalNotes"
+          aria-describedby="triage-notes-help"
+          className="min-h-32"
           defaultValue={currentInternalNotes ?? ""}
           maxLength={2000}
           disabled={pending}
@@ -121,7 +123,7 @@ export function FeedbackTriageForm({
 
       <div className="space-y-2">
         <Label htmlFor="triage-issue-url">Linked GitHub issue</Label>
-        <p className="text-xs text-muted-foreground">
+        <p id="triage-issue-help" className="text-xs text-muted-foreground">
           Optional GitHub issue link for this repository. Nothing is posted
           automatically.
         </p>
@@ -129,6 +131,7 @@ export function FeedbackTriageForm({
           id="triage-issue-url"
           name="linkedIssueUrl"
           type="url"
+          aria-describedby="triage-issue-help"
           defaultValue={currentLinkedIssueUrl ?? ""}
           disabled={pending}
         />
@@ -137,27 +140,30 @@ export function FeedbackTriageForm({
       {reopening ? (
         <div className="space-y-2">
           <Label htmlFor="triage-reason">Reopen reason</Label>
-          <p className="text-xs text-muted-foreground">
+          <p id="triage-reason-help" className="text-xs text-muted-foreground">
             Required when moving a resolved or dismissed item back to Reviewing.
           </p>
           <Input
             id="triage-reason"
             name="reason"
+            aria-describedby="triage-reason-help"
             maxLength={500}
             disabled={pending}
           />
         </div>
       ) : null}
 
-      <Button type="submit" disabled={pending}>
-        {pending ? (
-          <span className="flex items-center gap-2">
-            <LoadingSpinner size="sm" /> Saving review...
-          </span>
-        ) : (
-          "Save review"
-        )}
-      </Button>
+      <div className="border-t border-border pt-4">
+        <Button type="submit" disabled={pending} className="w-full sm:w-auto">
+          {pending ? (
+            <span className="flex items-center gap-2">
+              <LoadingSpinner size="sm" /> Saving review...
+            </span>
+          ) : (
+            "Save review"
+          )}
+        </Button>
+      </div>
     </form>
   );
 }

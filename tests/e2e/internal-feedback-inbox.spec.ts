@@ -206,6 +206,42 @@ test.describe("E2E-09 Internal feedback inbox", () => {
         operatorPage.getByText(participantMessage, { exact: true }),
       ).toBeVisible();
 
+      await operatorPage.setViewportSize({ width: 1280, height: 900 });
+      const submission = operatorPage.locator('[data-slot="card"]').filter({
+        has: operatorPage.getByRole("heading", {
+          name: "Participant submission",
+          exact: true,
+        }),
+      });
+      const triage = operatorPage.locator('[data-slot="card"]').filter({
+        has: operatorPage.getByRole("heading", {
+          name: "Review & triage",
+          exact: true,
+        }),
+      });
+      const submissionDesktop = await submission.boundingBox();
+      const triageDesktop = await triage.boundingBox();
+      if (!submissionDesktop || !triageDesktop)
+        throw new Error("Feedback panels must be visible");
+      expect(triageDesktop.x).toBeGreaterThan(
+        submissionDesktop.x + submissionDesktop.width,
+      );
+      expect(triageDesktop.y).toBeCloseTo(submissionDesktop.y, 0);
+
+      await operatorPage.setViewportSize({ width: 375, height: 812 });
+      const submissionMobile = await submission.boundingBox();
+      const triageMobile = await triage.boundingBox();
+      if (!submissionMobile || !triageMobile)
+        throw new Error("Feedback panels must be visible");
+      expect(triageMobile.y).toBeGreaterThan(
+        submissionMobile.y + submissionMobile.height,
+      );
+      expect(
+        await operatorPage.evaluate(
+          () => document.documentElement.scrollWidth <= window.innerWidth,
+        ),
+      ).toBe(true);
+
       // Triage through the real form: NEW -> REVIEWING. Capture the exact
       // on-the-wire action request so its byte-for-byte replay can be refused
       // once the row's version has moved past it.
