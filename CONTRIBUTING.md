@@ -45,7 +45,7 @@ refactor/repairs-interface
 docs/setup-guide
 ```
 
-v0.2.0 work targets `release/0.2.0`, which accepts the same feature, fix, hotfix, chore and dependabot branches as `staging`. Promotion runs `release/0.2.0` → `staging` → `master`; there is no direct `release/*` → `master` path. v0.1.0 hardening stays on `staging`.
+v0.2.0 work targets `release/0.2.0`, which accepts the same feature, fix, hotfix, chore and dependabot branches as `staging`. Promotion runs `release/0.2.0` → `staging` → `main`; there is no direct `release/*` → `main` path. v0.1.0 hardening stays on `staging`.
 
 ## Commits
 

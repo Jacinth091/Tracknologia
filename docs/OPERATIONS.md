@@ -74,12 +74,12 @@ P2/P3 return to the normal backlog unless impact escalates.
 hotfix/<issue>
   -> staging
   -> full affected validation
-  -> master
+  -> main
   -> deploy
   -> smoke
 ```
 
-Never patch only `master` while leaving `staging` divergent.
+Never patch only `main` while leaving `staging` divergent.
 
 If emergency SQL/config action is performed manually in production, immediately reconcile the exact change into version-controlled migration/configuration and verify staging equivalence.
 

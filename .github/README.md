@@ -11,7 +11,7 @@ feature/NN/name
    staging
       |
       v
-    master
+    main
 ```
 
 Examples:
@@ -25,7 +25,7 @@ feature/05/tracking
 feature/06/analytics
 ```
 
-`staging` is the integration branch. `master` is the release-ready branch.
+`staging` is the integration branch. `main` is the release-ready branch.
 
 ## Recommended default branch
 
@@ -37,7 +37,7 @@ This has two benefits:
 2. Dependabot security updates use the repository default branch, so they enter
    the integration branch instead of bypassing the staging workflow.
 
-`master` remains the stable/release branch even though it is not the default branch.
+`main` is the stable/release branch.
 
 ## Pull request policy
 
@@ -50,17 +50,17 @@ hotfix/name     -> staging
 chore/name      -> staging
 dependabot/*    -> staging
 
-staging         -> master
+staging         -> main
 ```
 
-Direct feature-to-master pull requests are rejected by `branch-policy.yml`.
+Direct feature-to-main pull requests are rejected by `branch-policy.yml`.
 
 ## Workflows
 
 ### `ci.yml`
 
 Runs on pull requests and pushes targeting `feature/**`, `staging`, and
-`master` branches.
+`main` branches.
 
 Checks:
 
@@ -128,7 +128,7 @@ Enforces:
 
 ```text
 feature/NN/name -> staging
-staging         -> master
+staging         -> main
 ```
 
 It also permits `fix/*`, `hotfix/*`, `chore/*`, and `dependabot/*` into
@@ -154,7 +154,7 @@ Block:
 - force pushes
 - branch deletion
 
-### `master`
+### `main`
 
 Require:
 
@@ -174,7 +174,7 @@ Block:
 - branch deletion
 
 The `Branch Policy` required check ensures that only `staging` can be promoted
-into `master`.
+into `main`.
 
 ## Feature branch workflow
 
@@ -197,7 +197,7 @@ After all intended features are integrated and staging passes full system
 testing, open:
 
 ```text
-staging -> master
+staging -> main
 ```
 
 ## Keeping a feature current
@@ -209,4 +209,4 @@ git fetch origin
 git rebase origin/staging
 ```
 
-Do not rebase shared `staging` or `master` history.
+Do not rebase shared `staging` or `main` history.
