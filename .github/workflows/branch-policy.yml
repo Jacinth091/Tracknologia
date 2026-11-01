@@ -6,7 +6,7 @@ on:
       - "feature/**"
       - "release/**"
       - staging
-      - master
+      - main
     types:
       - opened
       - synchronize
@@ -80,13 +80,13 @@ jobs:
           fi
 
           # Master accepts releases only from staging.
-          if [ "$BASE_BRANCH" = "master" ]; then
+          if [ "$BASE_BRANCH" = "main" ]; then
             if [ "$HEAD_BRANCH" != "staging" ]; then
-              echo "::error::Only staging may be merged into master."
+              echo "::error::Only staging may be merged into main."
               exit 1
             fi
 
-            echo "Valid release promotion: staging -> master"
+            echo "Valid release promotion: staging -> main"
             exit 0
           fi
 

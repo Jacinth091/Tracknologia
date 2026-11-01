@@ -5,13 +5,13 @@ on:
     branches:
       - "release/**"
       - staging
-      - master
+      - main
 
   push:
     branches:
       - "release/**"
       - staging
-      - master
+      - main
 
   workflow_dispatch:
 
