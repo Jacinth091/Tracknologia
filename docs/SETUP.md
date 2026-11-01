@@ -174,6 +174,11 @@ recovery email is sent entirely by Supabase:
   Authentication → Emails → "Reset password" and set the subject to "Reset your
   Tracknologia password". It must keep `{{ .ConfirmationURL }}`; the app
   routes the exchange itself.
+- **Sign-up confirmation template**: `supabase/templates/confirmation.html`, in
+  the same way. For each hosted project, paste it into Supabase → Authentication
+  → Emails → "Confirm signup" with the subject "Confirm your Tracknologia
+  email". It must keep `{{ .ConfirmationURL }}`; the link lands on
+  `/auth/callback?next=/confirmed`.
 - **Email sending**: uses the Supabase SMTP settings above, not the app's
   `SMTP_*` variables. Password recovery therefore still works when the app's
   invitation `SMTP_*` settings are intentionally unset and staff invitations

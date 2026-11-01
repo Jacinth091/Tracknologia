@@ -254,6 +254,10 @@ otp_expiry = 3600
 subject = "Reset your Tracknologia password"
 content_path = "./supabase/templates/recovery.html"
 
+[auth.email.template.confirmation]
+subject = "Confirm your Tracknologia email"
+content_path = "./supabase/templates/confirmation.html"
+
 # Uncomment to customize email template
 # [auth.email.template.invite]
 # subject = "You have been invited"
