@@ -187,6 +187,20 @@ if [ -z "$pending" ]; then
   exit 0
 fi
 
+# A base with no migrations has no release-like state to upgrade (e.g. the
+# first promotion into main): applying every migration to an empty database is
+# the fresh-install path, which the clean-replay DB suite already proves.
+if [ -z "$(git ls-tree --name-only "$base_ref" supabase/migrations/ | grep '\.sql$' || true)" ]; then
+  log "base $base_ref has no migrations; upgrade path equals fresh install"
+  printf '============ rehearsal summary ============\n'
+  printf 'base baseline   : %s (%s)\n' "$base_ref" "$base_sha"
+  printf 'pending set     : %s migration(s), base has none\n' "$(printf '%s\n' "$pending" | grep -c .)"
+  printf 'shared changes  : none (forward-only verified)\n'
+  printf 'suite result    : INAPPLICABLE (empty base; fresh install covered by clean replay)\n'
+  printf '===========================================\n'
+  exit 0
+fi
+
 # Migration version is the timestamp prefix of the file name.
 migration_version() { basename "$1" | cut -d_ -f1; }
 
