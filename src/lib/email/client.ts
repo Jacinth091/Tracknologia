@@ -1,6 +1,7 @@
 import "server-only";
-import { createTransport } from "nodemailer";
+import { createTransport, type SendMailOptions } from "nodemailer";
 import { getServerConfig } from "@/lib/config/server";
+import wordmark from "./wordmark.json";
 
 export interface SendEmailParams {
   to: string | string[];
@@ -8,6 +9,7 @@ export interface SendEmailParams {
   html: string;
   text?: string;
   from?: string;
+  attachments?: SendMailOptions["attachments"];
 }
 
 export type EmailDeliveryResult =
@@ -76,6 +78,7 @@ export async function sendEmail(
       subject: params.subject,
       html: params.html,
       text: params.text,
+      attachments: params.attachments,
     });
     // If the deadline wins, this send rejects later with no other handler.
     sending.catch(() => undefined);
@@ -115,46 +118,88 @@ export async function sendStaffInviteEmail(params: {
   inviteUrl: string;
 }) {
   const safeShopName = escapeHtml(params.shopName);
+  const safeRecipient = escapeHtml(params.to);
+  const safeCode = escapeHtml(params.inviteCode);
+  const safeUrl = escapeHtml(params.inviteUrl);
   const subject = `You're invited to join ${params.shopName} on Tracknologia`;
-  // Email clients ignore CSS variables and external stylesheets, so the brand
-  // tokens from src/app/globals.css (:root) are inlined as hex values here.
+  // Inline brand colors and presentation tables keep the layout usable without app CSS.
   const html = `
-    <div style="background-color: #faf8f3; padding: 32px 16px; font-family: Figtree, -apple-system, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; color: #141414;">
-      <div style="max-width: 560px; margin: 0 auto;">
-        <p style="margin: 0 0 20px 0; font-size: 22px; font-weight: 800; letter-spacing: -0.5px; color: #141414;">
-          Tracknologia<span style="color: #ffc72c;">.</span>
-        </p>
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Your Tracknologia invitation</title>
+  </head>
+  <body style="margin: 0; padding: 0; background-color: #faf8f3;">
+    <div style="display: none; max-height: 0; overflow: hidden; opacity: 0; mso-hide: all;">Join ${safeShopName} on Tracknologia. Your staff invitation is inside.</div>
+    <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="width: 100%; background-color: #faf8f3;">
+      <tr>
+        <td align="center" style="padding: 20px 12px;">
+          <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="width: 100%; max-width: 520px; table-layout: fixed; border: 1px solid #e9e4d8; border-spacing: 0; border-radius: 6px; background-color: #ffffff;">
+            <tr>
+              <td bgcolor="#141414" style="padding: 16px 20px; border-radius: 5px 5px 0 0; font-family: Arial, Helvetica, sans-serif;">
+                <img src="cid:tracknologia-wordmark" width="143" height="26" alt="Tracknologia" style="display: block; width: 143px; height: 26px; border: 0; color: #ffffff; font-size: 18px; font-weight: bold;">
+              </td>
+            </tr>
+            <tr>
+              <td style="padding: 22px 20px; font-family: Arial, Helvetica, sans-serif; color: #141414;">
+                <h1 style="margin: 0 0 12px; font-family: Arial, Helvetica, sans-serif; font-size: 22px; line-height: 28px; font-weight: 700; letter-spacing: -0.3px;">You're invited to the team.</h1>
+                <p style="margin: 0 0 12px; font-size: 14px; line-height: 22px; color: #45403a; word-wrap: break-word;">Join <strong style="color: #141414;">${safeShopName}</strong> as staff on Tracknologia.</p>
+                <p style="margin: 0 0 18px; font-size: 13px; line-height: 20px; color: #6b6455; word-break: break-word;">Use <strong style="color: #141414;">${safeRecipient}</strong> to join. This invitation is linked to that email address.</p>
 
-        <div style="background-color: #ffffff; border: 1px solid #e9e4d8; border-radius: 10px; padding: 28px 24px;">
-          <h1 style="margin: 0 0 12px 0; font-size: 20px; font-weight: 700; color: #141414;">Team invitation</h1>
-          <p style="margin: 0; font-size: 15px; line-height: 1.6; color: #45403a;">
-            You have been invited to join <strong style="color: #141414;">${safeShopName}</strong> as staff on Tracknologia.
-          </p>
+                <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="width: 100%;">
+                  <tr>
+                    <td align="center" bgcolor="#ffc72c" style="border-radius: 4px; font-family: Arial, Helvetica, sans-serif;">
+                      <a href="${safeUrl}" style="display: block; padding: 11px 16px; border: 1px solid #ffc72c; border-radius: 4px; font-family: Arial, Helvetica, sans-serif; font-size: 14px; line-height: 22px; font-weight: bold; color: #141414; text-align: center; text-decoration: none;">Accept invitation</a>
+                    </td>
+                  </tr>
+                </table>
 
-          <div style="background-color: #f3f0e8; border: 1px solid #e9e4d8; border-radius: 10px; padding: 16px; margin: 24px 0;">
-            <p style="margin: 0 0 6px 0; font-size: 13px; color: #6b6455;">Your invitation code</p>
-            <code style="font-family: 'Geist Mono', ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; font-size: 18px; font-weight: 700; letter-spacing: 1px; color: #141414;">${escapeHtml(params.inviteCode)}</code>
-          </div>
+                <h2 style="margin: 20px 0 6px; font-size: 14px; line-height: 22px; font-weight: bold;">Joining with a code?</h2>
+                <p style="margin: 0 0 10px; font-size: 13px; line-height: 20px; color: #6b6455;">You can also enter this code during Staff setup.</p>
+                <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="width: 100%; table-layout: fixed;">
+                  <tr>
+                    <td bgcolor="#f3f0e8" style="padding: 12px; border: 1px solid #e9e4d8; border-radius: 4px; font-family: Arial, Helvetica, sans-serif;">
+                      <p style="margin: 0 0 6px; font-size: 12px; line-height: 18px; color: #6b6455;">Invitation code</p>
+                      <p style="margin: 0; font-family: Consolas, 'Courier New', monospace; font-size: 14px; line-height: 22px; font-weight: bold; color: #141414; word-break: break-all; word-wrap: break-word;">${safeCode}</p>
+                    </td>
+                  </tr>
+                </table>
 
-          <a href="${escapeHtml(params.inviteUrl)}" style="display: inline-block; background-color: #ffc72c; color: #141414; padding: 12px 24px; border-radius: 10px; text-decoration: none; font-size: 15px; font-weight: 600;">
-            Accept invitation &amp; join shop
-          </a>
-        </div>
-
-        <p style="margin: 20px 4px 0 4px; font-size: 12px; line-height: 1.5; color: #6b6455;">
-          This invitation link is valid for 7 days. If you did not expect this invitation, you can safely ignore this email.
-        </p>
-      </div>
-    </div>
+                <div style="margin-top: 18px; padding-top: 14px; border-top: 1px solid #e9e4d8;">
+                  <p style="margin: 0 0 6px; font-size: 13px; line-height: 20px; color: #6b6455;">If the button doesn't open, copy this link into your browser:</p>
+                  <p style="margin: 0; font-size: 13px; line-height: 20px; word-break: break-all; word-wrap: break-word;"><a href="${safeUrl}" style="color: #141414; text-decoration: underline;">${safeUrl}</a></p>
+                </div>
+              </td>
+            </tr>
+            <tr>
+              <td bgcolor="#f3f0e8" style="padding: 14px 20px; border-top: 1px solid #e9e4d8; border-radius: 0 0 5px 5px; font-family: Arial, Helvetica, sans-serif;">
+                <p style="margin: 0 0 6px; font-size: 13px; line-height: 20px; font-weight: bold; color: #141414;">Valid for 7 days from creation.</p>
+                <p style="margin: 0; font-size: 12px; line-height: 19px; color: #6b6455;">Keep this invitation private. If you weren't expecting it, you can safely ignore this email.</p>
+              </td>
+            </tr>
+          </table>
+          <p style="margin: 18px 0 0; font-family: Arial, Helvetica, sans-serif; font-size: 12px; line-height: 18px; color: #6b6455;">Tracknologia &middot; Repair operations &amp; tracking</p>
+        </td>
+      </tr>
+    </table>
+  </body>
+</html>
   `;
 
   const text = `
-You're invited to join ${params.shopName} on Tracknologia!
+You're invited to join ${params.shopName} as staff on Tracknologia.
 
-Invitation Code: ${params.inviteCode}
-Join Link: ${params.inviteUrl}
+Use ${params.to} to join. This invitation is linked to that email address.
 
-This link is valid for 7 days.
+Accept invitation: ${params.inviteUrl}
+
+You can also enter this code during Staff setup:
+${params.inviteCode}
+
+Valid for 7 days from creation.
+Keep this invitation private. If you weren't expecting it, you can safely ignore this email.
   `.trim();
 
   return sendEmail({
@@ -162,5 +207,14 @@ This link is valid for 7 days.
     subject,
     html,
     text,
+    attachments: [
+      {
+        filename: "tracknologia.png",
+        content: wordmark,
+        encoding: "base64",
+        contentType: "image/png",
+        cid: "tracknologia-wordmark",
+      },
+    ],
   });
 }

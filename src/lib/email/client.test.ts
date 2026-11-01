@@ -41,7 +41,7 @@ vi.mock("@/lib/config/server", () => ({
   }),
 }));
 
-import { sendEmail } from "./client";
+import { sendEmail, sendStaffInviteEmail } from "./client";
 
 beforeEach(() => {
   vi.clearAllMocks();
@@ -60,6 +60,77 @@ beforeEach(() => {
 
 afterEach(() => {
   vi.useRealTimers();
+});
+
+describe("sendStaffInviteEmail", () => {
+  it("sends the branded invitation with an embedded wordmark and usable link/code alternatives", async () => {
+    mocks.sendMail.mockResolvedValue({ messageId: "<invite-1@example.test>" });
+    const inviteCode = "0123456789abcdef".repeat(4);
+    const inviteUrl = `https://app.example.test/register?invite=${inviteCode}`;
+
+    const result = await sendStaffInviteEmail({
+      to: "staff@example.test",
+      shopName: "Cebu Repair Workshop",
+      inviteCode,
+      inviteUrl,
+    });
+
+    expect(result).toEqual({ success: true, id: "<invite-1@example.test>" });
+    expect(mocks.sendMail).toHaveBeenCalledWith(
+      expect.objectContaining({
+        to: "staff@example.test",
+        subject: "You're invited to join Cebu Repair Workshop on Tracknologia",
+        html: expect.stringContaining('src="cid:tracknologia-wordmark"'),
+        attachments: [
+          expect.objectContaining({
+            content: expect.stringMatching(/^iVBORw0KGgo/),
+            encoding: "base64",
+            contentType: "image/png",
+            cid: "tracknologia-wordmark",
+          }),
+        ],
+      }),
+    );
+    const { html, text } = mocks.sendMail.mock.calls[0][0];
+    expect(html).toContain(`href="${inviteUrl}"`);
+    expect(html).toContain(`>${inviteUrl}</a>`);
+    expect(html).toContain(`>${inviteCode}</p>`);
+    expect(html).toContain('alt="Tracknologia"');
+    for (const alternative of [html, text]) {
+      expect(alternative).toContain("staff@example.test");
+      expect(alternative).toContain(
+        "This invitation is linked to that email address.",
+      );
+      expect(alternative).toContain("Valid for 7 days from creation.");
+    }
+    expect(text).toContain(`Accept invitation: ${inviteUrl}`);
+    expect(text).toContain(inviteCode);
+  });
+
+  it("escapes interpolated HTML while keeping the original values in plain text", async () => {
+    mocks.sendMail.mockResolvedValue({ messageId: "<invite-2@example.test>" });
+    await sendStaffInviteEmail({
+      to: "staff+&test@example.test",
+      shopName: 'Repair <b>&</b> "Workshop"',
+      inviteCode: "CODE<&\"'",
+      inviteUrl: 'https://app.example.test/register?invite=CODE&label="test"',
+    });
+
+    const { html, text } = mocks.sendMail.mock.calls[0][0];
+    expect(html).toContain(
+      "Repair &lt;b&gt;&amp;&lt;/b&gt; &quot;Workshop&quot;",
+    );
+    expect(html).not.toContain("Repair <b>");
+    expect(html).toContain("staff+&amp;test@example.test");
+    expect(html).toContain("CODE&lt;&amp;&quot;&#039;");
+    expect(html).toContain(
+      'href="https://app.example.test/register?invite=CODE&amp;label=&quot;test&quot;"',
+    );
+    expect(text).toContain('Repair <b>&</b> "Workshop"');
+    expect(text).toContain(
+      'https://app.example.test/register?invite=CODE&label="test"',
+    );
+  });
 });
 
 describe("sendEmail", () => {
