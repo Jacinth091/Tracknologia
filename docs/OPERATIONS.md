@@ -541,10 +541,69 @@ Participant feedback older than 90 days, with no privacy review recorded, is due
    priority does not remove an item. Privacy review must be recorded with one of
    the blocks above.
 
+### Monthly audit-retention review
+
+The [owner decision in #87](https://github.com/Jacinth091/Tracknologia/issues/87#issuecomment-6537741845)
+approves **180-day retention** for internal access, review, and privacy/deletion
+audits, with a manual owner check once each month during the pilot. The policy
+is approved; automatic deletion and a general audit-purge mechanism are not
+implemented.
+
+| Audit table              | Age field     | Existing integrity constraint                                                                  |
+| ------------------------ | ------------- | ---------------------------------------------------------------------------------------------- |
+| `internal_access_audit`  | `created_at`  | Append-only access/provisioning history; no direct service-role mutation                       |
+| `feedback_review_events` | `occurred_at` | Protected per-feedback review history; referenced feedback and reviewer deletion is restricted |
+| `feedback_privacy_audit` | `created_at`  | Append-only privacy/deletion evidence that survives target feedback purge                      |
+
+Once each month, the owner:
+
+1. Records the review date, reviewer, environment/project, and deployed release
+   SHA in the private operations record.
+2. Runs this **read-only** inventory through the trusted owner SQL connection.
+   It returns only counts and the oldest due timestamp, not identities, reasons,
+   feedback content, or credentials:
+
+   ```sql
+   BEGIN TRANSACTION READ ONLY;
+
+   SELECT 'internal_access_audit' AS audit_table,
+          count(*) FILTER (WHERE created_at <= now() - interval '180 days') AS events_180_days_or_older,
+          min(created_at) FILTER (WHERE created_at <= now() - interval '180 days') AS oldest_due_at
+     FROM public.internal_access_audit
+   UNION ALL
+   SELECT 'feedback_review_events',
+          count(*) FILTER (WHERE occurred_at <= now() - interval '180 days'),
+          min(occurred_at) FILTER (WHERE occurred_at <= now() - interval '180 days')
+     FROM public.feedback_review_events
+   UNION ALL
+   SELECT 'feedback_privacy_audit',
+          count(*) FILTER (WHERE created_at <= now() - interval '180 days'),
+          min(created_at) FILTER (WHERE created_at <= now() - interval '180 days')
+     FROM public.feedback_privacy_audit;
+
+   ROLLBACK;
+   ```
+
+3. Records each table's due count and oldest due timestamp, the action/approval
+   reference or "none due", and the next monthly review date. A query failure is
+   recorded as an incomplete review, never as zero due events.
+4. If events are due, records a retention-remediation task for owner approval.
+   Do not delete audit rows, disable triggers, weaken foreign keys, or widen
+   grants during this inventory. Any deletion/archive mechanism needs separate
+   integrity, privilege, and migration review before execution. If audit evidence
+   must be retained longer, obtain a specific time-limited owner exception with
+   its reason and next review date; do not assume indefinite retention is
+   approved. Until an approved disposition or exception exists, record the
+   overdue events as an unresolved policy exception.
+
+The existing targeted Feedback redaction/purge runbooks retain their own approval
+requirements. They are not a general 180-day audit purge, and the 90-day review
+of participant feedback remains a separate task.
+
 ### What is out of scope
 
 ```text
-audit retention/purge window, archive, or reporting surface (issue #87 approval)
+automated/general audit purge, archive, or application reporting surface
 Provider/owner automatic internal access
 internal provisioning UI or Server Action
 publishable-key access to the audit or admin functions

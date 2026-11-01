@@ -121,10 +121,16 @@ export default function PrivacyPage() {
               </strong>
             </p>
             <p>
-              When a tracking page is viewed, we record only the time, to count
-              how often tracking is used. We keep that for as long as the
-              repair. To stop abuse, we limit lookups with a temporary coded
-              key, not your IP address.
+              When someone successfully checks a repair using its tracking code,
+              we record which repair was viewed and when, to understand how
+              often tracking is used. These view records do not include the
+              visitor&apos;s name, raw IP address or tracking code, and are kept
+              while the repair exists.
+            </p>
+            <p>
+              To stop abuse, we limit repeated lookups with a temporary coded
+              key derived from the connection address. The lookup-limit record
+              does not store the raw IP address.
             </p>
           </PrivacySection>
 
@@ -175,7 +181,7 @@ export default function PrivacyPage() {
           </PrivacySection>
 
           <p className="text-xs text-muted-foreground">
-            Last updated: 31 October 2026.
+            Last updated: 1 November 2026.
           </p>
         </div>
       </main>

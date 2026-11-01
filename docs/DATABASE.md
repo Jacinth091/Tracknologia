@@ -290,8 +290,9 @@ internal access events.
   data
 - `service_role` can read but cannot insert, update, or delete rows directly;
   writes happen only through the owner-executed functions below
-- retention/purge policy remains deliberately undefined pending owner approval
-  (issue #87)
+- owner-approved retention is 180 days, with monthly manual review (#87,
+  comment 6537741845). No automatic deletion or general audit-purge mechanism
+  exists; see `docs/OPERATIONS.md` for inventory and escalation duties.
 
 ### 14. `feedback_submissions`
 
@@ -369,8 +370,9 @@ Append-only per-feedback review history (issue #89). It is separate from
   runbook is the only path that deletes this history, and it records itself in
   `feedback_privacy_audit`. Feedback is kept. Within 90 days an operator reviews
   it and redacts personal details or deletes it through the owner-run runbooks in
-  `docs/OPERATIONS.md`. Retention for the other data classes is still open in
-  issue #87.
+  `docs/OPERATIONS.md`. Review-audit retention is 180 days with monthly owner
+  review (#87, comment 6537741845); that policy does not authorize ad hoc
+  deletion of this protected history.
 
 `get_feedback_count_summary(p_operator_user_id, p_window_start, p_window_end)`
 (issue #90) is a service-role-only, set-based aggregate. It returns `(dimension,
@@ -392,7 +394,9 @@ It is separate from `internal_access_audit`, which stays access-only.
 - Written only inside the owner-run runbook transaction in `docs/OPERATIONS.md`,
   in the same transaction as the redaction, purge or privacy-review mark. Never
   holds participant text.
-- Retention is part of the open issue #87 policy decision and is not defined.
+- Owner-approved retention is 180 days, with monthly manual review (#87,
+  comment 6537741845). The audit survives target feedback purge; no automatic
+  deletion or general audit-purge mechanism is implemented.
 
 ### 16. `get_internal_validation_metrics`
 
@@ -582,8 +586,9 @@ category)` is also service-role-only, accepts only the fixed
 Do not add without a validated requirement:
 
 - `customers`, `devices`, `technicians`, `branches`, `inventory`, `parts`, `payments`, `invoices`, `appointments`, `ratings/reviews`.
-- Internal access audit retention/purge windows, archive targets, and reporting
-  projections: these need explicit owner approval (issue #87) and a retention
-  policy decision before any table, job, or query surface is added.
+- Audit deletion/archival mechanisms and reporting projections remain deferred.
+  The 180-day retention policy and monthly manual review are already approved
+  (#87); implementing a purge still needs separate owner approval and review of
+  append-only integrity, privileges, and any required migration.
 
 Customer and device details remain point-in-time snapshots attached to a Repair or Repair Request.
