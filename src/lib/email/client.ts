@@ -116,29 +116,35 @@ export async function sendStaffInviteEmail(params: {
 }) {
   const safeShopName = escapeHtml(params.shopName);
   const subject = `You're invited to join ${params.shopName} on Tracknologia`;
+  // Email clients ignore CSS variables and external stylesheets, so the brand
+  // tokens from src/app/globals.css (:root) are inlined as hex values here.
   const html = `
-    <div style="font-family: sans-serif; max-width: 580px; margin: 0 auto; padding: 24px; color: #1a1a1a;">
-      <h2 style="color: #111; margin-bottom: 12px;">Team Invitation</h2>
-      <p style="font-size: 15px; line-height: 1.6; color: #444;">
-        You have been invited to join <strong>${safeShopName}</strong> as staff on Tracknologia.
-      </p>
-      
-      <div style="background-color: #f4f4f5; border-radius: 12px; padding: 16px; margin: 24px 0; border: 1px solid #e4e4e7;">
-        <p style="margin: 0 0 8px 0; font-size: 13px; color: #71717a;">Your Invitation Code:</p>
-        <code style="font-family: monospace; font-size: 18px; font-weight: bold; color: #18181b; letter-spacing: 1px;">
-          ${escapeHtml(params.inviteCode)}
-        </code>
-      </div>
+    <div style="background-color: #faf8f3; padding: 32px 16px; font-family: Figtree, -apple-system, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; color: #141414;">
+      <div style="max-width: 560px; margin: 0 auto;">
+        <p style="margin: 0 0 20px 0; font-size: 22px; font-weight: 800; letter-spacing: -0.5px; color: #141414;">
+          Tracknologia<span style="color: #ffc72c;">.</span>
+        </p>
 
-      <div style="margin: 28px 0;">
-        <a href="${escapeHtml(params.inviteUrl)}" style="background-color: #18181b; color: #ffffff; padding: 12px 24px; border-radius: 8px; text-decoration: none; font-size: 14px; font-weight: 600; display: inline-block;">
-          Accept Invitation & Join Shop
-        </a>
-      </div>
+        <div style="background-color: #ffffff; border: 1px solid #e9e4d8; border-radius: 10px; padding: 28px 24px;">
+          <h1 style="margin: 0 0 12px 0; font-size: 20px; font-weight: 700; color: #141414;">Team invitation</h1>
+          <p style="margin: 0; font-size: 15px; line-height: 1.6; color: #45403a;">
+            You have been invited to join <strong style="color: #141414;">${safeShopName}</strong> as staff on Tracknologia.
+          </p>
 
-      <p style="font-size: 12px; color: #71717a; margin-top: 32px; border-top: 1px solid #e4e4e7; padding-top: 16px;">
-        This invitation link is valid for 7 days. If you did not expect this invitation, you can safely ignore this email.
-      </p>
+          <div style="background-color: #f3f0e8; border: 1px solid #e9e4d8; border-radius: 10px; padding: 16px; margin: 24px 0;">
+            <p style="margin: 0 0 6px 0; font-size: 13px; color: #6b6455;">Your invitation code</p>
+            <code style="font-family: 'Geist Mono', ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; font-size: 18px; font-weight: 700; letter-spacing: 1px; color: #141414;">${escapeHtml(params.inviteCode)}</code>
+          </div>
+
+          <a href="${escapeHtml(params.inviteUrl)}" style="display: inline-block; background-color: #ffc72c; color: #141414; padding: 12px 24px; border-radius: 10px; text-decoration: none; font-size: 15px; font-weight: 600;">
+            Accept invitation &amp; join shop
+          </a>
+        </div>
+
+        <p style="margin: 20px 4px 0 4px; font-size: 12px; line-height: 1.5; color: #6b6455;">
+          This invitation link is valid for 7 days. If you did not expect this invitation, you can safely ignore this email.
+        </p>
+      </div>
     </div>
   `;
 
