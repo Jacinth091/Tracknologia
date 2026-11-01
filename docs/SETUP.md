@@ -168,9 +168,12 @@ recovery email is sent entirely by Supabase:
   where `<app>` is the value of `NEXT_PUBLIC_APP_URL`. The recovery link lands
   on `/auth/callback?next=/reset-password`; a missing entry shows Supabase's
   own "redirect not allowed" error instead of the app.
-- **Recovery email template**: Supabase → Authentication → Emails → "Recover
-  Password" must keep `{{ .ConfirmationURL }}` in the message body. The app
-  routes the exchange itself; the template needs no other change.
+- **Recovery email template**: the branded template is
+  `supabase/templates/recovery.html` (local Supabase reads it through
+  `supabase/config.toml`). For each hosted project, paste it into Supabase →
+  Authentication → Emails → "Reset password" and set the subject to "Reset your
+  Tracknologia password". It must keep `{{ .ConfirmationURL }}`; the app
+  routes the exchange itself.
 - **Email sending**: uses the Supabase SMTP settings above, not the app's
   `SMTP_*` variables. Password recovery therefore still works when the app's
   invitation `SMTP_*` settings are intentionally unset and staff invitations
