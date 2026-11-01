@@ -1,94 +1,231 @@
 <!--
-  Supabase Auth "Confirm signup" email. Supabase sends it, not the app.
-  Local: wired in supabase/config.toml. Hosted projects: paste this into
-  Authentication -> Emails -> Confirm signup (see docs/SETUP.md).
-  Keep {{ .ConfirmationURL }}; brand colors mirror src/app/globals.css.
+  Supabase Auth sends this email. Local: supabase/config.toml.
+  Hosted: copy into Authentication -> Emails -> Confirm sign up.
+  Keep ConfirmationURL intact; SiteURL serves the public wordmark (docs/SETUP.md).
 -->
-<div
-  style="
-    background-color: #faf8f3;
-    padding: 32px 16px;
-    font-family:
-      Figtree,
-      -apple-system,
-      &quot;Segoe UI&quot;,
-      Roboto,
-      Helvetica,
-      Arial,
-      sans-serif;
-    color: #141414;
-  "
->
-  <div style="max-width: 560px; margin: 0 auto">
-    <p
-      style="
-        margin: 0 0 20px 0;
-        font-size: 22px;
-        font-weight: 800;
-        letter-spacing: -0.5px;
-        color: #141414;
-      "
-    >
-      Tracknologia<span style="color: #ffc72c">.</span>
-    </p>
-
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Confirm your Tracknologia account</title>
+  </head>
+  <body style="margin: 0; padding: 0; background-color: #faf8f3">
     <div
       style="
-        background-color: #ffffff;
-        border: 1px solid #e9e4d8;
-        border-radius: 10px;
-        padding: 28px 24px;
+        display: none;
+        max-height: 0;
+        overflow: hidden;
+        opacity: 0;
+        mso-hide: all;
       "
     >
-      <h1
-        style="
-          margin: 0 0 12px 0;
-          font-size: 20px;
-          font-weight: 700;
-          color: #141414;
-        "
-      >
-        Confirm your email
-      </h1>
-      <p
-        style="
-          margin: 0 0 24px 0;
-          font-size: 15px;
-          line-height: 1.6;
-          color: #45403a;
-        "
-      >
-        Thanks for signing up for Tracknologia. Confirm this email address to
-        finish creating your account.
-      </p>
-
-      <a
-        href="{{ .ConfirmationURL }}"
-        style="
-          display: inline-block;
-          background-color: #ffc72c;
-          color: #141414;
-          padding: 12px 24px;
-          border-radius: 10px;
-          text-decoration: none;
-          font-size: 15px;
-          font-weight: 600;
-        "
-      >
-        Confirm email
-      </a>
+      Confirm your email address to finish setting up your Tracknologia account.
     </div>
-
-    <p
-      style="
-        margin: 20px 4px 0 4px;
-        font-size: 12px;
-        line-height: 1.5;
-        color: #6b6455;
-      "
+    <table
+      role="presentation"
+      width="100%"
+      cellpadding="0"
+      cellspacing="0"
+      border="0"
+      style="width: 100%; background-color: #faf8f3"
     >
-      This link works once and expires soon. If you did not sign up for
-      Tracknologia, you can ignore this email.
-    </p>
-  </div>
-</div>
+      <tr>
+        <td align="center" style="padding: 20px 12px">
+          <table
+            role="presentation"
+            width="100%"
+            cellpadding="0"
+            cellspacing="0"
+            border="0"
+            style="
+              width: 100%;
+              max-width: 520px;
+              table-layout: fixed;
+              border: 1px solid #e9e4d8;
+              border-spacing: 0;
+              border-radius: 6px;
+              background-color: #ffffff;
+            "
+          >
+            <tr>
+              <td
+                bgcolor="#141414"
+                style="
+                  padding: 16px 20px;
+                  border-radius: 5px 5px 0 0;
+                  font-family: Arial, Helvetica, sans-serif;
+                "
+              >
+                <img
+                  src="{{ .SiteURL }}/email/wordmark.png"
+                  width="143"
+                  height="26"
+                  alt="Tracknologia"
+                  style="
+                    display: block;
+                    width: 143px;
+                    height: 26px;
+                    border: 0;
+                    color: #ffffff;
+                    font-size: 18px;
+                    font-weight: bold;
+                  "
+                />
+              </td>
+            </tr>
+            <tr>
+              <td
+                style="
+                  padding: 22px 20px;
+                  font-family: Arial, Helvetica, sans-serif;
+                  color: #141414;
+                "
+              >
+                <h1
+                  style="
+                    margin: 0 0 12px;
+                    font-family: Arial, Helvetica, sans-serif;
+                    font-size: 22px;
+                    line-height: 28px;
+                    font-weight: 700;
+                    letter-spacing: -0.3px;
+                  "
+                >
+                  Confirm your email address
+                </h1>
+                <p
+                  style="
+                    margin: 0 0 18px;
+                    font-size: 14px;
+                    line-height: 22px;
+                    color: #45403a;
+                  "
+                >
+                  Thanks for signing up. Confirm your email address to finish
+                  creating your Tracknologia account.
+                </p>
+                <table
+                  role="presentation"
+                  width="100%"
+                  cellpadding="0"
+                  cellspacing="0"
+                  border="0"
+                  style="width: 100%"
+                >
+                  <tr>
+                    <td
+                      align="center"
+                      bgcolor="#ffc72c"
+                      style="
+                        border-radius: 4px;
+                        font-family: Arial, Helvetica, sans-serif;
+                      "
+                    >
+                      <a
+                        href="{{ .ConfirmationURL }}"
+                        style="
+                          display: block;
+                          padding: 11px 16px;
+                          border: 1px solid #ffc72c;
+                          border-radius: 4px;
+                          font-family: Arial, Helvetica, sans-serif;
+                          font-size: 14px;
+                          line-height: 22px;
+                          font-weight: bold;
+                          color: #141414;
+                          text-align: center;
+                          text-decoration: none;
+                        "
+                        >Confirm email address</a
+                      >
+                    </td>
+                  </tr>
+                </table>
+                <div
+                  style="
+                    margin-top: 18px;
+                    padding-top: 14px;
+                    border-top: 1px solid #e9e4d8;
+                  "
+                >
+                  <p
+                    style="
+                      margin: 0 0 6px;
+                      font-size: 13px;
+                      line-height: 20px;
+                      color: #6b6455;
+                    "
+                  >
+                    If the button doesn't open, copy this link into your
+                    browser:
+                  </p>
+                  <p
+                    style="
+                      margin: 0;
+                      font-size: 13px;
+                      line-height: 20px;
+                      word-break: break-all;
+                      word-wrap: break-word;
+                    "
+                  >
+                    <a
+                      href="{{ .ConfirmationURL }}"
+                      style="color: #141414; text-decoration: underline"
+                      >{{ .ConfirmationURL }}</a
+                    >
+                  </p>
+                </div>
+              </td>
+            </tr>
+            <tr>
+              <td
+                bgcolor="#f3f0e8"
+                style="
+                  padding: 14px 20px;
+                  border-top: 1px solid #e9e4d8;
+                  border-radius: 0 0 5px 5px;
+                  font-family: Arial, Helvetica, sans-serif;
+                "
+              >
+                <p
+                  style="
+                    margin: 0 0 6px;
+                    font-size: 13px;
+                    line-height: 20px;
+                    font-weight: bold;
+                    color: #141414;
+                  "
+                >
+                  This link works once and expires soon.
+                </p>
+                <p
+                  style="
+                    margin: 0;
+                    font-size: 12px;
+                    line-height: 19px;
+                    color: #6b6455;
+                  "
+                >
+                  If you didn't create this account, you can safely ignore this
+                  email.
+                </p>
+              </td>
+            </tr>
+          </table>
+          <p
+            style="
+              margin: 18px 0 0;
+              font-family: Arial, Helvetica, sans-serif;
+              font-size: 12px;
+              line-height: 18px;
+              color: #6b6455;
+            "
+          >
+            Tracknologia &middot; Repair operations &amp; tracking
+          </p>
+        </td>
+      </tr>
+    </table>
+  </body>
+</html>

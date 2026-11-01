@@ -1,3 +1,4 @@
+import { readFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
 
 import {
@@ -23,6 +24,24 @@ const DEFAULT_RECOVERY_HTML = `
 `;
 
 describe("recovery email link extraction", () => {
+  it("preserves the Supabase recovery URL in the branded template's button and fallback", () => {
+    const template = readFileSync("supabase/templates/recovery.html", "utf8");
+    const verifyUrl = `http://127.0.0.1:54321/auth/v1/verify?token=abc123def&amp;type=recovery&amp;redirect_to=${CALLBACK}`;
+    const html = template
+      .replaceAll("{{ .ConfirmationURL }}", verifyUrl)
+      .replaceAll("{{ .SiteURL }}", expected.appOrigin);
+
+    expect(template.match(/href="\{\{ \.ConfirmationURL \}\}"/g)).toHaveLength(
+      2,
+    );
+    expect(template).toMatch(/>\s*\{\{ \.ConfirmationURL \}\}\s*<\/a\s*>/);
+    expect(findRecoveryLinkInBody({ html }, expected)).toBe(
+      verifyUrl.replaceAll("&amp;", "&"),
+    );
+    expect(html).toContain('src="http://localhost:3000/email/wordmark.png"');
+    expect(html).not.toContain("{{");
+  });
+
   it("returns the Supabase verify link from a default recovery email", () => {
     const link = findRecoveryLinkInBody(
       { html: DEFAULT_RECOVERY_HTML },
