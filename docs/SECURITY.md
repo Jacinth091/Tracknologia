@@ -185,8 +185,13 @@ roles, not `user_metadata`, and not inferred from owning or joining a Provider:
   references on retained audit rows through `ON DELETE SET NULL`; operation,
   reason and timestamp remain and may stay linkable to external approval
   records, so this is not full anonymization.
-- Internal audit retention/purge remains unapproved and is deliberately not
-  implemented (issue #87).
+- The owner approved 180-day retention for internal access, feedback review,
+  and feedback privacy/deletion audits, with monthly manual review
+  ([#87 decision](https://github.com/Jacinth091/Tracknologia/issues/87#issuecomment-6537741845)).
+  No automatic audit deletion or general audit purge is implemented. Follow
+  the read-only inventory and approval/escalation process in
+  `docs/OPERATIONS.md` ("Monthly audit-retention review"); append-only grants and
+  history protections remain in force.
 - Private Feedback (issue #89): `feedback_submissions` and
   `feedback_review_events` have RLS enabled, no policies, and no client grants.
   `service_role` may only `SELECT`; direct writes bypassing the RPCs are denied.
