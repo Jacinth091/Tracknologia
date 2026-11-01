@@ -319,6 +319,32 @@ Use the same final Repair-input model without a Request prerequisite. Here the
 Provider enters and can edit every intake field, because there is no
 customer-submitted Request.
 
+## Transactional emails
+
+The invitation uses the supplied Tracknologia wordmark, an Ink header, Paper
+surroundings and one Charge Yellow acceptance button. Keep presentation tables,
+inline styles and system fonts so the message remains usable without app CSS.
+The raster wordmark is embedded as a CID attachment rather than loaded from a
+deployment URL. `src/lib/email/wordmark.json` contains its base64 PNG, rendered
+from the supplied SVG in `BrandLogo`; regenerate it if that wordmark changes.
+The compact email layout uses a 520px maximum width, 22px heading, 14px body,
+6px outer corners and 4px control corners. Keep the header short and actions
+at least 44px tall.
+
+Show the invited email address and explain that acceptance is linked to it.
+Group the alternative invitation code separately, allow long codes and URLs to
+wrap, and include a visible fallback link and a plain-text message. Preserve the
+seven-day validity from creation. Do not add remote fonts or tracking images.
+
+The password reset email in `supabase/templates/recovery.html` and sign-up
+confirmation in `supabase/templates/confirmation.html` follow the same layout.
+Supabase sends them, so they use `public/email/wordmark.png` through the
+configured Site URL rather than an app-managed CID attachment. Keep that PNG
+identical to the invitation wordmark and publicly reachable (see `docs/SETUP.md`).
+Each email's button and visible fallback must retain `{{ .ConfirmationURL }}`
+without reconstructing the token or callback URL. Hosted templates must be
+updated separately from the application deployment.
+
 ## Device input design
 
 ### Device Type

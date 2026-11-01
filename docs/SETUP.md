@@ -159,10 +159,17 @@ configuration only.
    - Sender email: the project Gmail address
 3. Gmail limits how many messages an account can send each day. That limit covers both Supabase Auth email and invitation email, so keep pilot volume within it. Google sets the limit and can change it.
 
-Supabase Auth configuration matters for password recovery specifically. Do not
-assume the application's SMTP settings or email templates configure it — the
-recovery email is sent entirely by Supabase:
+Supabase Auth sends both sign-up confirmation and password recovery emails.
+Do not assume the application's SMTP settings or email templates configure it:
 
+- **Sign-up confirmation template**: use `supabase/templates/confirmation.html`.
+  Local Supabase reads it through `supabase/config.toml`. In each hosted project's
+  Authentication → Emails → "Confirm sign up", paste the template and set the
+  subject to "Confirm your Tracknologia email". Keep `{{ .ConfirmationURL }}`
+  intact in the button and fallback; it lands on `/auth/callback?next=/confirmed`.
+  This uses the same public logo and hosted
+  rollout steps described for recovery below. Local email confirmations remain
+  disabled by default; installing the template does not change that setting.
 - **Redirect allow list**: Supabase → Authentication → URL Configuration must
   allow `<app>/auth/callback` for each environment (local, preview, production),
   where `<app>` is the value of `NEXT_PUBLIC_APP_URL`. The recovery link lands
@@ -174,11 +181,15 @@ recovery email is sent entirely by Supabase:
   Authentication → Emails → "Reset password" and set the subject to "Reset your
   Tracknologia password". It must keep `{{ .ConfirmationURL }}`; the app
   routes the exchange itself.
-- **Sign-up confirmation template**: `supabase/templates/confirmation.html`, in
-  the same way. For each hosted project, paste it into Supabase → Authentication
-  → Emails → "Confirm signup" with the subject "Confirm your Tracknologia
-  email". It must keep `{{ .ConfirmationURL }}`; the link lands on
-  `/auth/callback?next=/confirmed`.
+  The logo loads from `{{ .SiteURL }}/email/wordmark.png`, using the public
+  asset in this repo. Deploy that asset before saving the template, and check
+  that the configured Site URL serves it without a sign-in or deployment
+  protection prompt. A protected preview can instead use an absolute URL to
+  the same logo on the public production deployment; change only the image
+  `src`, never the recovery links. Image blocking still leaves a text logo
+  alternative and the full reset link. Apply the updated template separately
+  to staging and production; an app deployment does not update hosted Auth
+  templates. See [Supabase's template documentation](https://supabase.com/docs/guides/auth/auth-email-templates).
 - **Email sending**: uses the Supabase SMTP settings above, not the app's
   `SMTP_*` variables. Password recovery therefore still works when the app's
   invitation `SMTP_*` settings are intentionally unset and staff invitations
