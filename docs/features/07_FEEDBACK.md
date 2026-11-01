@@ -36,7 +36,7 @@ let operators review them without exposing raw text to Provider users.
 
 ## Public Interface
 
-The barrel `src/features/feedback/index.ts` is server-only. It exports the six
+The barrel `src/features/feedback/index.ts` is server-only. It exports the seven
 use cases, `submitFeedbackForm`, `FeedbackError`, and types, including
 `FeedbackFormState`. Client code imports the client-safe schemas and types
 directly from `schemas.ts` and `types.ts`, and the shared participant form
@@ -50,6 +50,7 @@ component from `ui/feedback-form.tsx`.
 | `getInternalFeedback(id)`                                | Enabled internal operator     | Original, separate review state, bounded history; `null` if missing |
 | `recordFeedbackReview(id, decision, expectedRowVersion)` | Enabled internal operator     | `{ status, priority, rowVersion }`                                  |
 | `getFeedbackAggregateSummary(window)`                    | Enabled internal operator     | Count-only summary                                                  |
+| `getNewFeedbackCount()`                                  | Enabled internal operator     | Exact current NEW count across all retained submissions             |
 
 `submitFeedbackForm(formData, submit)` is the participant form adapter, not a
 use case. It reads only `category`, `title`, `message`, and `submissionNonce`
