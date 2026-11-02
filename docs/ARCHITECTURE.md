@@ -165,6 +165,15 @@ operation call the Module guard, so a layout cannot become the only enforcement
 point. Sensitive content renders only after the required audit append succeeds.
 The route is dynamic and non-indexable.
 
+`health.ts` exposes `getInternalHealth()` for the internal surfaces. At any
+instant it returns the application, database, auth and email states as
+`healthy`, `degraded`, `unavailable`, `unknown` or `stale`. The database and
+auth checks are real, bounded probes (a head-only single-row read and the
+Supabase Auth health endpoint) and a slow-but-successful probe is `degraded`,
+not `healthy`; email is `unknown` when SMTP is configured but unprobed and
+`unavailable` when no transport is configured. `stale` is reserved for the
+external uptime observer and is never faked locally.
+
 A private internal area does not justify a second application shell, Provider
 impersonation, or Auth-metadata authorization. Provisioning/revocation remains a
 manual, owner-approved service-role operation, not a web action.

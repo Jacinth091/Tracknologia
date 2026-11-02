@@ -632,6 +632,13 @@ Once set up:
 Record each incident as a GitHub issue with the #87 fields: start, end, impact,
 category, status, resolution and release ref. Never include participant data.
 
+Internal diagnostics (`getInternalHealth()` in `internal-operations`) reports
+the application, database, auth and email separately. A slow but successful
+probe is `degraded`, not `healthy`; email is `unknown` while SMTP is configured
+but unprobed and `unavailable` when no transport is configured. `stale` belongs
+only to the external observer, so a missing observation never reads as zero or
+as a fake 100%.
+
 ## Exit criteria
 
 ```text
