@@ -876,6 +876,87 @@ describe("getValidationMetrics guard and interface", () => {
     },
   );
 
+  it.each([
+    [
+      "a non-array result",
+      () => ({ data: { dimension: "REPAIR_ALL_TIME" }, error: null }),
+      "SCHEMA_INVALID",
+    ],
+    ["an empty row list", () => ({ data: [], error: null }), "GROUP_MISSING"],
+    [
+      "mixed as_of values",
+      () => ({
+        data: completeRows([
+          {
+            dimension: "REPAIR_ALL_TIME",
+            bucket: "TOTAL",
+            row_count: 0,
+            as_of: "2026-10-29T13:00:00.000Z",
+          },
+        ]),
+        error: null,
+      }),
+      "AS_OF_MISMATCH",
+    ],
+    [
+      "a duplicate aggregate group",
+      () => ({
+        data: [
+          ...completeRows(),
+          {
+            dimension: "REPAIR_ALL_TIME",
+            bucket: "TOTAL",
+            row_count: 0,
+            interval_seconds: null,
+            as_of: DOMAIN_AS_OF,
+          },
+        ],
+        error: null,
+      }),
+      "GROUP_DUPLICATE",
+    ],
+    [
+      "an ACTIVE_DAY bucket outside the window",
+      () => ({
+        data: completeRows([
+          { dimension: "ACTIVE_DAY", bucket: "2026-10-01", row_count: 1 },
+        ]),
+        error: null,
+      }),
+      "ACTIVE_DAY_OUT_OF_WINDOW",
+    ],
+    [
+      "a missing invariant aggregate group",
+      () => ({
+        data: completeRows().filter((r) => r.dimension !== "REPAIR_ALL_TIME"),
+        error: null,
+      }),
+      "GROUP_MISSING",
+    ],
+  ])(
+    "logs a fixed rejection reason for %s",
+    async (_label, respond, reason) => {
+      const logged = vi.spyOn(console, "error").mockImplementation(() => {});
+      seams.rpc.mockImplementation(async (name: string) => {
+        if (name === "get_feedback_count_summary") {
+          return { data: [], error: null };
+        }
+        return respond();
+      });
+
+      await expect(getValidationMetrics({ mode: "7d" })).rejects.toMatchObject({
+        name: "MetricsError",
+        code: "UNAVAILABLE",
+      });
+      expect(logged).toHaveBeenCalledWith(
+        "[METRICS_FAILURE] validation metrics rejected",
+        { reason },
+      );
+      expect(JSON.stringify(logged.mock.calls)).not.toContain(CANARY);
+      logged.mockRestore();
+    },
+  );
+
   it("zero-fills ACTIVE_DAY for every requested calendar day", async () => {
     seams.rpc.mockImplementation(async (name: string) => {
       if (name === "get_feedback_count_summary") {
