@@ -79,6 +79,16 @@ export async function resolveClientIdentifier(): Promise<string> {
   }
 
   const headerList = await headers();
+
+  if (config.publicAbuse.trustedProxyMode === "host") {
+    const clientIp =
+      headerList.get(config.publicAbuse.clientIpHeader)?.trim() ?? "";
+    if (!isIP(clientIp)) {
+      throw new Error("Public operation trusted ingress metadata is invalid");
+    }
+    return clientIp;
+  }
+
   const suppliedProof = headerList.get(TRUSTED_PROXY_PROOF_HEADER) ?? "";
   if (
     !constantTimeSecretMatch(

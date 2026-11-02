@@ -85,6 +85,14 @@ Next.js upstream. Do not reuse the HMAC secret as the proxy proof secret. The
 application rejects public operations in production when proof or client-IP
 metadata is missing or invalid.
 
+When the chosen host overwrites the client-IP header itself (for example through
+platform-level proxying on the selected Hobby plan), the deployment may set
+`PUBLIC_ABUSE_TRUSTED_PROXY_MODE=host` and `PUBLIC_ABUSE_CLIENT_IP_HEADER` to the
+host-guaranteed header name. In that mode the application reads the client-IP
+header directly, without the proof header, and fails closed when the metadata is
+missing or invalid. The mode is validated at startup and the local Docker setup
+stays on the proof/shared-bucket path, so local behaviour is unchanged.
+
 The local Docker setup exposes Next.js without that trusted ingress. Local
 development opts into one shared abuse-control bucket by setting
 `PUBLIC_ABUSE_SHARED_DEV_BUCKET=true` in `.env.local`; forwarding headers are

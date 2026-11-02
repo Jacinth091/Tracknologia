@@ -22,6 +22,10 @@ export interface ServerConfig {
     hmacSecret: string;
     trustedProxySecret: string;
     sharedDevBucket: boolean;
+    /** "proof" (ingress injects the HMAC proof + client-IP header) or "host"
+     * (the chosen platform overwrites the client-IP header; no proof needed). */
+    trustedProxyMode: "proof" | "host";
+    clientIpHeader: string;
   };
   auth: {
     requireEmailConfirmation: boolean;
@@ -177,6 +181,16 @@ export function parseServerConfig(
   const sharedDevBucketRaw =
     env.PUBLIC_ABUSE_SHARED_DEV_BUCKET?.trim().toLowerCase();
   const sharedDevBucket = sharedDevBucketRaw === "true";
+  const trustedProxyModeRaw =
+    env.PUBLIC_ABUSE_TRUSTED_PROXY_MODE?.trim().toLowerCase() || "proof";
+  if (trustedProxyModeRaw !== "proof" && trustedProxyModeRaw !== "host") {
+    throw new Error(
+      "Configuration error: PUBLIC_ABUSE_TRUSTED_PROXY_MODE must be proof or host.",
+    );
+  }
+  const trustedProxyMode = trustedProxyModeRaw;
+  const clientIpHeader =
+    env.PUBLIC_ABUSE_CLIENT_IP_HEADER?.trim() || "x-tracknologia-client-ip";
 
   if (hmacSecret.length < 32) {
     throw new Error(
@@ -237,6 +251,8 @@ export function parseServerConfig(
       hmacSecret,
       trustedProxySecret,
       sharedDevBucket,
+      trustedProxyMode,
+      clientIpHeader,
     },
     auth: {
       requireEmailConfirmation,

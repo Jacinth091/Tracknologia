@@ -32,6 +32,8 @@ beforeEach(() => {
     "sb_service_test_123456789012345678901234567890";
   process.env.PUBLIC_ABUSE_HMAC_SECRET = SECRET;
   process.env.PUBLIC_ABUSE_TRUSTED_PROXY_SECRET = PROXY_SECRET;
+  process.env.PUBLIC_ABUSE_TRUSTED_PROXY_MODE = "proof";
+  process.env.PUBLIC_ABUSE_CLIENT_IP_HEADER = "x-tracknologia-client-ip";
   delete process.env.PUBLIC_ABUSE_SHARED_DEV_BUCKET;
   delete process.env.PUBLIC_ABUSE_TRACKING_LOOKUP_MAX;
   delete process.env.PUBLIC_ABUSE_TRACKING_LOOKUP_WINDOW_SECONDS;
@@ -204,5 +206,43 @@ describe("durable public-operation abuse control", () => {
     });
 
     await expect(resolveClientIdentifier()).rejects.toThrow();
+  });
+
+  it("accepts the host-proven client-IP header in host ingress mode", async () => {
+    process.env.PUBLIC_ABUSE_TRUSTED_PROXY_MODE = "host";
+    mocks.headers.mockResolvedValue({
+      get: (name: string) => {
+        if (name === process.env.PUBLIC_ABUSE_CLIENT_IP_HEADER) {
+          return "203.0.113.10";
+        }
+        return null;
+      },
+    });
+    await expect(resolveClientIdentifier()).resolves.toBe("203.0.113.10");
+  });
+
+  it("in host ingress mode ignores the proof secret and rejects missing or invalid client-IP metadata", async () => {
+    process.env.PUBLIC_ABUSE_TRUSTED_PROXY_MODE = "host";
+    mocks.headers.mockResolvedValue({
+      get: (name: string) => {
+        if (name === process.env.PUBLIC_ABUSE_CLIENT_IP_HEADER) {
+          return null;
+        }
+        return process.env.PUBLIC_ABUSE_TRUSTED_PROXY_SECRET;
+      },
+    });
+    await expect(resolveClientIdentifier()).rejects.toThrow(
+      "Public operation trusted ingress metadata is invalid",
+    );
+
+    mocks.headers.mockResolvedValue({
+      get: (name: string) =>
+        name === process.env.PUBLIC_ABUSE_CLIENT_IP_HEADER
+          ? "not-an-ip"
+          : process.env.PUBLIC_ABUSE_TRUSTED_PROXY_SECRET,
+    });
+    await expect(resolveClientIdentifier()).rejects.toThrow(
+      "Public operation trusted ingress metadata is invalid",
+    );
   });
 });

@@ -323,13 +323,26 @@ browser
 -> service-role-only narrow public-operation RPC
 ```
 
+In the platform-host ingress mode the boundary becomes:
+
+```text
+browser
+-> chosen platform overwrites the client-IP header
+-> Next.js Server Action reads the host-guaranteed client-IP header and checks
+   durable abuse control
+-> service-role-only narrow public-operation RPC
+```
+
 Production ingress must strip incoming `x-tracknologia-proxy-secret` and
 `x-tracknologia-client-ip` headers, overwrite the client-IP header, inject the
 proof secret, and prevent direct access to the Next.js upstream. The action
 accepts the client IP only after a constant-time proof check and fails closed
-when proof or metadata is absent/invalid. `PUBLIC_ABUSE_HMAC_SECRET` and the
-separate `PUBLIC_ABUSE_TRUSTED_PROXY_SECRET` are server-only, must each contain
-at least 32 characters, and must be shared by the relevant app/ingress
+when proof or metadata is absent/invalid. With `PUBLIC_ABUSE_TRUSTED_PROXY_MODE=host`,
+the chosen platform overwrites the header named by
+`PUBLIC_ABUSE_CLIENT_IP_HEADER` and the proof check is skipped; the application
+still fails closed when the metadata is missing or invalid. `PUBLIC_ABUSE_HMAC_SECRET`
+and the separate `PUBLIC_ABUSE_TRUSTED_PROXY_SECRET` are server-only, must each
+contain at least 32 characters, and must be shared by the relevant app/ingress
 instances. Never reuse one as the other.
 
 The supported local Docker setup exposes Next.js directly and therefore does
