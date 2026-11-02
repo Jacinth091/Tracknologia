@@ -41,7 +41,8 @@ jobs:
           # Only approved upstream integration branches may enter staging.
           if [ "$BASE_BRANCH" = "staging" ]; then
             case "$HEAD_BRANCH" in
-              feature/[0-9][0-9]/*)
+              # NN is the issue number and may have any number of digits.
+              feature/[0-9]*/*)
                 echo "Valid feature promotion into staging."
                 ;;
               fix/*|hotfix/*|chore/*|dependabot/*)
@@ -63,7 +64,8 @@ jobs:
           # Release integration branches accept the same approved sources as staging.
           if [[ "$BASE_BRANCH" == release/* ]]; then
             case "$HEAD_BRANCH" in
-              feature/[0-9][0-9]/*)
+              # NN is the issue number and may have any number of digits.
+              feature/[0-9]*/*)
                 echo "Valid feature integration into release branch."
                 ;;
               fix/*|hotfix/*|chore/*|dependabot/*)
