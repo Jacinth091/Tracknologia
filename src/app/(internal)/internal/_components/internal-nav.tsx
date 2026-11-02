@@ -33,6 +33,7 @@ export function InternalNav() {
     { href: "/internal", label: "Overview" },
     { href: "/internal/feedback", label: "Feedback" },
     { href: "/internal/activity", label: "Activity" },
+    { href: "/internal/reports", label: "Reports" },
   ].map((link) => ({
     ...link,
     active:

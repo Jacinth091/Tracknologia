@@ -9,15 +9,13 @@ import {
   Wrench01Icon,
 } from "@hugeicons/core-free-icons";
 import { PageHeader } from "@/components/shared/page-header";
-import { Button, buttonVariants } from "@/components/ui/button";
+import { buttonVariants } from "@/components/ui/button";
 import {
   Card,
   CardContent,
   CardDescription,
   CardHeader,
 } from "@/components/ui/card";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
 import {
   getValidationMetrics,
   MetricsError,
@@ -42,18 +40,27 @@ import {
   GaugeChart,
 } from "../_components/metric-charts";
 import { StatTile } from "../_components/stat-tile";
+import {
+  formatCount,
+  formatDuration,
+  formatPercent,
+  formatTimestamp,
+  humanize,
+} from "../_components/format";
+import {
+  firstSearchParam,
+  nonEmptyParam,
+  periodHref,
+  selectedPeriod,
+  windowInput,
+  type Period,
+} from "../_components/metrics-period";
+import { PeriodPicker } from "../_components/metrics-period-picker";
 
 export const metadata: Metadata = {
   title: "Validation metrics — Tracknologia",
   description: "Operator view of pilot validation metrics",
 };
-
-const PERIOD_OPTIONS = [
-  { value: "today", label: "Today" },
-  { value: "7d", label: "Last 7 days" },
-  { value: "30d", label: "Last 30 days" },
-  { value: "custom", label: "Custom" },
-] as const;
 
 const REPAIR_STATUS_ORDER = [
   "IN_PROGRESS",
@@ -77,72 +84,6 @@ const FEEDBACK_STATUS_ORDER = [
   "RESOLVED",
   "DISMISSED",
 ] as const;
-
-type Period = (typeof PERIOD_OPTIONS)[number]["value"];
-
-function firstSearchParam(value?: string | string[]) {
-  return Array.isArray(value) ? value[0] : value;
-}
-
-function nonEmptyParam(value?: string) {
-  return value && value.length > 0 ? value : undefined;
-}
-
-// Unknown or missing periods fall back to the default 7-day window.
-function selectedPeriod(value?: string): Period {
-  const match = PERIOD_OPTIONS.find((option) => option.value === value);
-  return match ? match.value : "7d";
-}
-
-function windowInput(period: Period, start?: string, end?: string) {
-  if (period === "custom") {
-    return { mode: "custom", startDate: start, endDateExclusive: end };
-  }
-  return { mode: period };
-}
-
-function activityHref(period: Period, start?: string, end?: string) {
-  const params = new URLSearchParams({ period });
-  if (period === "custom") {
-    if (start) params.set("start", start);
-    if (end) params.set("end", end);
-  }
-  return `/internal/activity?${params.toString()}`;
-}
-
-function humanize(value: string) {
-  return value
-    .toLowerCase()
-    .replaceAll("_", " ")
-    .replace(/^./, (char) => char.toUpperCase());
-}
-
-function formatCount(value: number | null) {
-  return value === null ? "N/A" : value.toLocaleString("en-PH");
-}
-
-function formatPercent(value: number | null) {
-  return value === null ? "N/A" : `${value}%`;
-}
-
-function formatDuration(seconds: number | null) {
-  if (seconds === null) return "N/A";
-  if (seconds < 60) return "under 1 min";
-  const totalMinutes = Math.round(seconds / 60);
-  const hours = Math.floor(totalMinutes / 60);
-  const minutes = totalMinutes % 60;
-  if (hours === 0) return `${minutes} min`;
-  if (minutes === 0) return `${hours} h`;
-  return `${hours} h ${minutes} min`;
-}
-
-function formatTimestamp(value: string) {
-  return new Intl.DateTimeFormat("en-PH", {
-    dateStyle: "medium",
-    timeStyle: "short",
-    timeZone: "Asia/Manila",
-  }).format(new Date(value));
-}
 
 export default async function ActivityPage({
   searchParams,
@@ -798,7 +739,7 @@ function ActivityShell({
         actions={
           <>
             <Link
-              href={activityHref(period, start, end)}
+              href={periodHref("/internal/activity", period, start, end)}
               className={buttonVariants({ variant: "outline", size: "sm" })}
             >
               Refresh
@@ -807,87 +748,16 @@ function ActivityShell({
         }
       />
       <Card className="space-y-4 p-4 sm:p-5">
-        <PeriodPicker period={period} start={start} end={end} />
+        <PeriodPicker
+          action="/internal/activity"
+          period={period}
+          start={start}
+          end={end}
+        />
         {summary}
       </Card>
       {children}
     </div>
-  );
-}
-
-function PeriodPicker({
-  period,
-  start,
-  end,
-}: {
-  period: Period;
-  start?: string;
-  end?: string;
-}) {
-  return (
-    <form
-      method="get"
-      action="/internal/activity"
-      aria-label="Metrics period"
-      aria-describedby="metrics-range-help"
-      className="space-y-3"
-    >
-      <div className="grid items-end gap-3 sm:grid-cols-2 lg:grid-cols-[minmax(0,1fr)_minmax(0,1fr)_minmax(0,1fr)_auto]">
-        <div className="grid min-w-0 gap-1.5">
-          <Label htmlFor="metrics-period">Period</Label>
-          <select
-            id="metrics-period"
-            name="period"
-            defaultValue={period}
-            className="h-11 w-full min-w-0 rounded-lg border border-input bg-card px-3 text-sm outline-none focus-visible:border-ring focus-visible:ring-2 focus-visible:ring-ring sm:h-9"
-          >
-            {PERIOD_OPTIONS.map((option) => (
-              <option key={option.value} value={option.value}>
-                {option.label}
-              </option>
-            ))}
-          </select>
-        </div>
-        <div className="grid min-w-0 gap-1.5">
-          <Label htmlFor="metrics-start">Start date</Label>
-          <Input
-            id="metrics-start"
-            name="start"
-            type="date"
-            defaultValue={start ?? ""}
-            className="w-full min-w-0"
-          />
-        </div>
-        <div className="grid min-w-0 gap-1.5">
-          <Label htmlFor="metrics-end">End date (exclusive)</Label>
-          <Input
-            id="metrics-end"
-            name="end"
-            type="date"
-            defaultValue={end ?? ""}
-            className="w-full min-w-0"
-          />
-        </div>
-        <div className="flex flex-wrap gap-2">
-          <Button type="submit" className="flex-1 sm:flex-none">
-            Show period
-          </Button>
-          {/* eslint-disable-next-line @next/next/no-html-link-for-pages -- Reload resets uncontrolled fields, including same-URL navigation. */}
-          <a
-            href="/internal/activity"
-            className={buttonVariants({
-              variant: "outline",
-              className: "flex-1 sm:flex-none",
-            })}
-          >
-            Clear filters
-          </a>
-        </div>
-      </div>
-      <p id="metrics-range-help" className="text-xs text-muted-foreground">
-        Dates apply to a Custom period. The end date is excluded.
-      </p>
-    </form>
   );
 }
 

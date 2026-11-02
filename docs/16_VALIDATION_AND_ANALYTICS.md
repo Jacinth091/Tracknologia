@@ -103,6 +103,17 @@ atomic shared snapshot. A zero period shows an empty
 state rather than an empty chart, and an unavailable Feedback section shows
 "Unavailable" in place of its charts.
 
+The same guarded read backs the count-only exports at `/internal/reports`.
+`buildValidationReport` projects `ValidationMetrics` into explicit
+section/metric/bucket rows and adds window (Manila dates plus UTC instants),
+generated-at, deploy revision, source, coverage, the shared glossary, and
+missing-data notes. Counts from 1 to 4 are suppressed to a hidden value, the
+total of a group with a hidden part is hidden too (so the part cannot be derived
+by subtraction), and a derived ratio is hidden when one of its input counts is.
+Zero stays visible and missing Feedback stays N/A. CSV and JSON carry the same
+rows; CSV cells are formula-injection safe. Neither format carries Provider,
+Customer, feedback or authentication identifiers.
+
 ## Provider metrics
 
 ### Provider creation and type split

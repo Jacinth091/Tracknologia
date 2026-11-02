@@ -22,6 +22,17 @@ export {
 } from "./metrics";
 
 export {
+  buildValidationReport,
+  MIN_COHORT,
+  REPORT_GLOSSARY,
+  validationReportToCsv,
+  validationReportToJson,
+  type ReportRow,
+  type ReportUnit,
+  type ValidationReport,
+} from "./report";
+
+export {
   INTERNAL_OPERATION_CATEGORIES,
   type InternalAccess,
   type InternalOperationCategory,
