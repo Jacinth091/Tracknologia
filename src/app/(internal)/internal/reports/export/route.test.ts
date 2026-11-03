@@ -165,9 +165,15 @@ describe("Validation report export", () => {
     );
     const body = await response.text();
     expect(body.split("\n")[0]).toBe(
-      "section,metric,bucket,value,unit,suppressed",
+      "record,section,metric,bucket,value,unit,suppressed",
     );
-    expect(body).toContain("providers,onboarded_in_period,SHOP,,");
+    expect(body).toContain("meta,,window.timeZone,,Asia/Manila,,");
+    expect(body).toContain("meta,,window.startUtc,,");
+    expect(body).toContain("meta,,generatedAt,,");
+    expect(body).toContain("meta,,source,,INTERNAL_VALIDATION_METRICS,,");
+    expect(body).toContain("glossary,,");
+    expect(body).toContain("note,,,,");
+    expect(body).toContain("row,providers,onboarded_in_period,SHOP,,");
   });
 
   it("downloads JSON with the window and no identifiers", async () => {

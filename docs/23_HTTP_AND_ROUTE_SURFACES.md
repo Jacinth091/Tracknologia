@@ -168,12 +168,16 @@ for a missing/unknown `format` or an invalid window, `401` for an anonymous
 caller, the private `404` for a non-operator, and `503` when the guard or the
 metrics read is unavailable. `format=csv|json` streams the attachment with
 `Content-Disposition: attachment`, `Cache-Control: no-store` and
-`X-Content-Type-Options: nosniff`. Payloads contain count-only rows plus window,
-generated-at, revision, source, coverage, glossary, suppression flags and
-missing-data notes; counts from 1 to 4 are hidden, a hidden part hides its total,
-and derived ratios follow their inputs. No Provider, Customer, feedback or
-authentication identifiers are exported, and CSV cells are formula-injection
-safe.
+`X-Content-Type-Options: nosniff`. JSON carries the whole report object. CSV is
+one seven-column table (`record,section,metric,bucket,value,unit,suppressed`):
+`record` is `meta` (key in `metric`), `glossary` (term in `metric`, definition in
+`value`), `note` (text in `value`) or `row`. Both formats therefore carry the
+window, generated-at, revision, source, coverage, glossary, suppression flags
+and missing-data notes. Counts from 1 to 4 are hidden; a hidden part hides its
+total; and one small Feedback count pools the whole Feedback section, because
+its category, source, status and daily partitions share a single total. Derived
+ratios follow their inputs. No Provider, Customer, feedback or authentication
+identifiers are exported, and CSV cells are formula-injection safe.
 
 ## Server Actions
 

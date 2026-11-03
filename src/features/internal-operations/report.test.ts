@@ -275,6 +275,48 @@ describe("buildValidationReport", () => {
     });
   });
 
+  it("pools the whole Feedback section when any partition has a small count", () => {
+    // Category 2 is small. Source and status partitions would otherwise sum
+    // to the visible total of 12 and reveal it by subtraction.
+    const report = buildValidationReport(
+      metrics({
+        feedback: feedback({
+          total: 12,
+          byCategory: { BUG: 2, USABILITY: 5, FEATURE_REQUEST: 5, GENERAL: 0 },
+          bySource: {
+            PUBLIC_TRACKING: 6,
+            PUBLIC_REQUEST: 6,
+            PUBLIC_FEEDBACK: 0,
+            PROVIDER_WORKSPACE: 0,
+          },
+          byStatus: {
+            NEW: 12,
+            REVIEWING: 0,
+            PLANNED: 0,
+            RESOLVED: 0,
+            DISMISSED: 0,
+          },
+          daily: [{ date: "2026-10-27", count: 12 }],
+        }),
+      }),
+    );
+
+    const feedbackRows = report.rows.filter(
+      (entry) => entry.section === "feedback",
+    );
+    expect(feedbackRows.length).toBeGreaterThan(0);
+    expect(
+      feedbackRows.every((entry) => entry.suppressed && entry.value === null),
+    ).toBe(true);
+    expect(feedbackRows.map((entry) => entry.value)).not.toContain(12);
+    expect(report.notes.join(" ")).toContain("Feedback is pooled as a whole");
+    // Other sections keep their visible values.
+    expect(row(report, "tracking/period_views/")).toMatchObject({
+      value: 30,
+      suppressed: false,
+    });
+  });
+
   it("records missing Feedback data instead of inventing zeroes", () => {
     const report = buildValidationReport(metrics({ feedback: null }));
 
@@ -297,31 +339,41 @@ describe("buildValidationReport", () => {
 
 describe("report serialization", () => {
   function csvRows(csv: string): ReportRow[] {
-    const lines = csv.trim().split("\n");
-    const header = lines[0].split(",");
-    return lines.slice(1).map((line) => {
-      const cells = line.split(",");
-      const record = Object.fromEntries(
-        header.map((column, index) => [column, cells[index]]),
-      );
-      return {
-        section: record.section,
-        metric: record.metric,
-        bucket: record.bucket || null,
-        value: record.value === "" ? null : Number(record.value),
-        unit: record.unit as ReportRow["unit"],
-        suppressed: record.suppressed === "true",
-      };
-    });
+    return csv
+      .trim()
+      .split("\n")
+      .filter((line) => line.startsWith("row,"))
+      .map((line) => {
+        const [, section, metric, bucket, value, unit, suppressed] =
+          line.split(",");
+        return {
+          section,
+          metric,
+          bucket: bucket || null,
+          value: value === "" ? null : Number(value),
+          unit: unit as ReportRow["unit"],
+          suppressed: suppressed === "true",
+        };
+      });
   }
 
-  it("writes a CSV header and one row per metric with suppressed values blank", () => {
+  it("writes report context, glossary, notes and one row per metric", () => {
     const report = buildValidationReport(metrics());
     const csv = validationReportToCsv(report);
 
     expect(csv.split("\n")[0]).toBe(
-      "section,metric,bucket,value,unit,suppressed",
+      "record,section,metric,bucket,value,unit,suppressed",
     );
+    expect(csv).toContain("meta,,generatedAt,,");
+    expect(csv).toContain("meta,,window.timeZone,,Asia/Manila,,");
+    expect(csv).toContain("meta,,window.startUtc,,2026-10-22T16:00:00.000Z,,");
+    expect(csv).toContain("meta,,source,,INTERNAL_VALIDATION_METRICS,,");
+    expect(csv).toContain("meta,,coverage.feedback.status,,AVAILABLE,,");
+    expect(csv).toContain("meta,,suppression.minimumGroup,,5,,");
+    expect(csv).toContain("glossary,,Providers onboarded,,");
+    expect(csv).toContain("note,,,,");
+    expect(csv).toContain("meta,,revision,,,,");
+
     const rows = csvRows(csv);
     expect(rows).toHaveLength(report.rows.length);
     expect(

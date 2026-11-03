@@ -51,12 +51,12 @@ URL params map to the window input with a 7-day default, and that no raw
 identifiers appear in the HTML. It needs no database.
 
 `src/features/internal-operations/report.test.ts` covers the export projection:
-small-count suppression, complementary totals, derived ratios, explicit N/A,
-missing Feedback, revision gating, CSV header/quoting/formula safety and JSON
-round-trip. `src/app/(internal)/internal/reports/page.test.tsx` covers the
-export page's period links, guard outcomes, unavailable Feedback and glossary.
-`.../reports/export/route.test.ts` covers the `400/401/404/503` outcomes and the
-attachment, `no-store`, `nosniff`, CSV and JSON responses.
+small-count suppression, complementary totals, Feedback section pooling, derived
+ratios, explicit N/A, missing Feedback, revision gating, CSV metadata/rows,
+quoting/formula safety and JSON round-trip. `src/app/(internal)/internal/reports/page.test.tsx`
+covers the export page's period links, guard outcomes, unavailable Feedback and
+glossary. `.../reports/export/route.test.ts` covers the `400/401/404/503`
+outcomes and the attachment, `no-store`, `nosniff`, CSV and JSON responses.
 
 Avoid testing implementation details or Tailwind class strings unless they are functionally significant.
 

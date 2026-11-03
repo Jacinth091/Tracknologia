@@ -148,6 +148,19 @@ function applySuppression(cells: Cell[]): void {
     }
   }
 
+  // Feedback category, source, status and daily rows all partition the same
+  // total. Hiding one cell is not enough: another complete partition still
+  // sums to that total and reveals the hidden value by subtraction, so the
+  // whole section is pooled once any Feedback count is small.
+  const feedbackHidden = cells.some(
+    (cell) => cell.row.section === "feedback" && cell.row.suppressed,
+  );
+  if (feedbackHidden) {
+    for (const cell of cells) {
+      if (cell.row.section === "feedback") cell.row.suppressed = true;
+    }
+  }
+
   for (const cell of cells) {
     if (!cell.group || cell.row.bucket !== "TOTAL") continue;
     const smallPart = cells.some(
@@ -492,6 +505,12 @@ export function buildValidationReport(
   ];
   if (!feedback) {
     notes.push("Feedback counts are unavailable for this window.");
+  } else if (
+    cells.some((cell) => cell.row.section === "feedback" && cell.row.suppressed)
+  ) {
+    notes.push(
+      "Feedback is pooled as a whole when any Feedback count is below the minimum group, because its category, source, status and daily partitions share one total.",
+    );
   }
 
   return {
@@ -512,6 +531,7 @@ export function buildValidationReport(
 }
 
 const CSV_COLUMNS = [
+  "record",
   "section",
   "metric",
   "bucket",
@@ -526,22 +546,69 @@ function csvField(value: string): string {
   return /[",\n\r]/.test(safe) ? `"${safe.replaceAll('"', '""')}"` : safe;
 }
 
+function csvLine(cells: string[]): string {
+  return cells.map(csvField).join(",");
+}
+
+/**
+ * CSV carries the same context as JSON: a fixed seven-column table where
+ * `record` is `meta`, `glossary`, `note` or `row`. Metadata uses `metric` as
+ * its key; glossary rows carry the term in `metric` and the definition in
+ * `value`; notes are plain rows; metric rows follow the report schema.
+ */
 export function validationReportToCsv(report: ValidationReport): string {
   const lines = [CSV_COLUMNS.join(",")];
+  const meta = (key: string, value: string | number | boolean) => {
+    lines.push(csvLine(["meta", "", key, "", String(value), "", ""]));
+  };
+
+  meta("generatedAt", report.generatedAt);
+  meta("asOf", report.asOf);
+  meta("revision", report.revision ?? "");
+  meta("source", report.source);
+  meta("window.mode", report.window.mode);
+  meta("window.startDate", report.window.startDate);
+  meta("window.endDateExclusive", report.window.endDateExclusive);
+  meta("window.days", report.window.days);
+  meta("window.timeZone", report.window.timeZone);
+  meta("window.startUtc", report.window.startUtc);
+  meta("window.endUtc", report.window.endUtc);
+  meta("suppression.minimumGroup", report.suppression.minimumGroup);
+  meta("suppression.applied", report.suppression.applied);
+
+  const { domain, feedback, retentionPolicy } = report.coverage;
+  meta("coverage.domain.source", domain.source);
+  meta("coverage.domain.coverage", domain.coverage);
+  meta("coverage.domain.snapshot", domain.snapshot);
+  meta("coverage.domain.observedEndUtc", domain.observedEndUtc);
+  meta("coverage.feedback.source", feedback.source);
+  meta("coverage.feedback.coverage", feedback.coverage);
+  meta("coverage.feedback.status", feedback.status);
+  meta("coverage.feedback.asOfStart", feedback.asOfStart ?? "");
+  meta("coverage.feedback.asOfEnd", feedback.asOfEnd ?? "");
+  meta("coverage.feedback.batches", feedback.batches);
+  meta("coverage.retentionPolicy", retentionPolicy);
+
+  for (const { term, definition } of report.glossary) {
+    lines.push(csvLine(["glossary", "", term, "", definition, "text", ""]));
+  }
+  for (const note of report.notes) {
+    lines.push(csvLine(["note", "", "", "", note, "text", ""]));
+  }
   for (const row of report.rows) {
     lines.push(
-      [
+      csvLine([
+        "row",
         row.section,
         row.metric,
         row.bucket ?? "",
         row.value === null ? "" : String(row.value),
         row.unit,
         String(row.suppressed),
-      ]
-        .map(csvField)
-        .join(","),
+      ]),
     );
   }
+
   return `${lines.join("\n")}\n`;
 }
 
