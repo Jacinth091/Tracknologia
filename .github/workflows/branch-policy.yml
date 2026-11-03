@@ -23,74 +23,14 @@ jobs:
     timeout-minutes: 5
 
     steps:
+      - name: Check out branch policy
+        uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+
       - name: Validate promotion path
         shell: bash
         env:
           BASE_BRANCH: ${{ github.base_ref }}
           HEAD_BRANCH: ${{ github.head_ref }}
-        run: |
-          echo "Validating pull request: ${HEAD_BRANCH} -> ${BASE_BRANCH}"
-
-          # Developer/fork branch names are intentionally unrestricted.
-          # Any branch may submit a PR into a protected feature integration branch.
-          if [[ "$BASE_BRANCH" == feature/* ]]; then
-            echo "Valid contributor PR into feature integration branch."
-            exit 0
-          fi
-
-          # Only approved upstream integration branches may enter staging.
-          if [ "$BASE_BRANCH" = "staging" ]; then
-            case "$HEAD_BRANCH" in
-              # NN is the issue number and may have any number of digits.
-              feature/[0-9]*/*)
-                echo "Valid feature promotion into staging."
-                ;;
-              fix/*|hotfix/*|chore/*|dependabot/*)
-                echo "Valid maintenance promotion into staging."
-                ;;
-              release/*)
-                echo "Valid release promotion into staging."
-                ;;
-              *)
-                echo "::error::Invalid source branch for staging."
-                echo "Expected feature/NN/name, fix/*, hotfix/*, chore/*, dependabot/*, or release/*."
-                exit 1
-                ;;
-            esac
-
-            exit 0
-          fi
-
-          # Release integration branches accept the same approved sources as staging.
-          if [[ "$BASE_BRANCH" == release/* ]]; then
-            case "$HEAD_BRANCH" in
-              # NN is the issue number and may have any number of digits.
-              feature/[0-9]*/*)
-                echo "Valid feature integration into release branch."
-                ;;
-              fix/*|hotfix/*|chore/*|dependabot/*)
-                echo "Valid maintenance integration into release branch."
-                ;;
-              *)
-                echo "::error::Invalid source branch for release branch."
-                echo "Expected feature/NN/name, fix/*, hotfix/*, chore/*, or dependabot/*."
-                exit 1
-                ;;
-            esac
-
-            exit 0
-          fi
-
-          # Master accepts releases only from staging.
-          if [ "$BASE_BRANCH" = "main" ]; then
-            if [ "$HEAD_BRANCH" != "staging" ]; then
-              echo "::error::Only staging may be merged into main."
-              exit 1
-            fi
-
-            echo "Valid release promotion: staging -> main"
-            exit 0
-          fi
-
-          echo "::error::Unexpected protected target branch: $BASE_BRANCH"
-          exit 1
+        run: bash scripts/check-branch-policy.sh "$BASE_BRANCH" "$HEAD_BRANCH"
