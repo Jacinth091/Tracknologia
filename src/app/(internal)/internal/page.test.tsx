@@ -4,6 +4,8 @@ import { renderToStaticMarkup } from "react-dom/server";
 // Mocked: the access guard, the metrics read, the chart component and framework
 // navigation. The page renders for real with the fixture.
 const feature = vi.hoisted(() => ({
+  deploymentRevision: vi.fn(),
+  getInternalHealth: vi.fn(),
   getValidationMetrics: vi.fn(),
   getNewFeedbackCount: vi.fn(),
   recordSensitiveInternalAccess: vi.fn(),
@@ -29,6 +31,8 @@ vi.mock("@/features/internal-operations", () => ({
       super(message);
     }
   },
+  deploymentRevision: feature.deploymentRevision,
+  getInternalHealth: feature.getInternalHealth,
   getValidationMetrics: feature.getValidationMetrics,
   recordSensitiveInternalAccess: feature.recordSensitiveInternalAccess,
   requireInternalOperator: feature.requireInternalOperator,
@@ -103,6 +107,10 @@ const fixture = {
   feedback: {
     byStatus: { NEW: 1, REVIEWING: 2, PLANNED: 1, RESOLVED: 1, DISMISSED: 0 },
   },
+  asOf: "2026-10-30T12:00:00.000Z",
+  coverage: {
+    feedback: { status: "AVAILABLE" },
+  },
 };
 
 async function renderHome() {
@@ -118,6 +126,26 @@ beforeEach(() => {
   feature.recordSensitiveInternalAccess.mockResolvedValue(true);
   feature.getValidationMetrics.mockResolvedValue(fixture);
   feature.getNewFeedbackCount.mockResolvedValue(2);
+  feature.getInternalHealth.mockResolvedValue({
+    checkedAt: "2026-10-30T12:00:00.000Z",
+    application: {
+      status: "healthy",
+      latencyMs: null,
+      observedAt: "2026-10-30T12:00:00.000Z",
+    },
+    database: {
+      status: "healthy",
+      latencyMs: 42,
+      observedAt: "2026-10-30T12:00:00.000Z",
+    },
+    auth: {
+      status: "degraded",
+      latencyMs: 1500,
+      observedAt: "2026-10-30T12:00:00.000Z",
+    },
+    email: { status: "unknown", latencyMs: null, observedAt: null },
+  });
+  feature.deploymentRevision.mockReturnValue("abc1234");
 });
 
 describe("internal overview headline numbers", () => {
@@ -230,5 +258,45 @@ describe("internal overview headline numbers", () => {
 
     await expect(renderHome()).rejects.toThrow("notFound");
     expect(feature.recordSensitiveInternalAccess).not.toHaveBeenCalled();
+  });
+
+  it("shows truthful system status without treating missing telemetry as healthy", async () => {
+    const html = await renderHome();
+
+    expect(html).toContain("System status");
+    expect(html).toContain(">Healthy<");
+    expect(html).toContain(">Degraded<");
+    expect(html).toContain(">Unknown<");
+    expect(html).toContain(
+      "Not observed — no independent monitor is connected.",
+    );
+    expect(html).toContain("abc1234");
+    expect(html).toContain('href="/internal/health"');
+    expect(html).toContain('href="/internal/diagnostics"');
+  });
+
+  it("states when service checks are unavailable", async () => {
+    feature.getInternalHealth.mockRejectedValue(new Error("boom"));
+    vi.spyOn(console, "error").mockImplementation(() => {});
+
+    const html = await renderHome();
+
+    expect(html).toContain("Service checks are unavailable right now.");
+    expect(html).toContain("Nothing is assumed healthy.");
+  });
+
+  it("states when feedback coverage is unavailable", async () => {
+    feature.getValidationMetrics.mockResolvedValue({
+      ...fixture,
+      coverage: { feedback: { status: "UNAVAILABLE" } },
+    });
+
+    expect(await renderHome()).toContain("Unavailable");
+  });
+
+  it("says the release is not reported instead of inventing one", async () => {
+    feature.deploymentRevision.mockReturnValue(null);
+
+    expect(await renderHome()).toContain("Not reported by this runtime");
   });
 });

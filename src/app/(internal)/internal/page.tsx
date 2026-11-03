@@ -18,13 +18,20 @@ import {
   CardTitle,
 } from "@/components/ui/card";
 import {
+  deploymentRevision,
+  getInternalHealth,
   getValidationMetrics,
   MetricsError,
   recordSensitiveInternalAccess,
   requireInternalOperator,
+  type InternalHealth,
   type ValidationMetrics,
 } from "@/features/internal-operations";
 import { InternalServiceUnavailable } from "./_components/internal-service-unavailable";
+import {
+  formatProbeTime,
+  HealthStatusBadge,
+} from "./_components/health-status";
 import {
   dailySeries,
   dailySummary,
@@ -36,6 +43,13 @@ import { StatTile } from "./_components/stat-tile";
 function formatCount(value: number) {
   return value.toLocaleString("en-PH");
 }
+
+const STATUS_CHECKS = [
+  ["application", "Application"],
+  ["database", "Database"],
+  ["auth", "Authentication"],
+  ["email", "Email"],
+] as const;
 
 export default async function InternalPage() {
   // The layout guard is not sufficient by itself: every sensitive internal
@@ -57,6 +71,7 @@ export default async function InternalPage() {
   // Feature reads audit themselves; the page audits its fallback links only.
   let metrics: ValidationMetrics | null = null;
   let newFeedbackCount: number | null = null;
+  let health: InternalHealth | null = null;
   try {
     metrics = await getValidationMetrics({ mode: "7d" });
   } catch (error) {
@@ -73,6 +88,11 @@ export default async function InternalPage() {
 
   if (metrics) {
     try {
+      health = await getInternalHealth();
+    } catch {
+      health = null;
+    }
+    try {
       newFeedbackCount = await getNewFeedbackCount();
     } catch (error) {
       if (error instanceof FeedbackError && error.code === "FORBIDDEN") {
@@ -81,6 +101,8 @@ export default async function InternalPage() {
       newFeedbackCount = null;
     }
   }
+
+  const revision = deploymentRevision();
 
   const openRepairs = metrics
     ? Object.entries(metrics.repairs.statusNow)
@@ -147,6 +169,79 @@ export default async function InternalPage() {
               icon={Message01Icon}
             />
           </div>
+
+          <Card className="space-y-4 p-4 sm:p-5">
+            <div className="flex flex-wrap items-start justify-between gap-3">
+              <div className="space-y-1">
+                <h2 className="text-base font-semibold">System status</h2>
+                <p className="text-sm leading-relaxed text-muted-foreground">
+                  Probed when this page loads. Uptime is not observed yet, so
+                  silence never counts as healthy.
+                </p>
+              </div>
+              <div className="flex flex-wrap gap-2">
+                <Link
+                  href="/internal/health"
+                  className="text-sm font-medium underline underline-offset-4"
+                >
+                  Health
+                </Link>
+                <Link
+                  href="/internal/diagnostics"
+                  className="text-sm font-medium underline underline-offset-4"
+                >
+                  Diagnostics
+                </Link>
+              </div>
+            </div>
+
+            {health ? (
+              <dl className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+                {STATUS_CHECKS.map(([key, label]) => (
+                  <div key={key} className="flex items-center gap-2">
+                    <dt className="text-sm text-muted-foreground">{label}</dt>
+                    <dd>
+                      <HealthStatusBadge status={health[key].status} />
+                    </dd>
+                  </div>
+                ))}
+              </dl>
+            ) : (
+              <p className="text-sm text-muted-foreground">
+                Service checks are unavailable right now. Nothing is assumed
+                healthy.
+              </p>
+            )}
+
+            <dl className="grid gap-3 border-t border-border pt-4 text-sm sm:grid-cols-2 lg:grid-cols-4">
+              <div>
+                <dt className="text-muted-foreground">Uptime</dt>
+                <dd className="text-foreground">
+                  Not observed — no independent monitor is connected.
+                </dd>
+              </div>
+              <div>
+                <dt className="text-muted-foreground">Latest release</dt>
+                <dd className="font-mono text-foreground">
+                  {revision ?? "Not reported by this runtime"}
+                </dd>
+              </div>
+              <div>
+                <dt className="text-muted-foreground">Data as of</dt>
+                <dd className="text-foreground">
+                  {formatProbeTime(metrics.asOf)}
+                </dd>
+              </div>
+              <div>
+                <dt className="text-muted-foreground">Feedback coverage</dt>
+                <dd className="text-foreground">
+                  {metrics.coverage.feedback.status === "AVAILABLE"
+                    ? "Available"
+                    : "Unavailable"}
+                </dd>
+              </div>
+            </dl>
+          </Card>
 
           <Card>
             <CardHeader className="px-4 pt-4 pb-0 sm:px-5 sm:pt-5">
