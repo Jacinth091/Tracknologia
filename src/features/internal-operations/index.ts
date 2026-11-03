@@ -7,6 +7,13 @@ export {
 export { checkReadiness } from "./readiness";
 
 export {
+  getInternalHealth,
+  type HealthCheck,
+  type HealthStatus,
+  type InternalHealth,
+} from "./health";
+
+export {
   getValidationMetrics,
   MetricsError,
   type ValidationMetrics,
