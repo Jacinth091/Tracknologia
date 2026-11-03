@@ -202,7 +202,16 @@ protection remain in place.
 The internal header follows the Provider workspace pattern: inline desktop
 navigation, a phone navigation drawer that closes on selection, and an account
 dropdown containing Privacy notice and Sign Out. It identifies this workspace as
-Internal operations / Operator without displaying a Provider identity.
+Internal operations / Operator without displaying a Provider identity. The nav
+lists Health and Diagnostics beside Overview, Feedback and Activity.
+
+Health shows one card per service with a text status badge, latency and probe
+time; text carries the meaning and color only adds emphasis. Unprobed services
+read Not probed, never 0 ms, and email explains whether SMTP exists rather than
+claiming health. Diagnostics separates deployment provenance, raw probe rows,
+non-secret ingress and email configuration, and a Not observed list, so absent
+telemetry is never mistaken for a healthy zero. Both pages refresh only on an
+explicit click and state their audit and probe-time context in supporting text.
 
 ## Authenticated Provider area
 

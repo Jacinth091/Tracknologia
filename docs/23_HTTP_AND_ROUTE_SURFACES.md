@@ -152,6 +152,26 @@ visitors are redirected to login, forbidden operators get the private 404, and
 unavailable access or audit renders the safe unavailable state. The period
 picker is a plain form with no client JavaScript; refresh is a deliberate reload.
 
+### `/internal/health`
+
+Operator-only current service state. It re-runs the guard, records the required
+access audit, then calls `getInternalHealth()` and renders application,
+database, auth and email with `healthy` / `degraded` / `unavailable` / `unknown`
+/ `stale`, latency, and probe time. The application check means "this page
+rendered"; database and auth are live bounded probes; email is `unknown` when
+SMTP is configured but unprobed and `unavailable` when no transport exists.
+Nothing is auto-refreshed, and the page states which signals (independent
+uptime, host telemetry, operation counters) are not connected yet.
+
+### `/internal/diagnostics`
+
+Operator-only provenance view behind the same guard and audit. It shows the
+deploy revision only when the environment supplies a hex SHA, runtime,
+application origin, retention policy, raw probe rows, and non-secret ingress and
+email configuration (client-IP source, transport configured, confirmation
+requirement, shared dev bucket). It also lists the signals that are not
+observed, so missing telemetry is never read as healthy.
+
 ## Server Actions
 
 Good candidates:

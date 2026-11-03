@@ -174,6 +174,10 @@ not `healthy`; email is `unknown` when SMTP is configured but unprobed and
 `unavailable` when no transport is configured. `stale` is reserved for the
 external uptime observer and is never faked locally.
 
+`revision.ts` exposes `deploymentRevision()`: it returns an environment-supplied
+hex commit SHA and otherwise `null`, so operator pages and exports never echo
+arbitrary environment text.
+
 A private internal area does not justify a second application shell, Provider
 impersonation, or Auth-metadata authorization. Provisioning/revocation remains a
 manual, owner-approved service-role operation, not a web action.

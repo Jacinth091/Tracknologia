@@ -50,6 +50,15 @@ unavailable Feedback show as N/A and Unavailable rather than 0, that each
 URL params map to the window input with a 7-day default, and that no raw
 identifiers appear in the HTML. It needs no database.
 
+`src/app/(internal)/internal/health/page.test.tsx` and
+`.../diagnostics/page.test.tsx` render those operator pages with the feature
+guard, audit, health probe, deployment revision and server config mocked at
+their seams. They check every status label and latency, that unprobed services
+read Not probed rather than 0 ms, that email explains unknown/unavailable
+instead of claiming health, that a missing revision is stated rather than
+invented, the anonymous redirect, the private 404, the fail-closed unavailable
+states and the recorded view audit. They need no database.
+
 Avoid testing implementation details or Tailwind class strings unless they are functionally significant.
 
 ### End-to-end tests — Playwright
