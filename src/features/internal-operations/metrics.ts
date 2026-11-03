@@ -534,35 +534,39 @@ async function readMetricRows(
     );
   }
   const parsed = metricsRowSchema.array().safeParse(data);
-  if (!parsed.success || parsed.data.length === 0) {
-    throw new MetricsError(
-      "Validation metrics are unavailable. Please try again.",
-      "UNAVAILABLE",
-    );
+  if (!parsed.success) {
+    throw rejectedMetricsRows("SCHEMA_INVALID");
   }
   const rows = parsed.data;
   const seen = new Set<string>();
   for (const row of rows) {
     const key = row.dimension + "/" + row.bucket;
+    if (seen.has(key)) throw rejectedMetricsRows("GROUP_DUPLICATE");
+    if (row.as_of !== rows[0].as_of) {
+      throw rejectedMetricsRows("AS_OF_MISMATCH");
+    }
     if (
-      seen.has(key) ||
-      row.as_of !== rows[0].as_of ||
-      (row.dimension === "ACTIVE_DAY" &&
-        (row.bucket < window.startDate ||
-          row.bucket >= window.endDateExclusive))
+      row.dimension === "ACTIVE_DAY" &&
+      (row.bucket < window.startDate || row.bucket >= window.endDateExclusive)
     ) {
-      throw new MetricsError(
-        "Validation metrics are unavailable. Please try again.",
-        "UNAVAILABLE",
-      );
+      throw rejectedMetricsRows("ACTIVE_DAY_OUT_OF_WINDOW");
     }
     seen.add(key);
   }
   if (!REQUIRED_GROUPS.every((key) => seen.has(key))) {
-    throw new MetricsError(
-      "Validation metrics are unavailable. Please try again.",
-      "UNAVAILABLE",
-    );
+    throw rejectedMetricsRows("GROUP_MISSING");
   }
   return rows;
+}
+
+/**
+ * Logs one fixed, PII-free reason per rejection so an unavailable report is
+ * diagnosable, then fails closed. Row values are never logged.
+ */
+function rejectedMetricsRows(reason: string): MetricsError {
+  console.error("[METRICS_FAILURE] validation metrics rejected", { reason });
+  return new MetricsError(
+    "Validation metrics are unavailable. Please try again.",
+    "UNAVAILABLE",
+  );
 }
