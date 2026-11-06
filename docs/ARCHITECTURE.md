@@ -174,6 +174,10 @@ not `healthy`; email is `unknown` when SMTP is configured but unprobed and
 `unavailable` when no transport is configured. `stale` is reserved for the
 external uptime observer and is never faked locally.
 
+`revision.ts` exposes `deploymentRevision()`: it returns an environment-supplied
+hex commit SHA and otherwise `null`, so operator pages and exports never echo
+arbitrary environment text.
+
 `buildValidationReport` is the pure export projection over `ValidationMetrics`.
 The `(internal)/internal/reports/export` Route Handler is a thin transport
 adapter: guard, window parse, metrics read, serialize, headers. Suppression

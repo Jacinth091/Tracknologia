@@ -1,6 +1,7 @@
 import "server-only";
 
 import type { ValidationMetrics } from "./metrics";
+import { deploymentRevision } from "./revision";
 
 /**
  * Privacy-safe, count-only report rows for the validation exports. No Provider,
@@ -197,14 +198,6 @@ function applySuppression(cells: Cell[]): void {
     // Suppressed values must not survive in the payload.
     if (cell.row.suppressed) cell.row.value = null;
   }
-}
-
-function reportRevision(): string | null {
-  const raw =
-    process.env.VERCEL_GIT_COMMIT_SHA?.trim() ||
-    process.env.APP_REVISION?.trim() ||
-    "";
-  return /^[0-9a-f]{7,40}$/i.test(raw) ? raw : null;
 }
 
 export function buildValidationReport(
@@ -531,7 +524,7 @@ export function buildValidationReport(
   return {
     generatedAt: new Date().toISOString(),
     asOf: metrics.asOf,
-    revision: reportRevision(),
+    revision: deploymentRevision(),
     source: "INTERNAL_VALIDATION_METRICS",
     window: metrics.window,
     coverage: metrics.coverage,

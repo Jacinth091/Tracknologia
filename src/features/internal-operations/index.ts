@@ -6,6 +6,8 @@ export {
 
 export { checkReadiness } from "./readiness";
 
+export { deploymentRevision } from "./revision";
+
 export {
   getInternalHealth,
   type HealthCheck,
