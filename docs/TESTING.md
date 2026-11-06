@@ -60,6 +60,13 @@ outcomes and the attachment, `no-store`, `nosniff`, CSV and JSON responses.
 
 Avoid testing implementation details or Tailwind class strings unless they are functionally significant.
 
+### Branch policy — Vitest
+
+`tests/contracts/branch-policy.test.mjs` runs `scripts/check-branch-policy.sh`
+against a branch-name matrix: numeric issue segments of any width pass, mixed or
+nonnumeric segments fail, maintenance/release sources are unchanged, and `main`
+still accepts only `staging`.
+
 ### End-to-end tests — Playwright
 
 Run with `pnpm test:e2e` (or `pnpm exec playwright test`). The suite lives under
