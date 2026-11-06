@@ -174,6 +174,33 @@ unconfigured transport, confirmation requirement, shared dev bucket). Retained-r
 coverage is separate from retention policy. It also lists the signals that are not
 observed, so missing telemetry is never read as healthy.
 
+### `/internal/reports`
+
+Operator-only export page for the validation report, linked from the internal
+navigation. It shares the Activity period filter and guards/audits through the
+same `getValidationMetrics` read. It links one count-only CSV and one JSON
+download for the selected period and renders the metric glossary, window,
+generation time, Feedback availability, and the suppression rule. No rows are
+rendered on the page itself.
+
+### `/internal/reports/export`
+
+`GET` Route Handler behind the same internal-operator guard. It returns `400`
+for a missing/unknown `format` or an invalid window, `401` for an anonymous
+caller, the private `404` for a non-operator, and `503` when the guard or the
+metrics read is unavailable. `format=csv|json` streams the attachment with
+`Content-Disposition: attachment`, `Cache-Control: no-store` and
+`X-Content-Type-Options: nosniff`. JSON carries the whole report object. CSV is
+one seven-column table (`record,section,metric,bucket,value,unit,suppressed`):
+`record` is `meta` (key in `metric`), `glossary` (term in `metric`, definition in
+`value`), `note` (text in `value`) or `row`. Both formats therefore carry the
+window, generated-at, revision, source, coverage, glossary, suppression flags
+and missing-data notes. Counts from 1 to 4 are hidden; a hidden part hides its
+total; and one small Feedback count pools the whole Feedback section, because
+its category, source, status and daily partitions share a single total. Derived
+ratios follow their inputs. No Provider, Customer, feedback or authentication
+identifiers are exported, and CSV cells are formula-injection safe.
+
 ## Server Actions
 
 Good candidates:

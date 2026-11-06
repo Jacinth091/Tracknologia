@@ -41,6 +41,19 @@ beforeEach(() => {
 });
 
 describe("InternalNav", () => {
+  it.each(["reports", "health", "diagnostics"])(
+    "keeps %s reachable and current after combining internal pages",
+    (page) => {
+      navigation.pathname = `/internal/${page}`;
+      const html = renderToStaticMarkup(<InternalNav />);
+
+      expect(currentLinks(html)).toEqual([navigation.pathname]);
+      for (const path of ["reports", "health", "diagnostics"]) {
+        expect(html).toContain(`href="/internal/${path}"`);
+      }
+    },
+  );
+
   it("marks Overview as current only on the exact overview path", () => {
     const html = renderToStaticMarkup(<InternalNav />);
 

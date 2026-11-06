@@ -185,6 +185,16 @@ dates. Graphs use foreground Ink for the primary series and neutral gray for the
 second categorical series; dark mode uses its foreground equivalent. Bars and
 arcs have clear boundaries, and donut values sit outside their slices.
 
+## Internal validation reports
+
+`/internal/reports` reuses the metrics period panel and adds two explanation
+cards: Export and Glossary. Export states the count-only boundary, offers CSV and
+JSON downloads for the current period, and shows the window, generation time,
+Feedback availability, and the minimum-group-5 suppression rule. Glossary uses
+the same definitions the exports carry, so a downloaded file and the page cannot
+drift. The page renders no counts itself; the Activity page remains the reading
+surface.
+
 The internal Overview uses compact headline tiles and a short activity empty
 state, with direct links to feedback review and full metrics. Feedback Inbox uses
 the same header scale, a grouped filter form with Clear filters, and a submission

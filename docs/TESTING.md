@@ -59,7 +59,22 @@ instead of claiming health, that a missing revision is stated rather than
 invented, the anonymous redirect, the private 404, the fail-closed unavailable
 states and the recorded view audit. They need no database.
 
+`src/features/internal-operations/report.test.ts` covers the export projection:
+small-count suppression, complementary totals, Feedback section pooling, derived
+ratios, explicit N/A, missing Feedback, revision gating, CSV metadata/rows,
+quoting/formula safety and JSON round-trip. `src/app/(internal)/internal/reports/page.test.tsx`
+covers the export page's period links, guard outcomes, unavailable Feedback and
+glossary. `.../reports/export/route.test.ts` covers the `400/401/404/503`
+outcomes and the attachment, `no-store`, `nosniff`, CSV and JSON responses.
+
 Avoid testing implementation details or Tailwind class strings unless they are functionally significant.
+
+### Branch policy — Vitest
+
+`tests/contracts/branch-policy.test.mjs` runs `scripts/check-branch-policy.sh`
+against a branch-name matrix: numeric issue segments of any width pass, mixed or
+nonnumeric segments fail, maintenance/release sources are unchanged, and `main`
+still accepts only `staging`.
 
 ### End-to-end tests — Playwright
 
