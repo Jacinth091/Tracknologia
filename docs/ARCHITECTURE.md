@@ -174,6 +174,13 @@ not `healthy`; email is `unknown` when SMTP is configured but unprobed and
 `unavailable` when no transport is configured. `stale` is reserved for the
 external uptime observer and is never faked locally.
 
+`buildValidationReport` is the pure export projection over `ValidationMetrics`.
+The `(internal)/internal/reports/export` Route Handler is a thin transport
+adapter: guard, window parse, metrics read, serialize, headers. Suppression
+(minimum group 5, complementary totals, derived ratios) and the count-only field
+set live in the Module, not the route, so page previews and downloads cannot
+diverge. CSV/JSON leave through attachment responses with `no-store`.
+
 A private internal area does not justify a second application shell, Provider
 impersonation, or Auth-metadata authorization. Provisioning/revocation remains a
 manual, owner-approved service-role operation, not a web action.

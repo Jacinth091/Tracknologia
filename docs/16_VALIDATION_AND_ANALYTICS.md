@@ -103,6 +103,24 @@ atomic shared snapshot. A zero period shows an empty
 state rather than an empty chart, and an unavailable Feedback section shows
 "Unavailable" in place of its charts.
 
+The same guarded read backs the count-only exports at `/internal/reports`.
+`buildValidationReport` projects `ValidationMetrics` into explicit
+section/metric/bucket rows and adds window (Manila dates plus UTC instants),
+generated-at, deploy revision, source, coverage, the shared glossary, and
+missing-data notes. Counts from 1 to 4 are suppressed to a hidden value, the
+total of a group with a hidden part is hidden too (so the part cannot be derived
+by subtraction), and a derived ratio is hidden when one of its input counts is.
+Current Repair statuses partition the all-time Repair total: a hidden status
+also hides that total and the tracking adoption ratio that depends on it.
+Zero stays visible and missing Feedback stays N/A. Any Feedback count from 1 to
+4 pools the whole Feedback section, because its category, source, status and
+daily rows are parallel partitions of one total and a visible partition would
+otherwise reveal the hidden cell. CSV and JSON carry the same rows and the same
+report context (window, generated-at, revision, source, coverage, glossary,
+suppression and notes); CSV uses a `record` column to distinguish metadata,
+glossary, notes and rows. CSV cells are formula-injection safe. Neither format
+carries Provider, Customer, feedback or authentication identifiers.
+
 ## Provider metrics
 
 ### Provider creation and type split
