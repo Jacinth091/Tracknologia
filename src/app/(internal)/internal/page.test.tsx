@@ -1,4 +1,4 @@
-import { beforeEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { renderToStaticMarkup } from "react-dom/server";
 
 // Mocked: the access guard, the metrics read, the chart component and framework
@@ -148,6 +148,10 @@ beforeEach(() => {
   feature.deploymentRevision.mockReturnValue("abc1234");
 });
 
+afterEach(() => {
+  vi.restoreAllMocks();
+});
+
 describe("internal overview headline numbers", () => {
   it("shows the four tiles and passes the seven-day rows to the chart", async () => {
     const html = await renderHome();
@@ -223,10 +227,17 @@ describe("internal overview headline numbers", () => {
     await expect(renderHome()).rejects.toThrow("notFound");
   });
 
-  it("keeps the header and shows a notice when the numbers fail", async () => {
+  it("keeps system status visible when metrics fail after a successful fallback audit", async () => {
     feature.getValidationMetrics.mockRejectedValue(
       new MetricsError("unavailable", "UNAVAILABLE"),
     );
+    feature.getInternalHealth.mockResolvedValue({
+      checkedAt: "2026-10-30T12:00:00.000Z",
+      application: { status: "healthy", latencyMs: null, observedAt: null },
+      database: { status: "unavailable", latencyMs: null, observedAt: null },
+      auth: { status: "healthy", latencyMs: 42, observedAt: null },
+      email: { status: "unknown", latencyMs: null, observedAt: null },
+    });
 
     const html = await renderHome();
 
@@ -240,6 +251,22 @@ describe("internal overview headline numbers", () => {
     expect(feature.recordSensitiveInternalAccess).toHaveBeenCalledWith(
       "INTERNAL_ACCESS_VIEW",
     );
+    expect(feature.getInternalHealth).toHaveBeenCalledTimes(1);
+    expect(
+      feature.recordSensitiveInternalAccess.mock.invocationCallOrder[0],
+    ).toBeLessThan(feature.getInternalHealth.mock.invocationCallOrder[0]);
+    expect(html).toContain("System status");
+    expect(html).toMatch(/Database<\/dt><dd>.*?>Unavailable</);
+    expect(html).toContain(">Healthy<");
+    expect(html).toContain(">Unknown<");
+    expect(html).toContain("Not observed");
+    expect(html).toContain("abc1234");
+    expect(html).toContain('href="/internal/health"');
+    expect(html).toContain('href="/internal/diagnostics"');
+    expect(html).toMatch(
+      /Domain metrics as of<\/dt><dd[^>]*>Unavailable<\/dd>/,
+    );
+    expect(html).toMatch(/Feedback coverage<\/dt><dd[^>]*>Unavailable<\/dd>/);
   });
 
   it("renders the unavailable screen when the numbers fail and the audit fails", async () => {
@@ -249,6 +276,8 @@ describe("internal overview headline numbers", () => {
     feature.recordSensitiveInternalAccess.mockResolvedValue(false);
 
     expect(await renderHome()).toBe("UNAVAILABLE_SCREEN");
+    expect(feature.getInternalHealth).not.toHaveBeenCalled();
+    expect(feature.deploymentRevision).not.toHaveBeenCalled();
   });
 
   it("calls notFound when the metrics read reports forbidden", async () => {
@@ -258,6 +287,7 @@ describe("internal overview headline numbers", () => {
 
     await expect(renderHome()).rejects.toThrow("notFound");
     expect(feature.recordSensitiveInternalAccess).not.toHaveBeenCalled();
+    expect(feature.getInternalHealth).not.toHaveBeenCalled();
   });
 
   it("shows truthful system status without treating missing telemetry as healthy", async () => {
@@ -271,18 +301,25 @@ describe("internal overview headline numbers", () => {
       "Not observed — no independent monitor is connected.",
     );
     expect(html).toContain("abc1234");
+    expect(html).toContain("Domain metrics as of");
+    expect(html).toContain("Oct 30, 2026, 8:00 PM");
     expect(html).toContain('href="/internal/health"');
     expect(html).toContain('href="/internal/diagnostics"');
   });
 
   it("states when service checks are unavailable", async () => {
-    feature.getInternalHealth.mockRejectedValue(new Error("boom"));
-    vi.spyOn(console, "error").mockImplementation(() => {});
+    feature.getInternalHealth.mockRejectedValue(
+      new Error("private-health-detail"),
+    );
+    const log = vi.spyOn(console, "error").mockImplementation(() => {});
 
     const html = await renderHome();
 
     expect(html).toContain("Service checks are unavailable right now.");
     expect(html).toContain("Nothing is assumed healthy.");
+    expect(log.mock.calls).toEqual([
+      ["[INTERNAL_OVERVIEW_FAILURE] health read threw"],
+    ]);
   });
 
   it("states when feedback coverage is unavailable", async () => {

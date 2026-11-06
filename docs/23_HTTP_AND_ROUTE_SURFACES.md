@@ -141,6 +141,25 @@ from the authenticated membership. The browser sends no Provider or user identit
 
 ## Internal operator routes
 
+### `/internal`
+
+Operator-only Overview, guarded again at the page seam. The seven-day validation
+metrics read is independently guarded and audited; if it fails without denying
+access, a fallback access audit must succeed before health is probed or protected
+links are rendered. Access or audit failure denies the page.
+
+Headline counts and activity come from metrics, while the current NEW Feedback
+backlog is read separately through its audited feature interface. System status
+uses the bounded `getInternalHealth()` probes independently of metrics success,
+shows uptime as Not observed, and renders only a SHA-shaped deployment revision
+(or an explicit missing-revision message). Health and Diagnostics links remain
+available after a metrics failure; unavailable numbers never become zeroes.
+**Domain metrics as of** is `metrics.asOf` displayed in Asia/Manila, not a shared
+timestamp for health, Feedback coverage or backlog. When metrics fail, this field
+and Feedback coverage explicitly read Unavailable. Unexpected health-read errors
+produce a fixed safe log and unavailable service checks while available metrics
+remain visible. The page adds no polling or automatic refresh.
+
 ### `/internal/activity`
 
 Operator-only validation metrics page, reached from the internal home page. It
