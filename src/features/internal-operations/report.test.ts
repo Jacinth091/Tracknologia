@@ -66,7 +66,7 @@ function metrics(
     staff: { memberships: 6, shopsWithStaff: 4 },
     repairs: {
       statusNow: {
-        IN_PROGRESS: 5,
+        IN_PROGRESS: 8,
         WAITING_FOR_PARTS: 2,
         AWAITING_APPROVAL: 0,
         READY: 6,
@@ -184,6 +184,56 @@ describe("buildValidationReport", () => {
     });
     expect(row(report, "tracking/period_views/")).toMatchObject({
       value: 30,
+      suppressed: false,
+    });
+  });
+
+  it("hides the all-time Repair total and adoption when a status is small", () => {
+    const input = metrics();
+    expect(
+      Object.values(input.repairs.statusNow).reduce((a, b) => a + b, 0),
+    ).toBe(input.tracking.allTimeRepairs);
+    const report = buildValidationReport(input);
+
+    for (const key of [
+      "repairs/status_now/WAITING_FOR_PARTS",
+      "tracking/all_time_repairs/",
+      "tracking/adoption_percent/",
+    ]) {
+      expect(row(report, key)).toMatchObject({ value: null, suppressed: true });
+    }
+    expect(row(report, "repairs/status_now/IN_PROGRESS")).toMatchObject({
+      value: 8,
+      suppressed: false,
+    });
+    expect(row(report, "tracking/all_time_repairs_viewed/")).toMatchObject({
+      value: 20,
+      suppressed: false,
+    });
+
+    expect(JSON.parse(validationReportToJson(report)).rows).toEqual(
+      report.rows,
+    );
+    const csv = validationReportToCsv(report);
+    expect(csv).toContain("row,tracking,all_time_repairs,,,count,true");
+    expect(csv).toContain("row,tracking,adoption_percent,,,percent,true");
+  });
+
+  it("keeps the all-time Repair total and adoption when every status is zero or large", () => {
+    const input = metrics();
+    input.repairs.statusNow.IN_PROGRESS = 10;
+    input.repairs.statusNow.WAITING_FOR_PARTS = 0;
+    expect(
+      Object.values(input.repairs.statusNow).reduce((a, b) => a + b, 0),
+    ).toBe(input.tracking.allTimeRepairs);
+    const report = buildValidationReport(input);
+
+    expect(row(report, "tracking/all_time_repairs/")).toMatchObject({
+      value: 25,
+      suppressed: false,
+    });
+    expect(row(report, "tracking/adoption_percent/")).toMatchObject({
+      value: 80,
       suppressed: false,
     });
   });
