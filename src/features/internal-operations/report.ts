@@ -4,7 +4,7 @@ import type { ValidationMetrics } from "./metrics";
 import { deploymentRevision } from "./revision";
 
 /**
- * Privacy-safe, count-only report rows for the validation exports. No Provider,
+ * Count-only report rows with within-export cohort suppression. No Provider,
  * Customer or feedback identifiers and no feedback bodies are ever included.
  */
 export const MIN_COHORT = 5;
@@ -149,16 +149,14 @@ function applySuppression(cells: Cell[]): void {
     }
   }
 
-  // Feedback category, source, status and daily rows all partition the same
-  // total. Hiding one cell is not enough: another complete partition still
-  // sums to that total and reveals the hidden value by subtraction, so the
-  // whole section is pooled once any Feedback count is small.
-  const feedbackHidden = cells.some(
-    (cell) => cell.row.section === "feedback" && cell.row.suppressed,
-  );
-  if (feedbackHidden) {
-    for (const cell of cells) {
-      if (cell.row.section === "feedback") cell.row.suppressed = true;
+  // Overlapping totals and partitions can reveal another withheld count.
+  for (const section of ["activity", "feedback", "requests", "tracking"]) {
+    if (
+      cells.some((cell) => cell.row.section === section && cell.row.suppressed)
+    ) {
+      for (const cell of cells) {
+        if (cell.row.section === section) cell.row.suppressed = true;
+      }
     }
   }
 
@@ -182,16 +180,6 @@ function applySuppression(cells: Cell[]): void {
       if (cell.row.section === "repairs" || cell.key === "REPAIR_ALL_TIME") {
         cell.row.suppressed = true;
       }
-    }
-  }
-
-  // Received, decided and pending can describe the same Request population.
-  const requestsHidden = cells.some(
-    (cell) => cell.row.section === "requests" && cell.row.suppressed,
-  );
-  if (requestsHidden) {
-    for (const cell of cells) {
-      if (cell.row.section === "requests") cell.row.suppressed = true;
     }
   }
 
@@ -514,11 +502,15 @@ export function buildValidationReport(
   const notes = [
     `Counts from 1 to ${MIN_COHORT - 1} are suppressed as "<${MIN_COHORT}".`,
     "A suppressed part also suppresses its total, so the part cannot be derived.",
+    "Activity distinct, repeat and daily Provider counts are pooled together when any Activity count is below the minimum group.",
+    "Tracking view and distinct-Repair counts are pooled together when any Tracking count is below the minimum group.",
     "Repairs are pooled as a whole when any Repair count is below the minimum group; the all-time Repair total and tracking adoption are also suppressed.",
     "Requests are pooled as a whole when any Request count is below the minimum group, including their conversion and decision-time figures.",
     "Derived ratios are suppressed when an input count is suppressed.",
     "Zero counts are shown outside pooled sections; missing Feedback data is N/A, never zero.",
     "No Provider, Customer, feedback or authentication identifiers are exported.",
+    "Suppression applies within this export only; comparing overlapping periods or snapshots can reveal small changes.",
+    "Share only reports reviewed together for disclosure with the approved internal/developer audience.",
   ];
   if (!feedback) {
     notes.push("Feedback counts are unavailable for this window.");

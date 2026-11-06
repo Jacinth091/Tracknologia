@@ -123,12 +123,154 @@ function row(report: ReturnType<typeof buildValidationReport>, key: string) {
   );
 }
 
+function expectPooledSection(
+  report: ReturnType<typeof buildValidationReport>,
+  section: string,
+) {
+  const rows = report.rows.filter((entry) => entry.section === section);
+  expect(rows.length).toBeGreaterThan(0);
+  expect(rows.every((entry) => entry.suppressed && entry.value === null)).toBe(
+    true,
+  );
+  expect(JSON.parse(validationReportToJson(report)).rows).toEqual(report.rows);
+  const csvRows = validationReportToCsv(report)
+    .split("\n")
+    .filter((line) => line.startsWith(`row,${section},`));
+  expect(csvRows).toHaveLength(rows.length);
+  for (const line of csvRows) {
+    const fields = line.split(",");
+    expect(fields[4]).toBe("");
+    expect(fields[6]).toBe("true");
+  }
+}
+
 afterEach(() => {
   delete process.env.VERCEL_GIT_COMMIT_SHA;
   delete process.env.APP_REVISION;
 });
 
 describe("buildValidationReport", () => {
+  it.each([
+    {
+      name: "repeat count",
+      providerDays: [
+        [1, 2, 3, 4, 5],
+        [5, 6, 7, 8, 9, 10],
+      ],
+      distinct: 10,
+      repeat: 1,
+    },
+    {
+      name: "daily count",
+      providerDays: [[1, 2, 3, 4, 5], [6]],
+      distinct: 6,
+      repeat: 0,
+    },
+  ])(
+    "pools Activity when a hidden $name can be reconstructed",
+    ({ providerDays, distinct, repeat }) => {
+      const activity = {
+        distinctProviders: new Set(providerDays.flat()).size,
+        repeatProviders: providerDays[0].filter((provider) =>
+          providerDays[1].includes(provider),
+        ).length,
+        daily: Array.from({ length: WINDOW.days }, (_, day) => ({
+          date: new Date(Date.parse(WINDOW.startDate) + day * 86_400_000)
+            .toISOString()
+            .slice(0, 10),
+          distinctProviders: providerDays[day]?.length ?? 0,
+        })),
+      };
+      expect(activity.distinctProviders).toBe(distinct);
+      expect(activity.repeatProviders).toBe(repeat);
+      expectPooledSection(
+        buildValidationReport(metrics({ activity })),
+        "activity",
+      );
+    },
+  );
+
+  it("keeps Activity counts visible when distinct, repeat and daily counts are zero or at least five", () => {
+    const activity = {
+      distinctProviders: 5,
+      repeatProviders: 5,
+      daily: [
+        { date: "2026-10-23", distinctProviders: 5 },
+        { date: "2026-10-24", distinctProviders: 5 },
+        { date: "2026-10-25", distinctProviders: 0 },
+      ],
+    };
+    const report = buildValidationReport(metrics({ activity }));
+    expect(row(report, "activity/distinct_providers/")).toMatchObject({
+      value: 5,
+      suppressed: false,
+    });
+    expect(row(report, "activity/repeat_providers/")).toMatchObject({
+      value: 5,
+      suppressed: false,
+    });
+    expect(
+      row(report, "activity/active_providers_per_day/2026-10-25"),
+    ).toMatchObject({ value: 0, suppressed: false });
+    expect(
+      report.rows
+        .filter((entry) => entry.section === "activity")
+        .every((entry) => !entry.suppressed),
+    ).toBe(true);
+  });
+
+  it("pools Tracking when event totals force a hidden distinct-Repair count", () => {
+    // Five period views cover four Repairs; one earlier view adds a fifth.
+    // 6 - 5 = one earlier event, so 5 all-time Repairs requires >=4 in-period.
+    const report = buildValidationReport(
+      metrics({
+        tracking: {
+          periodViews: 5,
+          periodRepairsViewed: 4,
+          allTimeViews: 6,
+          allTimeRepairsViewed: 5,
+          allTimeRepairs: 25,
+          adoptionPercent: 20,
+        },
+      }),
+    );
+    expectPooledSection(report, "tracking");
+  });
+
+  it("keeps Tracking counts and adoption visible when no Tracking count is small", () => {
+    const input = metrics({
+      tracking: {
+        periodViews: 5,
+        periodRepairsViewed: 5,
+        allTimeViews: 10,
+        allTimeRepairsViewed: 5,
+        allTimeRepairs: 25,
+        adoptionPercent: 20,
+      },
+    });
+    input.repairs.statusNow.IN_PROGRESS = 10;
+    input.repairs.statusNow.WAITING_FOR_PARTS = 0;
+    input.repairs.created = {
+      total: 11,
+      customerRequest: 5,
+      providerCreated: 6,
+    };
+    const report = buildValidationReport(input);
+    expect(
+      report.rows
+        .filter((entry) => entry.section === "tracking")
+        .every((entry) => !entry.suppressed),
+    ).toBe(true);
+    expect(row(report, "tracking/period_views/")).toMatchObject({
+      value: 5,
+      suppressed: false,
+    });
+    expect(row(report, "tracking/adoption_percent/")).toMatchObject({
+      value: 20,
+      suppressed: false,
+    });
+  });
+
   it("emits only count-only rows and carries the window, coverage and source", () => {
     const report = buildValidationReport(metrics());
 
@@ -663,6 +805,12 @@ describe("report serialization", () => {
     expect(csv).toContain("meta,,suppression.minimumGroup,,5,,");
     expect(csv).toContain("glossary,,Providers onboarded,,");
     expect(csv).toContain("note,,,,");
+    expect(csv).toContain(
+      "Suppression applies within this export only; comparing overlapping periods or snapshots can reveal small changes.",
+    );
+    expect(csv).toContain(
+      "Share only reports reviewed together for disclosure with the approved internal/developer audience.",
+    );
     expect(csv).toContain("meta,,revision,,,,");
 
     const rows = csvRows(csv);

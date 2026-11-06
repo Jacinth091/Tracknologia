@@ -218,10 +218,17 @@ and missing-data notes. Counts from 1 to 4 are hidden; a hidden part hides its
 total. One small Repair count pools the whole Repair section, its all-time total
 and tracking adoption, preventing subtraction across status, creation and origin
 counts. One small Request count pools the Request counts and ratios together.
+Activity distinct/repeat/daily Provider counts and Tracking event/distinct-Repair
+counts are each pooled as a section when any count in that section is small.
 One small Feedback count pools the whole Feedback section, because
 its category, source, status and daily partitions share a single total. Derived
 ratios follow their inputs. No Provider, Customer, feedback or authentication
 identifiers are exported, and CSV cells are formula-injection safe.
+Suppression is per export; overlapping windows or snapshots can reveal changes.
+The owner accepted this risk in #87 on 2026-11-07. The page and export notes state
+that only reports reviewed together for disclosure may be shared with the
+approved internal/developer audience. This sharing rule is operational, not an
+application-enforced cross-query guarantee.
 
 ## Server Actions
 
