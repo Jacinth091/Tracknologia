@@ -2,6 +2,13 @@
 
 **Record type:** release evidence matrix for the #96 integrated verification gate (Gates 4 and 5).
 
+**Historical fixed-point record:** the results and scope below apply only to the
+2026-10-31 candidate named here. Later #139–#141 console/export additions and the
+PR #132 privacy correction require new exact-head verification. The current
+owner scope amendment and outstanding release gates are described in
+[the release notes](../RELEASE_NOTES.md) and #87/#97; this older matrix does not
+certify the expanded production candidate.
+
 - **Status:** VERIFIED AT CANDIDATE (CI rows); owner-run items open.
 - **Candidate:** `release/0.2.0` @ `29838f8ece32b34ec44f5cd337ea0f3a85da7277` (merge of PR #117, 2026-10-31).
 - **Previous-release baseline:** `origin/staging` @ `420ed1a`, an ancestor of `release/0.2.0`.
