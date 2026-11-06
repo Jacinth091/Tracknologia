@@ -196,7 +196,16 @@ drift. The page renders no counts itself; the Activity page remains the reading
 surface.
 
 The internal Overview uses compact headline tiles and a short activity empty
-state, with direct links to feedback review and full metrics. Feedback Inbox uses
+state, with direct links to feedback review and full metrics. Its System status
+card shows live service badges, unobserved uptime, the reported release revision,
+domain-metrics freshness and Feedback coverage, with links to Health and
+Diagnostics. After the required access/audit gate, health is probed even when
+metrics fail: the status card stays visible beside a numbers-unavailable notice,
+and metrics-only freshness and coverage read Unavailable. The **Domain metrics
+as of** timestamp is the metrics database read, displayed in Asia/Manila; health,
+Feedback coverage and the current backlog are independent reads, not one atomic
+snapshot. Unexpected health-read failures show unavailable checks and emit only
+a fixed, secret-free log marker. Feedback Inbox uses
 the same header scale, a grouped filter form with Clear filters, and a submission
 list whose source, participant class, timestamp, status, and privacy/priority flags
 wrap independently on phones. Counts describe only the loaded page, not a global

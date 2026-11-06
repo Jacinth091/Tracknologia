@@ -18,13 +18,20 @@ import {
   CardTitle,
 } from "@/components/ui/card";
 import {
+  deploymentRevision,
+  getInternalHealth,
   getValidationMetrics,
   MetricsError,
   recordSensitiveInternalAccess,
   requireInternalOperator,
+  type InternalHealth,
   type ValidationMetrics,
 } from "@/features/internal-operations";
 import { InternalServiceUnavailable } from "./_components/internal-service-unavailable";
+import {
+  formatProbeTime,
+  HealthStatusBadge,
+} from "./_components/health-status";
 import {
   dailySeries,
   dailySummary,
@@ -36,6 +43,13 @@ import { StatTile } from "./_components/stat-tile";
 function formatCount(value: number) {
   return value.toLocaleString("en-PH");
 }
+
+const STATUS_CHECKS = [
+  ["application", "Application"],
+  ["database", "Database"],
+  ["auth", "Authentication"],
+  ["email", "Email"],
+] as const;
 
 export default async function InternalPage() {
   // The layout guard is not sufficient by itself: every sensitive internal
@@ -54,21 +68,28 @@ export default async function InternalPage() {
     return <InternalServiceUnavailable />;
   }
 
-  // Feature reads audit themselves; the page audits its fallback links only.
+  // Metrics audit themselves; the page audits fallback health reads and links.
   let metrics: ValidationMetrics | null = null;
   let newFeedbackCount: number | null = null;
+  let health: InternalHealth | null = null;
   try {
     metrics = await getValidationMetrics({ mode: "7d" });
   } catch (error) {
     if (error instanceof MetricsError && error.code === "FORBIDDEN") {
       notFound();
     }
-    // The numbers failed, but the links still need a required audit first.
+    // The numbers failed, but health and links still need a required audit first.
     const audited = await recordSensitiveInternalAccess("INTERNAL_ACCESS_VIEW");
 
     if (!audited) {
       return <InternalServiceUnavailable />;
     }
+  }
+
+  try {
+    health = await getInternalHealth();
+  } catch {
+    console.error("[INTERNAL_OVERVIEW_FAILURE] health read threw");
   }
 
   if (metrics) {
@@ -81,6 +102,8 @@ export default async function InternalPage() {
       newFeedbackCount = null;
     }
   }
+
+  const revision = deploymentRevision();
 
   const openRepairs = metrics
     ? Object.entries(metrics.repairs.statusNow)
@@ -112,95 +135,168 @@ export default async function InternalPage() {
         }
       />
       {metrics ? (
-        <>
-          <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
-            <StatTile
-              href="/internal/activity"
-              label="Providers (all time)"
-              value={formatCount(metrics.providers.allTime.total)}
-              status="ACCEPTED"
-              icon={Store01Icon}
-            />
-            <StatTile
-              href="/internal/activity"
-              label="Open repairs (now)"
-              value={formatCount(openRepairs)}
-              status="IN_PROGRESS"
-              icon={Wrench01Icon}
-            />
-            <StatTile
-              href="/internal/activity"
-              label="Pending requests (now)"
-              value={formatCount(metrics.requests.pendingNow)}
-              status="SUBMITTED"
-              icon={Clock01Icon}
-            />
-            <StatTile
-              href="/internal/feedback?status=NEW"
-              label="New feedback (now)"
-              value={
-                newFeedbackCount !== null
-                  ? formatCount(newFeedbackCount)
-                  : "Unavailable"
-              }
-              status="AWAITING_APPROVAL"
-              icon={Message01Icon}
-            />
-          </div>
-
-          <Card>
-            <CardHeader className="px-4 pt-4 pb-0 sm:px-5 sm:pt-5">
-              <div className="flex flex-wrap items-center justify-between gap-3">
-                <CardTitle>
-                  <h2 className="text-base font-semibold">
-                    Active providers, last 7 days
-                  </h2>
-                </CardTitle>
-                <Link
-                  href="/internal/activity"
-                  className="text-sm font-medium underline underline-offset-4"
-                >
-                  View validation metrics
-                </Link>
-              </div>
-              <CardDescription>
-                Providers with a repair, decision or status change each day
-              </CardDescription>
-            </CardHeader>
-            <CardContent className="px-2 pb-4 sm:px-3 sm:pb-5">
-              {hasActivity(daily) ? (
-                <DayBarChart
-                  seriesLabel="Active providers"
-                  summary={dailySummary("Active providers, last 7 days", daily)}
-                  data={daily}
-                />
-              ) : (
-                <div className="mx-2 flex items-start gap-3 rounded-lg bg-muted/40 px-4 py-5 sm:mx-3">
-                  <HugeiconsIcon
-                    icon={Clock01Icon}
-                    strokeWidth={1.8}
-                    className="mt-0.5 size-5 shrink-0 text-muted-foreground"
-                    aria-hidden="true"
-                  />
-                  <div className="space-y-1">
-                    <p className="text-sm font-medium">
-                      No provider activity in the last 7 days
-                    </p>
-                    <p className="max-w-prose text-sm leading-relaxed text-muted-foreground">
-                      Activity appears here once providers create repairs,
-                      decide requests or change status.
-                    </p>
-                  </div>
-                </div>
-              )}
-            </CardContent>
-          </Card>
-        </>
+        <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
+          <StatTile
+            href="/internal/activity"
+            label="Providers (all time)"
+            value={formatCount(metrics.providers.allTime.total)}
+            status="ACCEPTED"
+            icon={Store01Icon}
+          />
+          <StatTile
+            href="/internal/activity"
+            label="Open repairs (now)"
+            value={formatCount(openRepairs)}
+            status="IN_PROGRESS"
+            icon={Wrench01Icon}
+          />
+          <StatTile
+            href="/internal/activity"
+            label="Pending requests (now)"
+            value={formatCount(metrics.requests.pendingNow)}
+            status="SUBMITTED"
+            icon={Clock01Icon}
+          />
+          <StatTile
+            href="/internal/feedback?status=NEW"
+            label="New feedback (now)"
+            value={
+              newFeedbackCount !== null
+                ? formatCount(newFeedbackCount)
+                : "Unavailable"
+            }
+            status="AWAITING_APPROVAL"
+            icon={Message01Icon}
+          />
+        </div>
       ) : (
         <Card className="p-5">
           <p className="text-sm text-muted-foreground">
             Numbers are unavailable right now. Try again in a moment.
           </p>
+        </Card>
+      )}
+
+      <Card className="space-y-4 p-4 sm:p-5">
+        <div className="flex flex-wrap items-start justify-between gap-3">
+          <div className="space-y-1">
+            <h2 className="text-base font-semibold">System status</h2>
+            <p className="text-sm leading-relaxed text-muted-foreground">
+              Probed when this page loads. Uptime is not observed yet, so
+              silence never counts as healthy.
+            </p>
+          </div>
+          <div className="flex flex-wrap gap-2">
+            <Link
+              href="/internal/health"
+              className="text-sm font-medium underline underline-offset-4"
+            >
+              Health
+            </Link>
+            <Link
+              href="/internal/diagnostics"
+              className="text-sm font-medium underline underline-offset-4"
+            >
+              Diagnostics
+            </Link>
+          </div>
+        </div>
+
+        {health ? (
+          <dl className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+            {STATUS_CHECKS.map(([key, label]) => (
+              <div key={key} className="flex items-center gap-2">
+                <dt className="text-sm text-muted-foreground">{label}</dt>
+                <dd>
+                  <HealthStatusBadge status={health[key].status} />
+                </dd>
+              </div>
+            ))}
+          </dl>
+        ) : (
+          <p className="text-sm text-muted-foreground">
+            Service checks are unavailable right now. Nothing is assumed
+            healthy.
+          </p>
+        )}
+
+        <dl className="grid gap-3 border-t border-border pt-4 text-sm sm:grid-cols-2 lg:grid-cols-4">
+          <div>
+            <dt className="text-muted-foreground">Uptime</dt>
+            <dd className="text-foreground">
+              Not observed — no independent monitor is connected.
+            </dd>
+          </div>
+          <div>
+            <dt className="text-muted-foreground">Latest release</dt>
+            <dd className="break-all font-mono text-foreground">
+              {revision ?? "Not reported by this runtime"}
+            </dd>
+          </div>
+          <div>
+            <dt className="text-muted-foreground">Domain metrics as of</dt>
+            <dd className="text-foreground">
+              {metrics ? formatProbeTime(metrics.asOf) : "Unavailable"}
+            </dd>
+          </div>
+          <div>
+            <dt className="text-muted-foreground">Feedback coverage</dt>
+            <dd className="text-foreground">
+              {metrics?.coverage.feedback.status === "AVAILABLE"
+                ? "Available"
+                : "Unavailable"}
+            </dd>
+          </div>
+        </dl>
+      </Card>
+
+      {metrics && (
+        <Card>
+          <CardHeader className="px-4 pt-4 pb-0 sm:px-5 sm:pt-5">
+            <div className="flex flex-wrap items-center justify-between gap-3">
+              <CardTitle>
+                <h2 className="text-base font-semibold">
+                  Active providers, last 7 days
+                </h2>
+              </CardTitle>
+              <Link
+                href="/internal/activity"
+                className="text-sm font-medium underline underline-offset-4"
+              >
+                View validation metrics
+              </Link>
+            </div>
+            <CardDescription>
+              Providers with a repair, decision or status change each day
+            </CardDescription>
+          </CardHeader>
+          <CardContent className="px-2 pb-4 sm:px-3 sm:pb-5">
+            {hasActivity(daily) ? (
+              <DayBarChart
+                seriesLabel="Active providers"
+                summary={dailySummary("Active providers, last 7 days", daily)}
+                data={daily}
+              />
+            ) : (
+              <div className="mx-2 flex items-start gap-3 rounded-lg bg-muted/40 px-4 py-5 sm:mx-3">
+                <HugeiconsIcon
+                  icon={Clock01Icon}
+                  strokeWidth={1.8}
+                  className="mt-0.5 size-5 shrink-0 text-muted-foreground"
+                  aria-hidden="true"
+                />
+                <div className="space-y-1">
+                  <p className="text-sm font-medium">
+                    No provider activity in the last 7 days
+                  </p>
+                  <p className="max-w-prose text-sm leading-relaxed text-muted-foreground">
+                    Activity appears here once providers create repairs, decide
+                    requests or change status.
+                  </p>
+                </div>
+              </div>
+            )}
+          </CardContent>
         </Card>
       )}
       <p className="border-t border-border pt-4 text-xs leading-relaxed text-muted-foreground">
