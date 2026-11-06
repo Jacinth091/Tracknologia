@@ -258,6 +258,14 @@ roles, not `user_metadata`, and not inferred from owning or joining a Provider:
   instead of turning failed reads into zero activity. Feedback unavailability
   is explicit; a Feedback authorization denial still denies the whole report.
 
+- Count-only CSV/JSON exports use minimum group 5 with complementary suppression
+  in the report Module before either serializer runs. A small Repair count pools
+  its entire section, the all-time Repair total and tracking adoption. A small
+  Request count pools its counts and ratios; a small Feedback count pools its
+  section. Pooled sections hide large and zero buckets too, preventing visible
+  related counts in the same report from reconstructing a withheld split. These
+  operator-only exports retain the required guard/audit and no-store headers.
+
 ## Public Provider and invitation projections
 
 Anonymous users cannot read raw Provider rows. `public_provider_profiles`

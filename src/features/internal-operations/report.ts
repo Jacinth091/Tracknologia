@@ -173,18 +173,26 @@ function applySuppression(cells: Cell[]): void {
     if (smallPart) cell.row.suppressed = true;
   }
 
-  // Current Repair statuses partition the all-time Repair total used by tracking.
-  const repairTotal = byKey.get("REPAIR_ALL_TIME");
-  if (
-    repairTotal &&
-    cells.some(
-      (cell) =>
-        cell.row.section === "repairs" &&
-        cell.row.metric === "status_now" &&
-        cell.row.suppressed,
-    )
-  ) {
-    repairTotal.row.suppressed = true;
+  // Statuses, period counts and origins can reveal each other by subtraction.
+  const repairsHidden = cells.some(
+    (cell) => cell.row.section === "repairs" && cell.row.suppressed,
+  );
+  if (repairsHidden) {
+    for (const cell of cells) {
+      if (cell.row.section === "repairs" || cell.key === "REPAIR_ALL_TIME") {
+        cell.row.suppressed = true;
+      }
+    }
+  }
+
+  // Received, decided and pending can describe the same Request population.
+  const requestsHidden = cells.some(
+    (cell) => cell.row.section === "requests" && cell.row.suppressed,
+  );
+  if (requestsHidden) {
+    for (const cell of cells) {
+      if (cell.row.section === "requests") cell.row.suppressed = true;
+    }
   }
 
   for (const cell of cells) {
@@ -506,9 +514,10 @@ export function buildValidationReport(
   const notes = [
     `Counts from 1 to ${MIN_COHORT - 1} are suppressed as "<${MIN_COHORT}".`,
     "A suppressed part also suppresses its total, so the part cannot be derived.",
-    "A suppressed current Repair status also suppresses the all-time Repair total and tracking adoption.",
+    "Repairs are pooled as a whole when any Repair count is below the minimum group; the all-time Repair total and tracking adoption are also suppressed.",
+    "Requests are pooled as a whole when any Request count is below the minimum group, including their conversion and decision-time figures.",
     "Derived ratios are suppressed when an input count is suppressed.",
-    "Zero counts are shown; missing Feedback data is N/A, never zero.",
+    "Zero counts are shown outside pooled sections; missing Feedback data is N/A, never zero.",
     "No Provider, Customer, feedback or authentication identifiers are exported.",
   ];
   if (!feedback) {

@@ -215,7 +215,10 @@ one seven-column table (`record,section,metric,bucket,value,unit,suppressed`):
 `value`), `note` (text in `value`) or `row`. Both formats therefore carry the
 window, generated-at, revision, source, coverage, glossary, suppression flags
 and missing-data notes. Counts from 1 to 4 are hidden; a hidden part hides its
-total; and one small Feedback count pools the whole Feedback section, because
+total. One small Repair count pools the whole Repair section, its all-time total
+and tracking adoption, preventing subtraction across status, creation and origin
+counts. One small Request count pools the Request counts and ratios together.
+One small Feedback count pools the whole Feedback section, because
 its category, source, status and daily partitions share a single total. Derived
 ratios follow their inputs. No Provider, Customer, feedback or authentication
 identifiers are exported, and CSV cells are formula-injection safe.

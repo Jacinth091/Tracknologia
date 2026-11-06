@@ -110,10 +110,16 @@ generated-at, deploy revision, source, coverage, the shared glossary, and
 missing-data notes. Counts from 1 to 4 are suppressed to a hidden value, the
 total of a group with a hidden part is hidden too (so the part cannot be derived
 by subtraction), and a derived ratio is hidden when one of its input counts is.
-Current Repair statuses partition the all-time Repair total: a hidden status
-also hides that total and the tracking adoption ratio that depends on it.
-Zero stays visible and missing Feedback stays N/A. Any Feedback count from 1 to
-4 pools the whole Feedback section, because its category, source, status and
+Repair status snapshots, period creations, origin counts and completions can
+reveal each other by subtraction, especially when the window covers every
+retained Repair. Any Repair count from 1 to 4 therefore pools the entire Repair
+section, the all-time Repair total and its tracking adoption ratio. This hides
+large and zero Repair buckets too, so other Repair counts in the same report
+cannot recover a withheld split. Request cohorts, decisions and pending counts
+are likewise pooled together with their ratios when any Request count is 1 to 4.
+Zero stays visible outside pooled sections and missing Feedback stays N/A. Any
+Feedback count from 1 to 4 pools the whole Feedback section, because its category,
+source, status and
 daily rows are parallel partitions of one total and a visible partition would
 otherwise reveal the hidden cell. CSV and JSON carry the same rows and the same
 report context (window, generated-at, revision, source, coverage, glossary,
