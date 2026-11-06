@@ -4,14 +4,16 @@ on:
   pull_request:
     branches:
       - "feature/**"
+      - "release/**"
       - staging
-      - master
+      - main
 
   push:
     branches:
       - "feature/**"
+      - "release/**"
       - staging
-      - master
+      - main
 
   workflow_dispatch:
 
@@ -29,8 +31,86 @@ jobs:
     timeout-minutes: 15
 
     env:
+      NEXT_PUBLIC_APP_URL: http://localhost:3000
       NEXT_PUBLIC_SUPABASE_URL: https://example.supabase.co
       NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY: ci-placeholder
+      PUBLIC_ABUSE_HMAC_SECRET: ci-build-only-hmac-placeholder-32-chars
+      PUBLIC_ABUSE_TRUSTED_PROXY_SECRET: ci-build-only-proxy-placeholder-32-chars
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v7
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v6
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v7
+        with:
+          node-version: 24
+          cache: pnpm
+          cache-dependency-path: pnpm-lock.yaml
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Check formatting
+        run: pnpm format:check
+
+      - name: Lint
+        run: pnpm lint
+
+      - name: Typecheck
+        run: pnpm typecheck
+
+      # Job name "Verify" is stable — branch protection depends on it.
+      - name: Run unit and module tests
+        # Call vitest directly to ensure --reporter and --outputFile flags
+        # are applied. Using the npm script with "pnpm test:run --" forwards
+        # the literal "--" separator, which vitest interprets as a test-name
+        # filter boundary rather than a flag prefix.
+        run: >-
+          pnpm exec vitest run
+          --passWithNoTests
+          --reporter=json
+          --outputFile=test-results/unit.json
+          src tests/contracts
+
+      - name: Upload unit test results
+        if: failure()
+        uses: actions/upload-artifact@v7
+        with:
+          name: unit-test-results-${{ github.run_id }}
+          path: test-results/unit.json
+          retention-days: 7
+
+      # The scan shares this step's env so it always searches for the exact
+      # placeholder values the build received.
+      - name: Build application and scan browser bundle for server secrets
+        env:
+          NEXT_PUBLIC_APP_URL: https://ci-build.invalid
+          SUPABASE_SERVICE_ROLE_KEY: ci-build-only-service-role-placeholder
+          SMTP_HOST: smtp.gmail.com
+          SMTP_USER: ci-build-only@ci-build.invalid
+          SMTP_PASSWORD: smtp_ci_build_only_placeholder
+        run: |
+          pnpm build
+          if [ -z "$(ls -A .next/static 2>/dev/null)" ]; then
+            echo "::error::.next/static is missing or empty; cannot scan the browser bundle"
+            exit 1
+          fi
+          for name in SUPABASE_SERVICE_ROLE_KEY SMTP_PASSWORD PUBLIC_ABUSE_HMAC_SECRET PUBLIC_ABUSE_TRUSTED_PROXY_SECRET; do
+            [ -n "${!name}" ] || { echo "::error::$name is empty; nothing to scan for"; exit 1; }
+            if grep -rlF -- "${!name}" .next/static; then
+              echo "::error::$name value found in the browser bundle (files above)"
+              exit 1
+            fi
+          done
+
+  db-integration:
+    name: Database integration
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
 
     steps:
       - name: Checkout repository
@@ -49,17 +129,112 @@ jobs:
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
 
-      - name: Check formatting
-        run: pnpm format:check
+      - name: Setup Supabase CLI
+        uses: supabase/setup-cli@v2
+        with:
+          version: 2.115.0
 
-      - name: Lint
-        run: pnpm lint
+      - name: Initialize local Supabase config
+        run: "[ -f supabase/config.toml ] || supabase init"
 
-      - name: Typecheck
-        run: pnpm typecheck
+      - name: Configure collision-free database port
+        shell: bash
+        run: |
+          sed -i '0,/port = 54322/s//port = 55432/' supabase/config.toml
+          grep -q '^port = 55432$' supabase/config.toml
 
-      - name: Run unit and module tests
-        run: pnpm test:run
+      - name: Prepare empty local seed
+        run: touch supabase/seed.sql
 
-      - name: Build application
-        run: pnpm build
+      - name: Start local Supabase
+        shell: bash
+        run: |
+          if supabase start; then
+            exit 0
+          fi
+
+          echo "::warning::Supabase startup failed; cleaning local state and retrying once."
+          supabase stop --all --no-backup || true
+          supabase start
+
+      - name: Reset local database
+        run: pnpm db:reset
+
+      - name: Export local Supabase test environment
+        shell: bash
+        run: |
+          supabase status -o env \
+            --override-name api.url=SUPABASE_TEST_URL \
+            --override-name auth.anon_key=SUPABASE_TEST_ANON_KEY \
+            --override-name auth.service_role_key=SUPABASE_TEST_SERVICE_ROLE_KEY \
+            | sed -E 's/^([^=]+)="(.*)"$/\1=\2/' >> "$GITHUB_ENV"
+
+      - name: Verify DB integration environment
+        shell: bash
+        run: |
+          for var in SUPABASE_TEST_URL SUPABASE_TEST_ANON_KEY SUPABASE_TEST_SERVICE_ROLE_KEY; do
+            if [ -z "${!var:-}" ]; then
+              echo "::error::Required environment variable $var is not set. Supabase export may have failed."
+              exit 1
+            fi
+          done
+          echo "DB integration environment OK: SUPABASE_TEST_URL=${SUPABASE_TEST_URL}"
+
+      # Job name "Database integration" is stable — branch protection depends on it.
+      - name: Run database integration tests
+        # Call vitest directly to ensure --reporter and --outputFile flags
+        # are applied. Using the npm script with "pnpm test:db --" forwards
+        # the literal "--" separator, which vitest interprets as a test-name
+        # filter boundary rather than a flag prefix.
+        run: >-
+          pnpm exec vitest run
+          --reporter=json
+          --outputFile=test-results/db.json
+          tests/integration
+
+      - name: Upload DB test results
+        if: failure()
+        uses: actions/upload-artifact@v7
+        with:
+          name: db-test-results-${{ github.run_id }}
+          path: test-results/db.json
+          retention-days: 7
+
+      - name: Capture Supabase logs
+        if: failure()
+        shell: bash
+        run: |
+          echo "=== Local Supabase Postgres diagnostics ==="
+          db_container="$(
+            docker ps -a \
+              --filter 'name=supabase_db_' \
+              --format '{{.Names}}' \
+              | head -n 1
+          )"
+          if [ -n "$db_container" ]; then
+            docker logs --tail 200 "$db_container" 2>&1 || true
+          else
+            echo "::warning::Local Supabase Postgres container was not found."
+          fi
+          echo "=== Supabase status ==="
+          supabase status 2>&1 || true
+
+      # Restore drill for docs/OPERATIONS.md ("Manual backups"). It runs only
+      # after the DB suite passed, on this disposable stack, and the script
+      # refuses any non-local API host.
+      - name: Run backup and restore drill
+        env:
+          DRILL_DISPOSABLE: "1"
+        run: pnpm drill:backup-restore
+
+      - name: Stop local Supabase
+        if: always()
+        run: supabase stop --no-backup || true
+
+      # The rehearsal boots its own scratch Supabase lab on offset ports and
+      # needs no dev stack, so it runs only after the dev stack has stopped
+      # to keep the runner from running two Supabase stacks at once.
+      - name: Rehearse pending-only migration upgrade
+        env:
+          REHEARSAL_BASE_REF: ${{ github.base_ref || 'staging' }}
+        run: pnpm rehearse:migrations

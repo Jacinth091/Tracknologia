@@ -14,8 +14,13 @@
     "format": "prettier --write .",
     "format:check": "prettier --check .",
     "typecheck": "next typegen && tsc --noEmit",
-    "test": "vitest",
-    "test:run": "vitest run --passWithNoTests"
+    "test": "vitest src tests/contracts",
+    "test:run": "vitest run --passWithNoTests src tests/contracts",
+    "test:db": "vitest run tests/integration",
+    "test:e2e": "playwright test",
+    "db:reset": "supabase db reset",
+    "rehearse:migrations": "bash scripts/rehearse-pending-migrations.sh",
+    "drill:backup-restore": "bash scripts/drill-backup-restore.sh"
   },
   "dependencies": {
     "@base-ui/react": "^1.7.0",
@@ -26,8 +31,10 @@
     "class-variance-authority": "^0.7.1",
     "clsx": "^2.1.1",
     "next": "16.3.1",
+    "nodemailer": "^10.3.1",
     "react": "19.2.8",
     "react-dom": "19.2.8",
+    "recharts": "3.8.0",
     "server-only": "^0.0.1",
     "shadcn": "^4.18.0",
     "tailwind-merge": "^3.6.0",
@@ -35,8 +42,10 @@
     "zod": "^4.4.3"
   },
   "devDependencies": {
+    "@playwright/test": "^1.62.1",
     "@tailwindcss/postcss": "^4",
     "@types/node": "^20",
+    "@types/nodemailer": "^8.0.2",
     "@types/react": "^19",
     "@types/react-dom": "^19",
     "eslint": "^9",

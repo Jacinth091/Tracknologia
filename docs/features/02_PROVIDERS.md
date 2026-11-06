@@ -4,7 +4,7 @@
 
 ## Description
 
-The Providers feature represents the **repair business identity and operating configuration** in Tracknologia.
+The Providers feature represents the **repair business identity, staff invitations, person profiles, and operating configuration** in Tracknologia.
 
 A Provider is either:
 
@@ -15,17 +15,20 @@ Both are first-class Provider types that use the same core Repair system.
 
 ## Primary goal
 
-Give Tracknologia a provider-centric business identity that works equally well for a traditional Repair Shop and an Independent Repairer without forcing either into the other's operating model.
+Give Tracknologia a provider-centric business identity that works equally well for a traditional Repair Shop and an Independent Repairer without forcing either into the other's operating model, while governing secure Staff onboarding.
 
 ## Feature goals
 
 - Create and maintain Provider business/profile information.
+- Atomic onboarding for Independent Repairers and Shop Owners.
+- Secure, Owner-authorized invitation flow for Shop Staff (`provider_invitations`) using one-way SHA-256 token hashing.
 - Preserve `SHOP` and `INDEPENDENT` as equal supported Provider types.
 - Support one-person shops as naturally as multi-user shops.
+- Separate canonical person profiles (`provider_user_profiles`) from authorization memberships (`provider_memberships`).
 - Allow Independent Repairers to operate without publishing a private home address.
 - Store Service Area and supported device categories without premature location/device normalization.
 - Configure multiple supported Service Modes.
-- Provide a public Provider profile by slug for provider-specific customer Request pages.
+- Provide a public Provider profile projection (`public_provider_profiles`) by slug or ID for provider-specific customer Request pages.
 - Control whether the Provider is currently accepting customer Repair Requests.
 
 ## Non-goals
@@ -43,16 +46,17 @@ The MVP Providers feature does not include:
 
 ## Main actors
 
-- **Provider User** — manages Provider configuration.
+- **Provider Owner** — creates Provider, manages configuration, and invites Shop Staff.
+- **Shop Staff** — joins an existing Shop via an Owner-authorized invitation.
 - **Customer** — may view limited public Provider identity/configuration on a Provider-specific Request page.
 
 ## Owned data
 
 ### `providers`
 
-Key information includes:
+Business profile information:
 
-- Provider type;
+- Provider type (`SHOP` | `INDEPENDENT`);
 - display name;
 - slug;
 - description/profile image;
@@ -63,108 +67,157 @@ Key information includes:
 - `accepting_requests`;
 - timestamps.
 
+### `provider_user_profiles`
+
+Canonical person-level display profile for authenticated users:
+
+- `user_id` (PK, FK $\to$ `auth.users.id`);
+- `display_name`;
+- `contact_phone`;
+- `avatar_url`;
+- timestamps.
+
+### `provider_memberships`
+
+Associates an authenticated user with a Provider as `OWNER` or `STAFF` (authorization link only).
+
+### `provider_invitations`
+
+Owner-authorized, expiring, single-use invitations for Shop Staff onboarding:
+
+- `id`
+- `provider_id`
+- `email`
+- `role` (`STAFF`)
+- `token_hash` (SHA-256 digest of raw token)
+- `invited_by_user_id`
+- `created_at`
+- `expires_at`
+- `accepted_at`
+- `accepted_by_user_id`
+- `revoked_at`
+
+Invitation policy (issue #43):
+
+- **Active pending** invitation = `accepted_at IS NULL` **and** `revoked_at IS
+NULL` and `expires_at > now()`.
+- **Reuse**: an active pending invitation per `(provider_id, email)` is
+  reused, not duplicated. Retries and double-clicks return the existing
+  invitation (`reused = true`) with its original credential; no new link or
+  email is emitted.
+- **Recipient eligibility**: an invitation cannot be created (or reused) for
+  an email whose account already holds an active `provider_memberships`
+  membership — such a link could never be accepted. Re-inviting a former Staff
+  member becomes valid again after the Owner offboards them
+  (`remove_staff_member`), which removes the membership. Eligibility rechecks
+  on create serialize under a recipient-email advisory lock shared by all
+  membership-establishing paths (`create_staff_invitation`,
+  `accept_staff_invitation`, and `create_provider_with_owner` — the composite
+  `create_provider_with_owner_and_modes` delegates to the latter), taken in
+  consistent order (recipient-email lock, then per-User lock).
+- **Settlement on membership**: the one-membership rule is per User across
+  Providers. Once the recipient holds any active membership, all other
+  currently-active pending invitations for the same normalized email are
+  superseded across **all** Providers — acceptance and Owner onboarding both
+  settle globally — so a different-Provider invitation held while the
+  recipient was eligible stops resolving. Same-email invitations across Shops
+  remain independent only while the recipient has no membership.
+
 ### `provider_service_modes`
 
-Repeating relation of supported modes:
+Repeating Provider-owned operating configuration:
 
-```text
-DROP_OFF
-MEETUP
-HOME_SERVICE
-OTHER
-```
+- `provider_id`;
+- `mode` (`DROP_OFF` | `MEETUP` | `HOME_SERVICE` | `OTHER`);
+- optional `details` (up to 240 characters);
+- primary key `(provider_id, mode)` prevents duplicate modes.
 
-`OTHER` may include Provider-defined details.
+### `public_provider_profiles` (View)
 
-## Conceptual Interface
+Restricted public projection containing only public-safe fields.
+
+## Public Interface (`src/features/providers/index.ts`)
 
 ```ts
-createProvider(input): Provider
-getProvider(providerId): Provider
-getPublicProviderBySlug(slug): PublicProviderProfile
-updateProviderProfile(context, input): Provider
-setServiceModes(context, modes): ProviderServiceMode[]
+// Commands
+createProvider(input: CreateProviderInput): Promise<{ providerId: string; membershipId: string; slug: string }>
+updateProviderProfile(input: UpdateProviderProfileInput): Promise<Provider>
+updateCurrentProviderUserProfile(input: UpdateProviderUserProfileInput): Promise<ProviderUserProfile>
+setServiceModes(modes: ProviderServiceMode[]): Promise<ProviderServiceMode[]>
+createStaffInvitation(input: { email: string }): Promise<CreateStaffInvitationResult>
+acceptStaffInvitation(input: AcceptStaffInvitationInput): Promise<{ providerId: string; membershipId: string; role: "STAFF" }>
+revokeStaffInvitation(invitationId: string): Promise<void>
+removeStaffMember(input: { membershipId: string }): Promise<RemoveStaffMemberResult>
+
+// Queries
+getProvider(providerId: string): Promise<Provider | null>
+getPublicProvider(slugOrId: string): Promise<PublicProviderProfile | null>
+getInvitationForOnboarding(rawToken: string): Promise<InvitationShopDetails | null>
+listTeamMembers(providerId: string): Promise<TeamMember[]>
+listPendingStaffInvitations(providerId: string): Promise<ProviderInvitation[]>
+getProviderUserProfile(userId: string): Promise<ProviderUserProfile | null>
+getProviderServiceModes(providerId: string): Promise<ProviderServiceMode[]>
 ```
 
-Public and private Provider views should not expose the same fields by accident.
+## Core workflows
 
-## Core workflow — Provider configuration
+### 1. Independent Repairer / Shop Owner Onboarding (LD-01)
 
 ```text
-Provider User
-   ↓ Auth / ProviderContext
-Open Settings
-   ↓
-Edit Provider profile
-   ↓
-Validate business/profile fields
-   ↓
-Update Provider-owned configuration
+Authenticated User
+       ↓
+createProvider({ displayName, providerType, ownerDisplayName, serviceModes, ... })
+       ↓ (atomic database transaction)
+INSERT providers + INSERT provider_user_profiles + INSERT provider_memberships (role: OWNER) + INSERT provider_service_modes
 ```
 
-## Core workflow — Service Modes
+### 2. Shop Staff Onboarding (LD-01)
 
 ```text
-Provider Settings
-    ↓
-Select one or more supported modes
-    ↓
-DROP_OFF / MEETUP / HOME_SERVICE / OTHER
-    ↓
-Persist supported modes
-    ↓
-Public Repair Request page can present those modes
+Shop Owner creates Staff invitation (generates raw token, persists SHA-256 digest in token_hash)
+       ↓
+Staff receives raw token via invitation link or code
+       ↓
+Staff creates Supabase identity / logs in
+       ↓
+getInvitationForOnboarding(rawToken) displays shop details
+       ↓
+acceptStaffInvitation({ token, displayName, contactPhone })
+       ↓ (atomic database transaction)
+Validate token_hash, not expired, not revoked, not accepted, verify SHOP provider, verify no active membership
+       ↓
+INSERT provider_user_profiles + INSERT provider_memberships (role: STAFF) + UPDATE provider_invitations
 ```
 
-A supported mode describes what the Provider offers. A particular Repair Request/Repair may select only one preferred/selected mode.
-
-## Routes and UI
-
-Protected configuration:
+### 3. Staff Offboarding
 
 ```text
-/dashboard/settings
+Shop Owner
+       ↓
+removeStaffMember({ membershipId })
+       ↓ (narrow database transaction)
+Lock target membership, verify same Provider + role STAFF, delete exactly that row
+       ↓
+Removed Staff loses ProviderContext and RLS-backed access on their next request
 ```
 
-Potential Provider UI sections:
+Not-found, cross-Provider, and OWNER targets collapse into `removed: false`.
 
-- profile identity;
-- Provider type;
-- contact information;
-- Service Area;
-- optional public address;
-- supported device categories;
-- supported Service Modes;
-- accepting Requests toggle.
-
-Public Provider identity appears primarily on:
+### 4. Provider and person profile settings
 
 ```text
-/p/[providerSlug]/request
+Authenticated Provider User
+       ↓
+updateCurrentProviderUserProfile(...) — edits only the caller's person profile
+
+Authenticated Provider Owner
+       ↓
+updateProviderProfile(...) — edits operating fields, not Provider identity
+setServiceModes(...) — atomically and serially replaces the Provider's supported modes
 ```
 
-## Relationships with other features
-
-### Auth
-
-Protected Provider writes require trusted `ProviderContext`.
-
-### Repair Requests
-
-Repair Requests depends on Providers to determine:
-
-- target Provider by slug;
-- whether the Provider accepts Requests;
-- public Provider identity;
-- supported Service Modes.
-
-### Repairs
-
-Every Repair belongs to exactly one Provider. Repair ownership must be derived from trusted Provider context on protected operations.
-
-### Tracking
-
-Public Tracking may display Provider display name and intentionally public profile information.
+Provider IDs come from trusted membership context. Server Actions never accept a
+browser-supplied `providerId`, role, or user ID for these mutations.
 
 ## Important invariants
 
@@ -172,61 +225,70 @@ Public Tracking may display Provider display name and intentionally public profi
 2. Provider type does not change the core Repair lifecycle.
 3. A Shop may have one owner-user only.
 4. Independent Repairers are not required to publish a residential address.
-5. A Provider may support multiple Service Modes.
-6. Public Provider information must be intentionally selected, not a raw database row.
-7. Provider slugs are unique.
-
-## Important scenarios
-
-### Independent Repairer
-
-```text
-Type: INDEPENDENT
-Public address: null
-Service Area: Cebu City
-Modes: MEETUP, HOME_SERVICE
-```
-
-Valid configuration.
-
-### One-person Shop
-
-```text
-Type: SHOP
-Public address: shop location
-Memberships: owner only
-```
-
-Also valid. No Staff/Technician requirement exists.
-
-## Validation expectations
-
-- slug format and uniqueness;
-- Provider type enum;
-- contact fields;
-- supported Service Mode enum values;
-- reasonable Service Area/public-address lengths;
-- public fields sanitized/validated before rendering.
-
-## Security expectations
-
-- only authorized Provider Users may modify their Provider;
-- Provider A cannot update Provider B;
-- public Provider lookup exposes only public-safe fields;
-- RLS should enforce Provider ownership where applicable.
+5. Staff invitations are valid only for `SHOP` providers.
+6. A user cannot have multiple active provider memberships in MVP.
+7. Public Provider information is strictly projected via `public_provider_profiles`.
+8. Raw invitation tokens are never stored in the database; only SHA-256 digests are persisted.
+9. Provider slugs are unique.
+10. Only an `OWNER` may update Provider operating configuration or Service Modes.
+11. Provider `id`, `provider_type`, `slug`, ownership, and timestamps are not editable profile fields.
+12. Service Mode replacement is atomic, serialized per Provider, and direct authenticated table writes are denied.
+13. Anonymous invitation lookup reveals the intended email and public Shop identity, but never private Provider contact fields.
+14. Database constraints enforce durable Provider/person-profile size bounds even when an Owner bypasses the application forms.
+15. Removing a configured Service Mode does not invalidate historical Repairs;
+    replacement serializes with intentional Repair mode changes through the
+    Provider-row lock.
+16. Only an `OWNER` can remove a same-Provider `STAFF` membership; OWNER
+    targets and cross-Provider targets are never removable through Staff
+    offboarding.
+17. At most one active pending Staff invitation exists per `(provider_id,
+  normalized email)`: `create_staff_invitation` reuses an existing active
+    pending invitation (no duplicate credential, no regenerated token) rather
+    than minting a second simultaneously valid link. A recipient who already
+    holds an active membership is ineligible to be invited; the eligibility
+    check serializes under a shared recipient-email advisory lock (followed by
+    the per-User lock) that `accept_staff_invitation` and
+    `create_provider_with_owner` (`create_provider_with_owner_and_modes`
+    delegates to it) also take to establish memberships, so a create/accept
+    race never leaves an unusable active invitation even if the recipient's
+    Auth User is created mid-create or the create is issued by another Shop.
+    Because the one-membership rule is per User across Providers, once any
+    member is joined every other currently-active pending invitation for the
+    normalized email is superseded across Providers (acceptance and Owner
+    onboarding settle globally); cross-Shop invitations stay independent only
+    while the recipient has no membership. Legacy duplicates from before
+    this policy are reconciled to the earliest currently-valid link per Shop +
+    email (expired rows stay untouched) by the migration (and by the
+    service-role-only `reconcile_staff_invitation_duplicates()` RPC);
+    superseded links stop resolving without ever exposing a raw credential.
 
 ## Testing expectations
 
 Test:
 
-- create/update Provider;
-- public lookup by valid/invalid slug;
-- independent with null public address;
-- shop with one owner only;
-- multiple Service Modes;
-- `accepting_requests = false` behavior;
-- cross-Provider update denial.
-
-## Definition of done
-
-The feature is healthy when both Shops and Independent Repairers can accurately represent how they operate, and other features can consume that configuration without embedding shop-specific assumptions.
+- atomic Independent provider + owner creation with person profile;
+- atomic Shop provider + owner creation with person profile;
+- valid Staff invitation creates exactly one `STAFF` membership atomically;
+- expired, revoked, or consumed invitations are rejected;
+- Staff cannot join a Provider without a valid invitation;
+- retries and concurrent duplicate invites for the same Shop + email produce
+  at most one active pending invitation (reuse policy);
+- an active member's email cannot be re-invited, but is eligible again after
+  offboarding;
+- accepting an invitation supersedes sibling active pending invitations;
+- legacy duplicate active invitations reconcile to a single valid link;
+- OWNER removes a same-Provider STAFF and the removed member loses access;
+- STAFF cannot remove members; OWNER rows cannot be removed through offboarding;
+- cross-Provider removal attempts are neutral and non-destructive;
+- Staff invitations cannot be created or accepted for `INDEPENDENT` providers;
+- public lookup by slug returns only public-safe fields;
+- Provider creation rolls back when Service Mode persistence fails;
+- Owners can update operating fields but cannot mutate Provider identity fields;
+- Staff cannot update Provider configuration or Service Modes;
+- Staff can update only their own person profile;
+- Service Mode replacement prevents duplicates, partial state, and mixed results from concurrent replacements;
+- Service Mode replacement raced with a Repair mode edit produces one valid
+  serialized outcome without erasing or invalidating historical Repair data;
+- direct profile writes cannot bypass durable database size bounds;
+- anonymous invitation detail lookup excludes private contact fields;
+- cross-Provider isolation and RLS enforcement.

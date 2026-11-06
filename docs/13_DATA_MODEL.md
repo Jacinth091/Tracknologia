@@ -8,19 +8,36 @@ Rule:
 
 > Keep single-valued or Repair-snapshot information as columns. Create separate tables only for genuinely repeating relationships/history or relationships that need their own constraints.
 
-## Core tables
+## Core tables & projections
 
 1. `providers`
-2. `provider_memberships`
-3. `provider_service_modes`
-4. `repair_requests`
-5. `repairs`
-6. `repair_status_events`
-7. `repair_updates`
+2. `provider_user_profiles`
+3. `provider_memberships`
+4. `provider_invitations`
+5. `public_provider_profiles` (view)
+6. `provider_service_modes`
+7. `repair_requests`
+8. `repairs`
+9. `repair_status_events`
+10. `repair_updates`
+11. `tracking_events` (validation telemetry)
 
 Supabase manages `auth.users` separately.
 
-`tracking_events` is optional validation telemetry, not a required domain table.
+## provider_user_profiles
+
+```text
+user_id               uuid PK, FK -> auth.users.id
+display_name          text
+contact_phone         text nullable
+avatar_url            text nullable
+created_at            timestamptz
+updated_at            timestamptz
+```
+
+This table holds the canonical person profile for authenticated Provider Users (both `OWNER` and `STAFF`). Membership contains the authorization link only.
+Database checks bound `display_name` to 2–120 characters, `contact_phone` to
+40 characters, and `avatar_url` to 2,048 characters.
 
 ## providers
 
@@ -31,7 +48,7 @@ display_name          text
 slug                  text UNIQUE
 description           text nullable
 profile_image_url     text nullable
-contact_phone         text
+contact_phone         text nullable
 contact_email         text nullable
 public_address        text nullable
 service_area          text nullable
@@ -44,6 +61,17 @@ updated_at            timestamptz
 A `SHOP` may have only one Provider User, including an owner who is also the working technician. No separate technician table is required.
 
 An `INDEPENDENT` Provider may leave `public_address` null and use `service_area` instead.
+
+`provider_type` and `slug` are stable Provider identity fields. Owner settings
+may change the operating/profile columns, but authenticated clients do not have
+column privileges to rewrite identity, ownership, or timestamps. The database
+maintains `updated_at` on Provider profile changes.
+
+Database checks preserve the Module's durable size limits: Provider names are
+2–120 characters, description is at most 1,000, image URLs are at most 2,048,
+phone/email are at most 40/254, address and Service Area are at most 300, and
+supported devices contain at most 20 nonblank values of at most 80 characters.
+Email/URL syntax and device de-duplication remain application validation rules.
 
 ## provider_memberships
 
@@ -59,6 +87,24 @@ UNIQUE(provider_id, user_id)
 
 This table links Supabase identity to Tracknologia Provider authority.
 
+## provider_invitations
+
+```text
+id                    uuid PK
+provider_id           uuid FK -> providers.id
+email                 text
+role                  membership_role (STAFF)
+token_hash            text UNIQUE
+invited_by_user_id    uuid FK -> auth.users.id
+created_at            timestamptz
+expires_at            timestamptz
+accepted_at           timestamptz nullable
+accepted_by_user_id   uuid FK -> auth.users.id nullable
+revoked_at            timestamptz nullable
+```
+
+Governs Owner-authorized, secure, single-use Staff onboarding (LD-01).
+
 ## provider_service_modes
 
 ```text
@@ -67,9 +113,14 @@ mode                  DROP_OFF | MEETUP | HOME_SERVICE | OTHER
 details               text nullable
 
 PRIMARY KEY(provider_id, mode)
+CHECK(details IS NULL OR char_length(details) <= 240)
 ```
 
-A Provider may support several modes; therefore this remains a separate repeating relation.
+A Provider may support several modes; therefore this remains a separate
+repeating relation. Authenticated members may read their Provider's modes, but
+only Owners may atomically replace them through `set_provider_service_modes`.
+The function locks the Provider row so concurrent whole-set replacements are
+serialized and cannot leave a mixed union.
 
 ## repair_requests
 
@@ -108,6 +159,15 @@ declined_by_user_id        uuid nullable
 
 A Repair Request belongs to exactly one Provider and is not an authoritative Repair.
 
+The implemented Feature 03 schema also enforces:
+
+- `reference_code` format `REQ-` + 16 uppercase hexadecimal characters;
+- bounded, nonblank customer name/phone, device type, and Reported Problem;
+- maximum lengths aligned with the Repair Requests Zod schema;
+- Service Mode details only when a preferred Service Mode exists;
+- terminal lifecycle consistency between status, timestamp, and acting User;
+- index `(provider_id, status, submitted_at DESC)` for the Provider inbox.
+
 ## repairs
 
 ```text
@@ -117,7 +177,7 @@ repair_request_id      uuid UNIQUE nullable
 origin                 CUSTOMER_REQUEST | PROVIDER_CREATED
 
 ticket_number          text
-tracking_code           text UNIQUE
+tracking_code          text UNIQUE
 
 customer_name          text
 customer_phone         text
@@ -125,10 +185,10 @@ customer_email         text nullable
 
 device_type            text
 brand                  text nullable
-model                   text nullable
-serial_number           text nullable
-color_variant           text nullable
-device_specs            text nullable
+model                  text nullable
+serial_number          text nullable
+color_variant          text nullable
+device_specs           text nullable
 physical_condition     text nullable
 accessories_received   text nullable
 
@@ -157,6 +217,29 @@ completed_at           timestamptz nullable
 
 This enforces "one Repair Request can produce at most one Repair" at the database level.
 
+The composite Request foreign key also guarantees the source Request and
+created Repair belong to the same Provider. Feature 04 creates
+`PROVIDER_CREATED` Repairs directly while preserving the same downstream
+lifecycle used by `CUSTOMER_REQUEST` Repairs.
+
+`service_mode` and `service_mode_details` are Repair-owned historical snapshot
+fields. A configured mode may be removed later without invalidating existing
+Repairs. On an actual `service_mode` change, a database trigger locks the
+Provider row `FOR SHARE` and rejects a new non-null mode that is not currently
+present in `provider_service_modes`. This serializes with Owner replacement,
+which locks the same Provider row `FOR UPDATE`, without adding a permanent
+foreign key to mutable configuration.
+
+Implemented identifiers use:
+
+```text
+Ticket Number   TN-YYYY-XXXXXXXXXX   unique per Provider
+Tracking Code   TRK-XXXXXXXXXXXXXXXXXXXXXXXX   globally unique
+```
+
+The Tracking Code is random rather than sequential and remains distinct from
+both Ticket Number and Request Reference.
+
 ## repair_status_events
 
 ```text
@@ -169,6 +252,12 @@ created_at             timestamptz
 ```
 
 The initial event is `NULL -> IN_PROGRESS`.
+
+Request acceptance inserts this initial event in the same database transaction
+that creates the Request-origin Repair and marks the source Request `ACCEPTED`.
+Direct Provider creation likewise commits the Repair and initial event
+atomically. Later transitions lock the Repair and commit status,
+`completed_at`, and one matching event together.
 
 Status history remains separate because it is inherently repeating and required for lifecycle history/validation.
 
@@ -183,6 +272,55 @@ created_at             timestamptz
 ```
 
 Customer Updates are independent of status changes. A Provider can post several updates while a Repair remains `IN_PROGRESS`.
+
+Feature 04 materializes this table with a nonblank 2,000-character message
+bound, authenticated author default, cascading Repair relationship, Provider-
+scoped RLS, and `(repair_id, created_at DESC, id DESC)` index. Provider members
+may append and read updates for their own Repairs, but cannot edit or delete
+them. Anonymous roles receive no raw table access.
+
+## tracking_events
+
+```text
+id                     uuid PK
+repair_id              uuid FK -> repairs.id
+viewed_at               timestamptz
+```
+
+This is minimal validation telemetry rather than authoritative Repair history.
+One row means one successful public Tracking observation; repeated refreshes
+remain repeated rows and must not be interpreted as distinct Customers. The
+Repair relationship cascades on deletion. The table deliberately excludes the
+Tracking Code, Provider/customer snapshots, contact information, request data,
+network identifiers, browser/device fingerprints, Auth ids, and arbitrary
+metadata.
+
+Anonymous and authenticated roles have no direct table privileges or RLS
+policies. A bounded `record_successful_tracking_view(text)` function resolves a
+valid existing Repair internally and returns no existence detail.
+
+## Public Tracking read model
+
+`PublicRepairView` is an application read model backed by the
+`lookup_public_repair(text)` database function, not another domain table and
+not a raw SQL view over `repairs`.
+
+Its durable projection is restricted to:
+
+```text
+Provider display name
+device type + optional brand/model
+current Repair Status
+selected Service Mode
+Repair/Customer-Update last activity time
+latest 25 Customer Update message/timestamp pairs
+```
+
+The existing globally unique `repairs.tracking_code` index supplies the lookup
+path. Provider request availability does not affect tracking of an existing
+Repair. Customer identity/contact, technical/private fields, Ticket Number,
+internal identifiers, credentials, Update authors, and Status Event history do
+not enter the read model.
 
 ## Why no customers table yet
 
@@ -200,7 +338,9 @@ Normalize Device only if reusable device history becomes a validated requirement
 
 - unique `providers.slug`
 - unique `(provider_id, user_id)` membership
+- unique `provider_invitations.token_hash`
 - primary/unique `(provider_id, mode)` service mode
+- Provider/person-profile size checks matching durable Module bounds
 - unique `repair_requests.reference_code`
 - index `repair_requests(provider_id, status, submitted_at)`
 - unique `repairs.tracking_code`
@@ -209,7 +349,8 @@ Normalize Device only if reusable device history becomes a validated requirement
 - index `repairs(provider_id, current_status, updated_at)`
 - index `repairs(provider_id, created_at)`
 - index `repair_status_events(repair_id, created_at)`
-- index `repair_updates(repair_id, created_at)`
+- index `repair_updates(repair_id, created_at DESC, id DESC)`
+- index `tracking_events(repair_id, viewed_at DESC)`
 
 ## RLS ownership path
 

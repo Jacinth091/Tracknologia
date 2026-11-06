@@ -42,19 +42,29 @@ Waiting states are manually selected optional branches.
 
 ## Current database direction
 
-Seven core application tables:
+Nine core application tables and one public projection:
 
 - providers
+- provider_user_profiles
 - provider_memberships
+- provider_invitations
+- public_provider_profiles (view)
 - provider_service_modes
 - repair_requests
 - repairs
 - repair_status_events
 - repair_updates
 
+One minimal validation-telemetry table:
+
+- tracking_events
+
 Supabase manages `auth.users`.
 
-Keep Customer/Device as snapshots rather than separate tables for MVP.
+Keep Customer/Device as snapshots rather than separate tables for MVP. Derive
+domain analytics from authoritative tables. Store only successful public
+Tracking observations in `tracking_events`; do not introduce external event
+tooling or a generic analytics stream for the MVP.
 
 ## Open product questions
 
@@ -69,10 +79,13 @@ Keep Customer/Device as snapshots rather than separate tables for MVP.
 ## Open technical questions
 
 1. Exact Tracking Code format and whether to store raw code or hash.
-2. Exact rate-limiting provider/implementation.
-3. Exact deployment platform.
-4. Whether to introduce Prisma later if persistence ergonomics justify it.
-5. Whether optional tracking analytics should use a DB table or external event tooling.
+2. Exact deployment platform.
+3. Whether to introduce Prisma later if persistence ergonomics justify it.
+
+Resolved 2026-08-26: public-operation rate limiting uses durable PostgreSQL
+fixed-window counters in `public_operation_rate_limits`, consumed atomically by
+`check_public_operation_rate_limit(...)` with opaque HMAC actor keys. See
+`docs/SECURITY.md` and Plan 02.
 
 ## Deferred decisions
 

@@ -9,6 +9,30 @@
 - Do not introduce a dependency, table, workflow or abstraction without a concrete requirement.
 - Security and Provider isolation are acceptance criteria, not cleanup work.
 
+## Soft freeze (v0.1.0 hardening)
+
+Until v0.1.0 ships, `staging` accepts only:
+
+- bug/security/reliability fixes;
+- scope-valid missing behavior (see the feature-discovery gate below);
+- CI/testing/deployment work;
+- required accessibility/UX fixes.
+
+New domain actors, new business Modules, large redesigns, and speculative infrastructure are rejected by default. Every PR into `staging` must complete the release-justification section of the PR template. Full rules: [`docs/release/v0.1.0-hardening/handoff/00_POST_MVP_MASTER_HANDOFF.md`](docs/release/v0.1.0-hardening/handoff/00_POST_MVP_MASTER_HANDOFF.md).
+
+### Feature-discovery gate
+
+Testing sometimes reveals missing behavior. Include it in v0.1.0 only when **all** are true:
+
+1. current MVP scope already implies the behavior;
+2. absence makes an existing workflow incomplete, unsafe, or misleading;
+3. no major new domain model is required;
+4. implementation scope is bounded;
+5. the regression surface is known;
+6. tests can be added.
+
+Everything else goes to the backlog unless the Lead explicitly expands release scope.
+
 ## Branches
 
 Use short descriptive branches, for example:
@@ -21,24 +45,36 @@ refactor/repairs-interface
 docs/setup-guide
 ```
 
+v0.2.0 work targets `release/0.2.0`, which accepts the same feature, fix, hotfix, chore and dependabot branches as `staging`. Promotion runs `release/0.2.0` → `staging` → `main`; there is no direct `release/*` → `main` path. v0.1.0 hardening stays on `staging`.
+
 ## Commits
 
 Keep commits coherent. Avoid combining unrelated formatting, refactors and feature work unless they are necessary for the same change.
+
+## Database changes
+
+Accepted/shared migrations are forward-only. Never mutate a shared database without a version-controlled migration in `supabase/migrations/`. Before production, rehearse both paths: an empty database replaying the full migration history, and a release-like database applying only pending migrations. When a branch adds pending migrations, run the automated upgrade rehearsal with `pnpm rehearse:migrations` (scratch lab, base-only state, apply-pending-only, then the DB integration suite).
 
 ## Required checks
 
 Before opening a PR:
 
 ```bash
-docker compose run --rm web npm run lint
-docker compose run --rm web npm test
-docker compose run --rm web npm run build
+pnpm format:check
+pnpm lint
+pnpm typecheck
+pnpm test:run
+pnpm build
+pnpm db:reset
+pnpm test:db
 ```
+
+`pnpm db:reset` and `pnpm test:db` require local Supabase to be running and configured. The database suite runs against real PostgreSQL/Supabase behavior; security-sensitive database changes, including schema, RLS, policies, constraints, triggers, or RPCs, require the real DB suite before completion. See [`docs/17_TESTING_STRATEGY.md`](docs/17_TESTING_STRATEGY.md) for the full testing strategy.
 
 Run Playwright for user-flow changes:
 
 ```bash
-docker compose run --rm web npx playwright test
+pnpm exec playwright test
 ```
 
 ## Pull request description

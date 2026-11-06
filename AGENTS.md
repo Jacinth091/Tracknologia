@@ -14,6 +14,39 @@ These instructions apply to all code, tests, database changes, configuration, an
 
 The goal is not to produce the most code or the most abstractions. The goal is to produce a small, coherent, maintainable system whose structure reflects Tracknologia's actual domain.
 
+## Agent skills
+
+### Issue tracker
+
+Issues and specs are tracked in GitHub Issues for `Jacinth091/Tracknologia`. See `docs/agents/issue-tracker.md`.
+
+### Triage labels
+
+The Matt Pocock skill defaults are the canonical triage labels for this repo. See `docs/agents/triage-labels.md`.
+
+### Domain docs
+
+Tracknologia uses a single-context domain docs layout rooted at `CONTEXT.md` and `docs/adr/`. See `docs/agents/domain.md`.
+
+---
+
+## Toolchain & commands
+
+- Package manager is **pnpm** (`packageManager: pnpm@11.22.0`); Node must be `>=24 <25`. Do not use npm/yarn for installs.
+- Quality gates, in CI order: `pnpm format:check` → `pnpm lint` → `pnpm typecheck` → `pnpm test:run` → `pnpm build`.
+  - Prettier formatting is enforced by CI. Run `pnpm format` before committing.
+  - `pnpm typecheck` runs `next typegen && tsc --noEmit` — it regenerates route types first, so run it after adding/changing routes.
+- Tests use Vitest with `globals` and the node environment. `pnpm test` is watch mode; use `pnpm test:run` (covers `src/` and `tests/contracts/`). Run one file with e.g. `pnpm test:run tests/contracts/provider-security.contract.test.ts`.
+  - The Vitest config aliases `@` to `src/` and `server-only` to an empty module, so feature modules import cleanly in tests.
+  - Database integration tests (`pnpm test:db`, `tests/integration/*.db.test.ts`) hit real PostgreSQL via a local Supabase stack. The suite is split by Module (auth, providers, repair-requests, repairs, tracking, service-modes, invitations) with shared helpers in `tests/integration/helpers/`. Start Supabase, then run `pnpm db:reset` before `pnpm test:db`. **Any schema, RLS, policy, trigger, constraint, or RPC change requires this suite** — unit tests alone are not enough.
+- Local env lives in `.env.local` (copy `.env.example`). Compose reads it via `env_file`. `NEXT_PUBLIC_REQUIRE_EMAIL_CONFIRMATION=false` skips email confirmation locally; `SMTP_*` is optional in dev (emails log to console). CI builds with placeholder Supabase values.
+- Playwright E2E (`tests/e2e/`) runs with `pnpm test:e2e` and drives the real UI for the mandatory release scenarios (`docs/TESTING.md`). It requires a local Supabase stack: start it, run `pnpm db:reset`, and point `.env.local` at it (see `.env.example`). The destructive fixtures refuse non-local Supabase hosts, and retries are disabled by policy.
+
+## Branches & commits
+
+- Promotion path enforced by `.github/workflows/branch-policy.yml`: only `staging` merges into `main`; only `feature/NN/*`, `fix/*`, `hotfix/*`, `chore/*`, `dependabot/*`, or `release/*` merge into `staging`; `release/*` accepts `feature/NN/*`, `fix/*`, `hotfix/*`, `chore/*` and `dependabot/*` sources; any branch may PR into a protected `feature/**` integration branch. Active development lands on `staging`; v0.2.0 work lands on `release/0.2.0`.
+- Commit messages follow `tag[author_name]: description` (e.g., `feat[jnnzz]: add pilot analytics`) — see the `git-commit-rules` skill.
+
 ---
 
 ## 1. Read Before Writing
@@ -360,7 +393,9 @@ Any new table must have a present product requirement.
 
 ---
 
-## 12. Database Changes Must Be Intentional
+## 12. Database Changes & Supabase Migrations
+
+Tracknologia uses PostgreSQL managed through Supabase.
 
 When changing the database:
 
@@ -368,13 +403,43 @@ When changing the database:
 - add appropriate foreign keys;
 - add uniqueness constraints for domain invariants;
 - consider nullability carefully;
-- consider RLS implications;
+- consider RLS implications (avoid recursive subqueries on the same table);
 - update schema documentation;
 - update tests affected by the change.
 
-Do not modify a shared database manually and leave the repository unaware of the change.
+Do not modify a shared or remote database manually and leave the repository unaware of the change. All schema, table, enum, trigger, and RLS changes must be committed as versioned SQL migration files.
 
-When migration infrastructure is present, database changes must be committed as migrations.
+### Migration Workflow & Structure
+
+1. **Location**: All migrations live in `supabase/migrations/` using timestamped naming:
+   ```text
+   supabase/migrations/YYYYMMDDHHMMSS_description.sql
+   ```
+2. **Applying Migrations**:
+   - Link project once:
+     ```bash
+     npx supabase link --project-ref <your-project-ref>
+     ```
+   - Push new migrations to remote database:
+     ```bash
+     npx supabase db push
+     ```
+   - Local Docker development (alternative):
+     ```bash
+     npx supabase start
+     ```
+3. **Environment Configuration (`.env.local`)**:
+   ```env
+   NEXT_PUBLIC_SUPABASE_URL=https://<project-ref>.supabase.co
+   NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY=<your-publishable-key>
+   ```
+4. **Trigger & RLS Writing Rules**:
+   - `SECURITY DEFINER` trigger functions on `auth.users` must explicitly set:
+     ```sql
+     SET search_path = public, pg_temp;
+     ```
+   - Always grant table and schema permissions to `authenticated`, `service_role`, and `anon` where appropriate.
+   - Avoid self-referencing subqueries inside RLS policies on the same relation to prevent `infinite recursion detected` errors.
 
 ---
 
@@ -396,6 +461,181 @@ Does this Repair belong to their Provider?
 ```
 
 Do not treat a valid Supabase session as sufficient authorization.
+
+---
+
+## 13A. Application Owns Business Operations; PostgreSQL Owns Persistence Guarantees
+
+Tracknologia uses Next.js as the full-stack application runtime. Supabase provides authentication and PostgreSQL infrastructure; it is not the default owner of Tracknologia business use cases.
+
+Use this responsibility flow by default:
+
+```text
+Browser
+   ↓
+Next.js Server Action / Route Handler
+   ↓
+Owning feature Module
+   ↓
+Persistence
+   ↓
+Supabase / PostgreSQL
+```
+
+The layers have different responsibilities.
+
+### Next.js adapters
+
+Server Actions and Route Handlers should:
+
+- receive browser/HTTP input;
+- adapt route/form values into feature input;
+- call the owning feature Interface;
+- translate deliberate feature outcomes into redirects, revalidation, or responses.
+
+They must not become the business/domain layer.
+
+### Feature Modules
+
+The owning feature Module should:
+
+- own the use case and domain vocabulary;
+- validate business input and preconditions;
+- derive or require trusted authorization context;
+- make business/domain decisions;
+- orchestrate the operation and its required side effects;
+- expose a small, meaningful Interface to `src/app` and other Modules.
+
+Examples include:
+
+```text
+Providers.createProvider(...)
+Providers.createStaffInvitation(...)
+Providers.acceptStaffInvitation(...)
+Repairs.changeRepairStatus(...)
+RepairRequests.acceptRepairRequest(...)
+```
+
+Do not move these semantics into SQL merely because persistence uses Supabase.
+
+### Persistence
+
+Server-only persistence code should:
+
+- hide `supabase-js`, query, and RPC mechanics;
+- translate feature inputs into persistence operations;
+- return explicit results and failures;
+- avoid inventing product semantics that belong to the feature.
+
+Direct `.from(...).select/insert/update/delete` calls are acceptable inside persistence when a single statement plus RLS and constraints provides the required correctness guarantee.
+
+An RPC is not automatically better than direct persistence.
+
+### Supabase Auth
+
+Supabase Auth owns authentication mechanics:
+
+```text
+identity
+passwords
+sessions
+email/auth tokens
+```
+
+Tracknologia owns authorization and business behavior.
+
+Do not put Provider creation, Staff onboarding, Repair lifecycle behavior, or other feature use cases into Auth merely because the authenticated user is involved.
+
+### PostgreSQL / Supabase database
+
+PostgreSQL should own persistence guarantees such as:
+
+- durable storage;
+- foreign keys and relational integrity;
+- uniqueness and check constraints;
+- RLS and least-privilege enforcement;
+- narrow atomic transactions;
+- row locking and concurrency protection;
+- write-time rechecking of security/integrity invariants where races matter.
+
+Application ownership does **not** mean trusting the application alone. Critical authorization and integrity invariants should still be enforced again by RLS, constraints, and transactional checks where appropriate.
+
+### RPC / database-function rule
+
+Use a PostgreSQL RPC/function when the current `supabase-js` architecture needs a database-side transaction or race-safe operation that cannot safely be represented as independent calls.
+
+Good RPC responsibilities include:
+
+```text
+lock a row
+verify a credential/invitation is still valid at write time
+prevent an invalid duplicate or second membership
+insert multiple required rows atomically
+advance/consume durable state atomically
+commit everything or roll everything back
+```
+
+Do **not** use an RPC as the default business-service layer.
+
+An RPC should normally not decide:
+
+```text
+which feature owns the operation
+what a domain concept means
+which onboarding screen comes next
+which profile concept exists
+fallback display-name semantics
+notification/email behavior
+redirect/revalidation behavior
+cross-feature orchestration
+```
+
+Those decisions belong to the owning feature/application layer.
+
+Even when a database transaction repeats a business invariant for integrity or security, the feature Module remains the semantic owner of the use case.
+
+### Atomicity rule
+
+If several writes together define one required durable state, do not split them into unchecked calls.
+
+Bad:
+
+```text
+create Provider + OWNER atomically
+then perform a separate required Provider-profile UPDATE
+then ignore the UPDATE result
+```
+
+Preferred:
+
+```text
+Feature Module decides the complete operation
+        ↓
+Persistence invokes one narrow transaction when atomicity is required
+        ↓
+PostgreSQL commits all required durable writes or rolls them all back
+```
+
+If a follow-up write is intentionally outside the transaction, its failure must be checked, surfaced, and safe to retry.
+
+### Do not add infrastructure only to avoid RPCs
+
+Do not introduce Prisma, a new PostgreSQL driver, or another persistence framework merely to move transaction syntax out of PostgreSQL.
+
+If Tracknologia later adopts application-controlled SQL transactions, make that an explicit architecture decision with a present requirement and documented trade-off.
+
+### Review rule
+
+For every non-trivial mutation, reviewers should be able to answer:
+
+1. Which feature owns the business operation?
+2. Is the Next.js route/action only adapting transport/UI concerns?
+3. Is persistence hiding database mechanics rather than defining product semantics?
+4. Does PostgreSQL enforce the necessary RLS, constraints, and atomicity?
+5. Is an RPC used only because a real transaction/concurrency/security boundary requires it?
+6. Are required writes atomic, or are intentionally separate failures checked and recoverable?
+
+If those answers are unclear, the responsibility boundary needs redesign before merge.
 
 ---
 
@@ -445,7 +685,7 @@ Provider A must not be able to read or mutate Provider B's data even if an ident
 
 ## 16. `proxy.ts` Is Not the Authorization System
 
-`proxy.ts` may handle:
+`proxy.ts` lives at the repository root (this Next.js version uses `proxy.ts`, not `middleware.ts`). It may handle:
 
 - session refresh;
 - redirects;

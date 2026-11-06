@@ -12,10 +12,20 @@ This directory contains the repository-facing engineering documentation for Trac
 | [DATABASE.md](DATABASE.md)         | Initial MVP relational model and invariants                    |
 | [SECURITY.md](SECURITY.md)         | Authentication, authorization, RLS and public-surface security |
 | [TESTING.md](TESTING.md)           | Unit/module, component and E2E testing strategy                |
+| [OPERATIONS.md](OPERATIONS.md)     | Post-deployment monitoring, incident severity and hotfix flow  |
 
 ## Domain documentation
 
 `../CONTEXT.md` is the canonical glossary. It should contain domain terms and their meanings, not implementation details.
+
+## Release hardening (v0.1.0)
+
+`release/v0.1.0-hardening/` holds the release-hardening program for v0.1.0:
+
+- `handoff/` — process parts: change control, security/reliability scope, testing/CI gates, bug burn, load, UAT, RC/deployment, stabilization, readiness checklist. Start at `00_POST_MVP_MASTER_HANDOFF.md`.
+- `plans/` — executable implementation plans derived from the handoff, with dependency order and shared execution context. Start at `00_MASTER_INDEX_AND_DEPENDENCY_MAP.md`.
+- `evidence/` — per-plan execution records and release evidence (load baselines, UAT pilot, RC deployment record).
+- `RELEASE_NOTES.md` — what v0.1.0 delivers and its explicit known limitations.
 
 ## Architecture Decision Records
 
@@ -47,4 +57,8 @@ Included features:
 - Analytics / Pilot Metrics
 - Cross-feature Integration Map
 
-These documents are aligned to the current Tracknologia v0.3 MVP model: Provider-centric architecture, `SHOP` and `INDEPENDENT` parity, optional customer Repair Requests, direct Provider Repair creation, minimal meaningful Repair statuses, accountless Tracking, and the lean seven-table core data model.
+These documents are aligned to the current Tracknologia v0.3 MVP model:
+Provider-centric architecture, `SHOP` and `INDEPENDENT` parity, optional
+customer Repair Requests, direct Provider Repair creation, minimal meaningful
+Repair statuses, accountless Tracking, a lean core data model, and minimal
+successful-view validation telemetry.

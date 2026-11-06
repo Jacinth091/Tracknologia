@@ -38,11 +38,15 @@ Own Provider profile and operating configuration.
 ### Conceptual interface
 
 ```ts
-createProvider(input): Provider
+createProvider(input): { providerId, membershipId, slug }
 getProvider(providerId): Provider
-getPublicProviderBySlug(slug): PublicProviderProfile
-updateProviderProfile(context, input): Provider
-setServiceModes(context, modes): ProviderServiceMode[]
+getPublicProvider(slugOrId): PublicProviderProfile
+getProviderServiceModes(providerId): ProviderServiceMode[]
+updateProviderProfile(input): Provider
+updateCurrentProviderUserProfile(input): ProviderUserProfile
+setServiceModes(modes): ProviderServiceMode[]
+createStaffInvitation(input): CreateStaffInvitationResult
+acceptStaffInvitation(input): AcceptedStaffMembership
 ```
 
 ### Owns
@@ -52,7 +56,14 @@ setServiceModes(context, modes): ProviderServiceMode[]
 - optional public address;
 - supported device categories;
 - request-acceptance flag;
-- supported Service Modes.
+- supported Service Modes;
+- canonical person profiles;
+- Owner-authorized Shop Staff invitation lifecycle.
+
+The Module derives Provider and user identity from authenticated context for
+mutations. Its persistence layer hides direct table queries and the narrow
+atomic RPCs used for Provider creation, Service Mode replacement, and Staff
+invitation acceptance.
 
 ## 3. Repair Requests Module
 
@@ -66,11 +77,21 @@ Manage customer-submitted pre-acceptance Requests for exactly one Provider.
 
 ```ts
 submitRepairRequest(providerSlug, input): RepairRequestReceipt
-listRepairRequests(context, filter?): RepairRequestSummary[]
-getRepairRequest(context, requestId): RepairRequestDetail
-acceptRepairRequest(context, requestId, verifiedInput): AcceptedRepairResult
-declineRepairRequest(context, requestId): RepairRequest
+listRepairRequests(options?): RepairRequestPage
+getRepairRequest(requestId): RepairRequestDetail | null
+acceptRepairRequest(requestId, verifiedInput): AcceptedRepairResult
+declineRepairRequest(requestId): RepairRequestDetail
 ```
+
+Provider-side Interfaces derive `ProviderContext` from the authenticated
+Supabase session. Browser-supplied Provider/user identifiers are not part of
+the mutation or query contracts. Persistence is server-only and hides direct
+queries plus the submission/decision RPC mechanics.
+
+The list Interface accepts an optional status and positive page number. It
+returns at most 25 Provider-scoped summaries with `hasPrevious` and `hasNext`
+flags. The Module hides offset/range calculation, deterministic
+`submitted_at DESC, id DESC` ordering, and the one-row look-ahead query.
 
 ### Invariants
 
@@ -92,14 +113,31 @@ Own authoritative Repair behavior.
 ### Conceptual interface
 
 ```ts
-createRepair(context, input): RepairResult
-getRepair(context, repairId): RepairDetail
-listRepairs(context, filter?): RepairSummary[]
-updateRepairDetails(context, repairId, input): RepairDetail
-changeRepairStatus(context, repairId, input): RepairDetail
-addCustomerUpdate(context, repairId, message): CustomerUpdate
-completeRepair(context, repairId): RepairDetail
+createRepair(input): RepairResult
+getRepair(repairId): RepairDetail | null
+listRepairs(options?): RepairPage
+getRepairCounts(): RepairCounts
+updateRepairDetails(repairId, input): RepairDetail
+changeRepairStatus(repairId, nextStatus): RepairDetail
+addCustomerUpdate(repairId, message): CustomerUpdate
+completeRepair(repairId): RepairDetail
 ```
+
+Provider-facing Interfaces derive trusted Provider context internally. The
+narrow `createRepairFromRequest` seam remains available to Repair Requests for
+the accepted-request transaction, while both Repair origins converge on this
+Module for later reads, edits, updates, and lifecycle behavior.
+
+`listRepairs` returns at most 25 summaries plus page navigation flags and hides
+quoted/escaped punctuation-safe search construction, the aggregate `WAITING`
+filter, stable ordering, projections, and Provider scoping.
+`getRepair` composes the authoritative snapshot with Status Events and Customer
+Updates without exposing persistence mechanics to pages.
+
+`updateRepairDetails` distinguishes omitted Service Mode input (preserve the
+recorded snapshot) from an intentional clear. Changed non-null modes must be
+currently configured, and PostgreSQL serializes the write-time recheck against
+Provider Service Mode replacement.
 
 ### Hides
 
@@ -111,6 +149,7 @@ completeRepair(context, repairId): RepairDetail
 - Provider ownership checks;
 - Request origin linkage;
 - completion timestamps;
+- historical Service Mode preservation and write-time serialization;
 - persistence transaction details.
 
 ## 5. Tracking Module
@@ -122,20 +161,41 @@ completeRepair(context, repairId): RepairDetail
 Resolve a public Tracking Code into a restricted customer-safe view.
 
 ```ts
-lookupRepairByTrackingCode(code): PublicRepairView
+lookupRepairByTrackingCode(code): PublicRepairView | null
 ```
 
-`PublicRepairView` must never be a raw `repairs` row.
+The Module normalizes and validates the public credential, invokes one bounded
+database projection, fails closed if that projection drifts, and composes
+customer-facing device/status/Service Mode wording. Invalid and unknown codes
+both return `null`.
 
-It excludes Provider-private information, Internal Notes, contact information not intended for display, and internal identifiers.
+`PublicRepairView` is never a raw `repairs` row. It contains Provider display
+name, one safe device summary, current status presentation, selected Service
+Mode, computed last activity time, READY handover guidance, and at most 25
+message/timestamp-only Customer Updates. It excludes contact information,
+customer identity, Internal Notes, Diagnosis, technical identifiers, ticket/
+tracking credentials, database/auth ids, Update authors, and audit history.
 
 ## 6. Analytics / Pilot Metrics Module
 
 **Location:** `src/features/analytics/`
 
-This is intentionally small and can initially delegate to an external analytics event stream or an optional `tracking_events` table.
+### Responsibility
 
-Measures only what is needed to validate the MVP hypothesis.
+Measure only what is needed to validate the MVP hypothesis without duplicating
+authoritative domain state or becoming an availability dependency.
+
+```ts
+recordSuccessfulTrackingView(trackingCode): Promise<boolean>
+```
+
+The Module hides the narrow Supabase RPC and converts persistence failure into
+a sanitized `false` result. The `/track` Server Action schedules it with Next.js
+`after()` only after Tracking returns a successful restricted projection, so
+Tracking has no Analytics dependency and the customer response does not await
+telemetry. `tracking_events` stores only Repair correlation and observation
+time. Provider, Request, Repair, status, origin, and completion metrics are
+derived directly from their owning tables.
 
 ## Suggested internal feature layout
 
