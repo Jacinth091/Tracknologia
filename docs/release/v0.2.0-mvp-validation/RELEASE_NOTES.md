@@ -39,6 +39,21 @@ Feedback pooling remains in place. Both serializers consume the same suppressed
 report; zero and N/A remain distinct outside pooled sections. The policy remains
 minimum group 5 with complementary suppression.
 
+The corrective review of #142 additionally identified Activity daily/repeat
+disclosure (REQ-PRIV-02). A hidden repeat count of 1 can be reconstructed from
+daily counts 5 and 6 and distinct total 10. Activity is now pooled as a section
+when any count is small. Tracking also pools event/distinct-Repair counts to
+prevent event totals from recovering a hidden distinct count. Regression tests
+exercise the projected report and both serializers, plus no-small cases.
+
+For RISK-EXPORT-03, the owner explicitly chose protection within each individual
+export on 2026-11-07 ([#87](https://github.com/Jacinth091/Tracknologia/issues/87)).
+Overlapping periods or repeated snapshots can reveal small changes when combined;
+this residual risk is accepted. Only reports reviewed together for disclosure by
+the owner or a designated internal reviewer may be shared with the approved
+internal/developer audience. This is an operational control, not an app-enforced
+multi-export privacy guarantee. The Reports page and exported notes disclose it.
+
 ## Candidate identity and acceptance
 
 The reviewed candidate was `staging` at `135e66f`, against `main` at `32e21f1`:

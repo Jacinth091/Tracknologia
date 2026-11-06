@@ -128,6 +128,11 @@ export default async function ReportsPage({
           Counts only. No Provider, Customer, feedback or authentication
           identifiers leave this page.
         </p>
+        <p className="text-sm text-muted-foreground">
+          Suppression applies within each file. Comparing overlapping periods or
+          snapshots can reveal small changes. Share only reports reviewed
+          together for disclosure with the approved internal/developer audience.
+        </p>
         <div className="flex flex-wrap gap-2">
           <Link
             href={exportHref("csv", period, start, end)}
@@ -162,7 +167,9 @@ export default async function ReportsPage({
         </dl>
         <p className="text-xs text-muted-foreground">
           Counts from 1 to 4 are suppressed as &lt;5, including the total a
-          suppressed part would reveal. Retention policy: approved (#87).
+          suppressed part would reveal. Related sections are pooled to prevent
+          reconstruction, including their large and zero counts. Retention
+          policy: approved (#87).
         </p>
       </Card>
 
