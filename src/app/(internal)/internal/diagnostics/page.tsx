@@ -125,9 +125,10 @@ export default async function DiagnosticsPage() {
             <dd className="break-all text-foreground">{config.app.origin}</dd>
           </div>
           <div>
-            <dt className="text-muted-foreground">Retention policy</dt>
+            <dt className="text-muted-foreground">Diagnostics retention</dt>
             <dd className="text-foreground">
-              Approved (#87), retained rows only
+              7 days approved (#87). No automatic deletion; owner reviews
+              monthly.
             </dd>
           </div>
         </dl>
@@ -209,11 +210,11 @@ export default async function DiagnosticsPage() {
           <div>
             <dt className="text-muted-foreground">Email transport</dt>
             <dd className="text-foreground">
-              {config.email.smtp
-                ? config.email.isDevLogger
-                  ? "Dev logger (console)"
-                  : "SMTP configured"
-                : "Not configured"}
+              {config.email.isDevLogger
+                ? "Dev logger (console)"
+                : config.email.smtp
+                  ? "SMTP configured"
+                  : "Not configured"}
             </dd>
           </div>
           <div>

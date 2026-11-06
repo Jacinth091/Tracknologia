@@ -20,7 +20,8 @@ vi.mock("@/features/internal-operations", () => ({
   requireInternalOperator: feature.requireInternalOperator,
 }));
 
-vi.mock("@/lib/config/server", () => ({
+vi.mock("@/lib/config/server", async (importOriginal) => ({
+  ...(await importOriginal<typeof import("@/lib/config/server")>()),
   getServerConfig: config.getServerConfig,
 }));
 
@@ -44,6 +45,7 @@ vi.mock("next/link", () => ({
 }));
 
 import type { InternalHealth } from "@/features/internal-operations";
+import { parseServerConfig } from "@/lib/config/server";
 import DiagnosticsPage from "./page";
 
 const health: InternalHealth = {
@@ -66,18 +68,15 @@ const health: InternalHealth = {
   email: { status: "unavailable", latencyMs: null, observedAt: null },
 };
 
-const serverConfig = {
-  runtime: "production",
-  app: {
-    url: "https://tracknologia.example",
-    origin: "https://tracknologia.example",
-  },
-  email: { smtp: null, from: "no-reply@example.test", isDevLogger: true },
-  publicAbuse: {
-    clientIpSource: "vercel",
-    sharedDevBucket: false,
-  },
-  auth: { requireEmailConfirmation: true },
+const serverEnv = {
+  NODE_ENV: "production",
+  NEXT_PUBLIC_APP_URL: "https://tracknologia.example",
+  NEXT_PUBLIC_SUPABASE_URL: "https://example.supabase.co",
+  NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY: "test-publishable-key",
+  SUPABASE_SERVICE_ROLE_KEY: "test-service-role-key",
+  PUBLIC_ABUSE_HMAC_SECRET: "test-hmac-secret-at-least-32-characters",
+  PUBLIC_ABUSE_CLIENT_IP_SOURCE: "vercel",
+  VERCEL: "1",
 };
 
 async function renderDiagnostics() {
@@ -94,7 +93,7 @@ describe("Diagnostics page", () => {
     feature.recordSensitiveInternalAccess.mockResolvedValue(true);
     feature.getInternalHealth.mockResolvedValue(health);
     feature.deploymentRevision.mockReturnValue("abc1234");
-    config.getServerConfig.mockReturnValue(serverConfig);
+    config.getServerConfig.mockReturnValue(parseServerConfig(serverEnv));
   });
 
   afterEach(() => {
@@ -107,11 +106,46 @@ describe("Diagnostics page", () => {
     expect(html).toContain("abc1234");
     expect(html).toContain("production");
     expect(html).toContain("https://tracknologia.example");
-    expect(html).toContain("Approved (#87), retained rows only");
+    expect(html).toContain("Diagnostics retention");
+    expect(html).toContain("7 days approved (#87)");
+    expect(html).toContain("No automatic deletion; owner reviews monthly");
+    expect(html).not.toContain("retained rows only");
     expect(html).toContain("Vercel forwarded IP");
     expect(html).toContain("Not configured");
     expect(html).toContain("Required");
     expect(html).toContain("Disabled");
+  });
+
+  it.each(["local", "test"])(
+    "shows the console email logger in %s",
+    async (runtime) => {
+      config.getServerConfig.mockReturnValue(
+        parseServerConfig({
+          ...serverEnv,
+          NODE_ENV: runtime === "local" ? "development" : "test",
+        }),
+      );
+
+      expect(await renderDiagnostics()).toContain("Dev logger (console)");
+    },
+  );
+
+  it("shows configured SMTP without exposing its credentials", async () => {
+    config.getServerConfig.mockReturnValue(
+      parseServerConfig({
+        ...serverEnv,
+        SMTP_HOST: "smtp.example.test",
+        SMTP_USER: "private-smtp-user",
+        SMTP_PASSWORD: "private-smtp-password",
+      }),
+    );
+    const html = await renderDiagnostics();
+
+    expect(html).toContain("SMTP configured");
+    expect(html).not.toContain("Dev logger (console)");
+    expect(html).not.toContain("smtp.example.test");
+    expect(html).not.toContain("private-smtp-user");
+    expect(html).not.toContain("private-smtp-password");
   });
 
   it("says the revision is missing rather than inventing one", async () => {

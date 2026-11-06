@@ -167,9 +167,11 @@ uptime, host telemetry, operation counters) are not connected yet.
 
 Operator-only provenance view behind the same guard and audit. It shows the
 deploy revision only when the environment supplies a hex SHA, runtime,
-application origin, retention policy, raw probe rows, and non-secret ingress and
-email configuration (client-IP source, transport configured, confirmation
-requirement, shared dev bucket). It also lists the signals that are not
+application origin, the approved 7-day diagnostics retention policy (no automatic
+deletion; owner reviews monthly under #87), raw probe rows, and non-secret ingress
+and email configuration (client-IP source, SMTP / local or test console logger /
+unconfigured transport, confirmation requirement, shared dev bucket). Retained-row
+coverage is separate from retention policy. It also lists the signals that are not
 observed, so missing telemetry is never read as healthy.
 
 ## Server Actions

@@ -19,10 +19,6 @@ const VARIANTS: Record<HealthStatus, "secondary" | "outline" | "destructive"> =
     stale: "outline",
   };
 
-export function healthStatusLabel(status: HealthStatus): string {
-  return LABELS[status];
-}
-
 export function formatLatency(latencyMs: number | null): string {
   return latencyMs === null ? "Not probed" : `${latencyMs} ms`;
 }
