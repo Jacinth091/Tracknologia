@@ -12,6 +12,11 @@
 
 # testing
 /coverage
+/test-results/
+/playwright-report/
+
+# pnpm store artifacts
+/.pnpm-store/
 
 # next.js
 /.next/
@@ -30,8 +35,10 @@ yarn-debug.log*
 yarn-error.log*
 .pnpm-debug.log*
 
-# env files (can opt-in for committing if needed)
-.env*
+# env files
+.env*.local
+.env
+.env.*
 
 # vercel
 .vercel
@@ -39,3 +46,16 @@ yarn-error.log*
 # typescript
 *.tsbuildinfo
 next-env.d.ts
+
+# Supabase CLI local artifacts
+supabase/.temp/
+supabase/.branches/
+
+# local agent/session tool artifacts
+.headroom/
+.herdr-loop/
+
+# UAT data-pack run manifests (credentials for local testers)
+/scripts/uat/outputs/
+# graphify knowledge-graph output
+/graphify-out/

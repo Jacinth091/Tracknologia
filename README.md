@@ -183,10 +183,10 @@ Run module/component tests:
 docker compose run --rm web npm test
 ```
 
-Run end-to-end tests:
+Run end-to-end tests (Playwright; requires a local Supabase stack and the E2E environment — see `docs/TESTING.md`):
 
 ```bash
-docker compose run --rm web npx playwright test
+pnpm test:e2e
 ```
 
 Create a production build:
@@ -363,8 +363,9 @@ Recommended reading order for developers:
 5. [`docs/DATABASE.md`](docs/DATABASE.md) — initial relational model
 6. [`docs/SECURITY.md`](docs/SECURITY.md) — security model
 7. [`docs/TESTING.md`](docs/TESTING.md) — testing expectations
-8. [`CONTRIBUTING.md`](CONTRIBUTING.md) — contribution workflow
-9. `docs/adr/` — accepted architecture decisions
+8. [`docs/OPERATIONS.md`](docs/OPERATIONS.md) — post-deployment operations and hotfix runbook
+9. [`CONTRIBUTING.md`](CONTRIBUTING.md) — contribution workflow
+10. `docs/adr/` — accepted architecture decisions
 
 ---
 

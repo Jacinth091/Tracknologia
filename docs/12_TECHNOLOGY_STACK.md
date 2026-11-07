@@ -11,6 +11,7 @@ This is the current Tracknologia MVP implementation baseline.
 - **TypeScript** — application language
 - **Tailwind CSS** — styling
 - **shadcn/ui** — selective UI acceleration, not a required all-components framework
+- **recharts** — charts, through the shadcn chart component (`src/components/ui/chart.tsx`); used only by the internal metrics client components
 
 The MVP does not add React Router because App Router owns routing.
 

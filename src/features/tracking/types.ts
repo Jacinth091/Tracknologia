@@ -1,0 +1,28 @@
+import type { ServiceMode } from "@/features/providers";
+import type { RepairStatus } from "@/features/repairs";
+
+export type TrackingStatus = RepairStatus | "SUBMITTED" | "DECLINED";
+
+export interface PublicCustomerUpdate {
+  message: string;
+  createdAt: string;
+}
+
+export interface PublicRepairView {
+  providerDisplayName: string;
+  deviceSummary: string;
+  deviceType: string;
+  brandModel: string | null;
+  currentStatus: TrackingStatus;
+  statusLabel: string;
+  statusDescription: string;
+  serviceMode: ServiceMode | null;
+  serviceModeLabel: string | null;
+  handoverMessage: string | null;
+  lastUpdatedAt: string;
+  customerUpdates: PublicCustomerUpdate[];
+  reportedProblem: string;
+  submittedAt: string;
+  trackingType: "REPAIR" | "REQUEST";
+  trackingCode: string;
+}

@@ -18,6 +18,7 @@ Reduce friction for Customers who want to provide device/problem information bef
 - Target exactly one Provider through a provider-specific request page.
 - Capture useful but lightweight customer/device/problem information.
 - Record a Request Reference distinct from Repair ticket/tracking identifiers.
+- Allow Customers to track request progress seamlessly via their Request Reference Code (`REQ-...`) on `/track`.
 - Give the owning Provider a private Request inbox and detail view.
 - Allow the Provider to decline a Request without creating a Repair.
 - Allow the Provider to verify/correct customer-supplied data before accepting.
@@ -96,11 +97,18 @@ SUBMITTED → DECLINED
 
 ```ts
 submitRepairRequest(providerSlug, input): RepairRequestReceipt
-listRepairRequests(context, filter?): RepairRequestSummary[]
-getRepairRequest(context, requestId): RepairRequestDetail
-acceptRepairRequest(context, requestId, verifiedInput): AcceptedRepairResult
-declineRepairRequest(context, requestId): RepairRequest
+listRepairRequests(options?): RepairRequestPage
+getRepairRequest(requestId): RepairRequestDetail | null
+acceptRepairRequest(requestId, verifiedInput): AcceptedRepairResult
+declineRepairRequest(requestId): RepairRequestDetail
 ```
+
+`RepairRequestPage` contains up to 25 summaries plus the current page and
+`hasPrevious`/`hasNext` navigation flags. Options include an optional status
+and positive page number.
+
+Provider-side Interfaces resolve trusted `ProviderContext` internally; callers
+do not supply Provider/user ownership identifiers.
 
 ## Public submission workflow
 
@@ -121,10 +129,10 @@ Create RepairRequest(SUBMITTED)
         ↓
 Generate Request Reference
         ↓
-Return submission receipt
+Return submission receipt with reference code and direct track link
 ```
 
-No Repair is created at this stage.
+No Repair is created at this stage. Customers can check the status of their Request anytime at `/track?code=REQ-...`.
 
 ## Provider review workflow
 
@@ -173,7 +181,9 @@ This operation should be atomic enough that a persistence failure cannot leave a
 ```text
 SUBMITTED Request
         ↓
-Provider declines
+Provider chooses Decline
+        ↓
+Validate Request still SUBMITTED
         ↓
 Request.status = DECLINED
         ↓
@@ -206,6 +216,11 @@ Suggested sections:
 
 Request detail must visually distinguish **customer-reported information** from Provider-authored technical information.
 
+The inbox accepts `status` and `page` query parameters, for example
+`/dashboard/requests?status=SUBMITTED&page=2`. Changing the status resets to
+page 1. Previous/Next navigation preserves the selected status and omits the
+page parameter for page 1.
+
 ## Relationships with other features
 
 ### Providers
@@ -228,11 +243,14 @@ Once created, the Repair does not need the Repair Requests Module for normal lif
 
 ### Tracking
 
-A Request Reference is not a Tracking Code. Public Repair tracking begins only after a Repair exists.
+A Request Reference Code (`REQ-...`) allows accountless public lookup on `/track` to view intake status before acceptance, and seamlessly displays active repair progress once accepted.
 
 ### Analytics
 
-May record submitted/accepted/declined events and Request-origin conversion metrics.
+Submitted, accepted, and declined counts, conversion, and decision time are
+derived from committed `repair_requests` state and timestamps. Feature 06 does
+not duplicate these outcomes into an event stream, so rejected or rolled-back
+operations cannot create contradictory analytics records.
 
 ## Important invariants
 
@@ -278,6 +296,13 @@ Existing `SUBMITTED` Requests remain reviewable. New public submissions should b
 
 The customer's preferred mode is not immutable authority. Provider may verify/change the selected arrangement when creating the Repair.
 
+### Inbox growth
+
+The Provider inbox uses fixed 25-row pages rather than a hard maximum. Each
+page fetches one look-ahead row and orders by `submitted_at DESC, id DESC`, so
+older Requests remain reachable and equal submission timestamps do not make
+page boundaries unstable.
+
 ## Testing expectations
 
 Test:
@@ -287,12 +312,49 @@ Test:
 - Provider not accepting Requests;
 - unsupported Service Mode;
 - Provider A cannot read/action Provider B Request;
+- Provider B cannot accept Provider A Request or create side effects;
+- 60 matching Requests paginate as 25, 25, and 10 without tenant leakage;
 - accept creates one Repair with correct origin/status;
 - second accept cannot create another Repair;
 - decline creates no Repair;
-- accepted/declined Request cannot be processed again;
+- accept-versus-decline concurrency commits exactly one terminal outcome;
+- accept-after-decline and decline-after-accept are rejected without changing
+  durable state;
 - customer data can be corrected during acceptance.
+
+## Implemented baseline
+
+Feature 03 is implemented through:
+
+- `src/features/repair-requests/` for validation, public submission,
+  Provider-scoped queries, acceptance, decline, and persistence mapping;
+- `src/features/repairs/` for the narrow Request-origin Repair creation seam;
+- `/p/[providerSlug]/request` for accountless submission and receipt display;
+- `/dashboard/requests` and `/dashboard/requests/[requestId]` for the private
+  paginated Provider inbox, detail, verification, acceptance, and decline
+  surfaces;
+- `20260823120000_create_repair_requests.sql` for the schema, RLS, restricted
+  RPCs, row locking, uniqueness, and atomic Request-to-Repair transaction.
+
+Anonymous callers cannot insert or read `repair_requests` directly. They can
+only call `submit_repair_request`, which verifies current Provider availability
+and configured Service Modes while holding a Provider row lock. Provider reads
+are RLS-scoped to membership. Acceptance and decline lock the Request so
+concurrent terminal decisions serialize safely.
+
+Inbox persistence fetches 26 rows for each 25-row page to derive `hasNext`
+without an exact-count query. Status filtering composes with pagination, and
+Provider context plus RLS continue to scope every page to one Provider.
+
+This change materializes the Repair columns and initial Status Event required
+for Request acceptance. It does not implement Feature 04's direct Repair
+creation, Repair list/detail, lifecycle transitions, Customer Updates, or
+public Tracking UI.
+
+Server Action payloads retain the framework's default size protection and Zod
+bounds. Dedicated rate limiting/CAPTCHA remains an operational hardening step
+to add only when a production exposure plan or observed abuse justifies it.
 
 ## Definition of done
 
-The feature is healthy when Customers can submit low-friction Provider-specific intake information and Providers can safely turn only accepted, verified Requests into authoritative Repairs without duplicate or cross-tenant behavior.
+The feature is healthy when Customers can submit low-friction Provider-specific intake information, every Request remains reachable through the Provider inbox, and Providers can safely turn only accepted, verified Requests into authoritative Repairs without duplicate or cross-tenant behavior.

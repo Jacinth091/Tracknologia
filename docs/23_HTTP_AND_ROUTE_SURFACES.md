@@ -8,9 +8,72 @@ The MVP does not require a dedicated REST backend. Next.js routes render the web
 
 Customer enters Tracking Code and receives a `PublicRepairView`.
 
+Implemented as a Server Component plus route-local Client form and thin Server
+Action. The form uses POST so the Tracking credential is not placed in URL
+query parameters or browser history. The action passes untrusted FormData to
+`Tracking.lookupRepairByTrackingCode`; malformed and unknown values share one
+neutral not-found result, while infrastructure failure becomes a generic
+temporary-unavailable state.
+
+After a successful projection is validated, the Server Action captures the
+submitted string on the server and schedules one best-effort Analytics
+observation with Next.js `after()`. The found response is returned without
+waiting for the callback. Malformed/unknown/failed lookups schedule nothing,
+and neither the Tracking Code nor Analytics state enters the serialized action
+result. There is no separate public analytics route or browser-visible
+analytics payload.
+
+The rendered result contains Provider display name, safe device summary,
+customer-facing status meaning, Service Mode label, READY handover guidance,
+computed last activity time, and at most 25 message/timestamp-only Customer
+Updates. It never renders the underlying Repair representation.
+
 ### `/p/[providerSlug]/request`
 
 Customer submits a Repair Request to one specific Provider. The page presents Provider identity and supported Service Modes.
+
+Implemented as a Server Component plus route-local Client form/Server Action.
+Dynamic `params` are awaited. Submission returns an inline receipt containing a
+Request Reference only; it does not create a Repair or return a Tracking Code.
+Unavailable/closed Provider slugs render a generic unavailable state.
+
+### `/feedback`
+
+Anonymous visitors and Customers send product feedback through one shared
+client form, with no account and no Tracking Code or Request Reference. The
+`/track` page and the Request receipt link here with a plain `/feedback`
+(no query string).
+
+Implemented as a Server Component that awaits `connection()` before it
+generates the submission nonce, so each visit gets its own. It renders the
+shared `FeedbackForm` with the route-local `submitPublicFeedbackAction`. The
+action reads only the form fields through `submitFeedbackForm` and always
+records the `PUBLIC_FEEDBACK` source. The browser supplies no identity, source,
+or participant class. The copy and the inline privacy notice were owner-approved
+on 2026-10-30 (#87).
+
+### `/privacy`
+
+Public, anonymous, static content: no reads, no writes, no data, no Server
+Actions. It explains what Tracknologia keeps for feedback, repair requests,
+tracking and Provider accounts, and who can see it. Section 1 renders the same
+`FeedbackPrivacyNotice` component as the feedback form, so the approved text
+exists once. The contact address is the project address, a single constant in
+the page file (owner decision on #87, 2026-10-31). Linked from the feedback form, the
+Repair Request form, `/track` and `/register`.
+
+Implemented as a Server Component with no client JavaScript and no
+`connection()` call; it is safe to prerender.
+
+## Operational routes
+
+### `/api/health`
+
+`GET` only, dynamic (`force-dynamic`, never prerendered or cached). It is a thin
+Route Handler over `checkReadiness()` in `internal-operations`. It returns
+`{"status":"healthy"}` with 200, or `{"status":"unavailable"}` with 503, both
+with `Cache-Control: no-store`. It reads no cookies or headers and returns no
+other fields. Documented in `docs/SECURITY.md` as the public health exception.
 
 ## Authentication routes
 
@@ -28,20 +91,193 @@ Exact Supabase Auth callbacks may add framework-specific routes as implementatio
 - `/dashboard/repairs`
 - `/dashboard/repairs/new`
 - `/dashboard/repairs/[repairId]`
+- `/dashboard/feedback`
 - `/dashboard/settings`
 
-## Server Action candidates
+`/dashboard/repairs` is implemented as a Server Component using awaited
+`searchParams`. It supports bounded, punctuation-safe ticket/customer/device
+search, actual-status filters, the `WAITING` aggregate, and 25-row
+Previous/Next pagination ordered by `updated_at DESC, id DESC`. Search values
+are quoted/escaped before raw PostgREST OR construction. Invalid search input
+is preserved and shown with an inline validation error rather than silently
+discarded; invalid values do not reach persistence.
+
+`/dashboard/repairs/new` loads the authenticated Provider's configured Service
+Modes and adapts a sectioned direct-intake form to `Repairs.createRepair`.
+Successful creation redirects to the new detail page only after revalidating
+dashboard and Repair list surfaces.
+
+`/dashboard/repairs/[repairId]` awaits the route parameter and renders the
+authoritative snapshot, private Provider information, Customer Updates,
+Status Events, valid lifecycle actions, and edit/update forms. Invalid and
+cross-Provider IDs share not-found behavior. Tracking Code display is private
+Provider functionality here; public lookup remains Feature 05.
+
+Repair detail editing preserves an omitted recorded Service Mode, treats the
+explicit blank choice as an intentional clear, and renders a removed historical
+mode as "recorded on this Repair; no longer offered." Changed non-null modes are
+validated again at database write time.
+
+`/dashboard/requests` implements Provider-scoped summary cards with 25-row
+pagination. It accepts `status` and `page` query parameters, including
+`/dashboard/requests?status=SUBMITTED&page=2`. Status changes reset to page 1;
+Previous/Next links preserve status, and page 1 is omitted from canonical link
+URLs. Invalid page values render page 1 safely. `/dashboard/requests/[requestId]`
+separates customer-reported data from the editable authoritative Repair
+snapshot and Provider-private intake fields. Terminal Requests render read-only
+state.
+
+`/dashboard/settings` lets every Provider member edit their own canonical person
+profile. Provider business profile and Service Mode forms are rendered for
+Owners only; their Server Actions derive Provider/user identity from the
+authenticated membership rather than accepting IDs from form data.
+
+`/dashboard/feedback` is open to every Provider role (SHOP OWNER, SHOP STAFF,
+and INDEPENDENT), and it is linked from the Provider nav. It requires Provider
+membership before render, and it
+renders the same `FeedbackForm` with the protected `submitProviderFeedbackAction`.
+That action derives the participant class and the `PROVIDER_WORKSPACE` source
+from the authenticated membership. The browser sends no Provider or user identity.
+
+## Internal operator routes
+
+### `/internal`
+
+Operator-only Overview, guarded again at the page seam. The seven-day validation
+metrics read is independently guarded and audited; if it fails without denying
+access, a fallback access audit must succeed before health is probed or protected
+links are rendered. Access or audit failure denies the page.
+
+Headline counts and activity come from metrics, while the current NEW Feedback
+backlog is read separately through its audited feature interface. System status
+uses the bounded `getInternalHealth()` probes independently of metrics success,
+shows uptime as Not observed, and renders only a SHA-shaped deployment revision
+(or an explicit missing-revision message). Health and Diagnostics links remain
+available after a metrics failure; unavailable numbers never become zeroes.
+**Domain metrics as of** is `metrics.asOf` displayed in Asia/Manila, not a shared
+timestamp for health, Feedback coverage or backlog. When metrics fail, this field
+and Feedback coverage explicitly read Unavailable. Unexpected health-read errors
+produce a fixed safe log and unavailable service checks while available metrics
+remain visible. The page adds no polling or automatic refresh.
+
+### `/internal/activity`
+
+Operator-only validation metrics page, reached from the internal home page. It
+is a GET Server Component: the `period` (`today`, `7d`, `30d`, `custom`, default
+`7d`), `start` and `end` query parameters map to the window input, and
+`getValidationMetrics` validates it. The page re-runs the internal access guard
+before reading, and the read itself is guarded and audited. Unauthenticated
+visitors are redirected to login, forbidden operators get the private 404, and
+unavailable access or audit renders the safe unavailable state. The period
+picker is a plain form with no client JavaScript; refresh is a deliberate reload.
+
+### `/internal/health`
+
+Operator-only current service state. It re-runs the guard, records the required
+access audit, then calls `getInternalHealth()` and renders application,
+database, auth and email with `healthy` / `degraded` / `unavailable` / `unknown`
+/ `stale`, latency, and probe time. The application check means "this page
+rendered"; database and auth are live bounded probes; email is `unknown` when
+SMTP is configured but unprobed and `unavailable` when no transport exists.
+Nothing is auto-refreshed, and the page states which signals (independent
+uptime, host telemetry, operation counters) are not connected yet.
+
+### `/internal/diagnostics`
+
+Operator-only provenance view behind the same guard and audit. It shows the
+deploy revision only when the environment supplies a hex SHA, runtime,
+application origin, the approved 7-day diagnostics retention policy (no automatic
+deletion; owner reviews monthly under #87), raw probe rows, and non-secret ingress
+and email configuration (client-IP source, SMTP / local or test console logger /
+unconfigured transport, confirmation requirement, shared dev bucket). Retained-row
+coverage is separate from retention policy. It also lists the signals that are not
+observed, so missing telemetry is never read as healthy.
+
+### `/internal/reports`
+
+Operator-only export page for the validation report, linked from the internal
+navigation. It shares the Activity period filter and guards/audits through the
+same `getValidationMetrics` read. It links one count-only CSV and one JSON
+download for the selected period and renders the metric glossary, window,
+generation time, Feedback availability, and the suppression rule. No rows are
+rendered on the page itself.
+
+### `/internal/reports/export`
+
+`GET` Route Handler behind the same internal-operator guard. It returns `400`
+for a missing/unknown `format` or an invalid window, `401` for an anonymous
+caller, the private `404` for a non-operator, and `503` when the guard or the
+metrics read is unavailable. `format=csv|json` streams the attachment with
+`Content-Disposition: attachment`, `Cache-Control: no-store` and
+`X-Content-Type-Options: nosniff`. JSON carries the whole report object. CSV is
+one seven-column table (`record,section,metric,bucket,value,unit,suppressed`):
+`record` is `meta` (key in `metric`), `glossary` (term in `metric`, definition in
+`value`), `note` (text in `value`) or `row`. Both formats therefore carry the
+window, generated-at, revision, source, coverage, glossary, suppression flags
+and missing-data notes. Counts from 1 to 4 are hidden; a hidden part hides its
+total. One small Repair count pools the whole Repair section, its all-time total
+and tracking adoption, preventing subtraction across status, creation and origin
+counts. One small Request count pools the Request counts and ratios together.
+Activity distinct/repeat/daily Provider counts and Tracking event/distinct-Repair
+counts are each pooled as a section when any count in that section is small.
+One small Feedback count pools the whole Feedback section, because
+its category, source, status and daily partitions share a single total. Derived
+ratios follow their inputs. No Provider, Customer, feedback or authentication
+identifiers are exported, and CSV cells are formula-injection safe.
+Suppression is per export; overlapping windows or snapshots can reveal changes.
+The owner accepted this risk in #87 on 2026-11-07. The page and export notes state
+that only reports reviewed together for disclosure may be shared with the
+approved internal/developer audience. This sharing rule is operational, not an
+application-enforced cross-query guarantee.
+
+## Server Actions
 
 Good candidates:
 
-- create Provider/profile update;
+- create Provider during onboarding;
+- update the current user's person profile;
+- Owner-only Provider operating profile update;
+- Owner-only atomic Service Mode replacement;
 - direct Repair creation;
 - accept/decline Repair Request;
 - change Repair status;
 - add Customer Update;
 - complete Repair.
 
+Feature 05 uses public `trackRepairAction(state, formData)` as a read adapter.
+It accepts no Provider/Repair id, forwards no client authority, and returns only
+the Tracking Module's restricted serializable view.
+
+Feature 04 actions are:
+
+- `createRepairAction(state, formData)`;
+- `updateRepairDetailsAction(state, formData)`;
+- `changeRepairStatusAction(state, formData)`;
+- `addCustomerUpdateAction(state, formData)`;
+- `completeRepairAction(state, formData)`.
+
+They accept Repair IDs only as untrusted locators. Provider/user identity,
+roles, status history actors, ticket numbers, and Tracking Codes are never
+accepted as mutation authority.
+
 Every Server Action still authenticates/authorizes and validates input before calling the feature Module.
+
+Feature 03 actions are:
+
+- public `submitRepairRequestAction(providerSlug, state, formData)`;
+- protected `acceptRepairRequestAction(state, formData)`;
+- protected `declineRepairRequestAction(state, formData)`.
+
+Actions do not accept a Provider identifier. Hidden/route Request IDs are
+untrusted locators; the Module and PostgreSQL derive ownership independently.
+
+Feedback actions are:
+
+- public `submitPublicFeedbackAction(previousState, formData)`;
+- protected `submitProviderFeedbackAction(previousState, formData)`.
+
+Both delegate to `submitFeedbackForm` and return a `FeedbackFormState`. Neither
+accepts a source, participant class, or identity from the form.
 
 ## Route Handler candidates
 
