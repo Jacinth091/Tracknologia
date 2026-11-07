@@ -258,6 +258,22 @@ roles, not `user_metadata`, and not inferred from owning or joining a Provider:
   instead of turning failed reads into zero activity. Feedback unavailability
   is explicit; a Feedback authorization denial still denies the whole report.
 
+- Count-only CSV/JSON exports use minimum group 5 with complementary suppression
+  in the report Module before either serializer runs. A small Repair count pools
+  its entire section, the all-time Repair total and tracking adoption. A small
+  Request count pools its counts and ratios; a small Feedback count pools its
+  section. Activity distinct/repeat/daily counts and Tracking event/distinct
+  counts are also pooled as sections when any count in the section is small.
+  Pooled sections hide large and zero buckets too, preventing visible
+  related counts in the same report from reconstructing a withheld split. These
+  operator-only exports retain the required guard/audit and no-store headers.
+- The owner accepted the privacy policy's per-export boundary in #87 on
+  2026-11-07. Comparing overlapping exports or live snapshots can reveal small
+  changes even when neither file contains suppressed cells. An owner or
+  designated internal reviewer must review proposed files together before
+  sharing them with the approved internal/developer audience. The UI and file
+  notes disclose this limit; cross-export privacy is not enforced by the app.
+
 ## Public Provider and invitation projections
 
 Anonymous users cannot read raw Provider rows. `public_provider_profiles`

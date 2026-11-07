@@ -123,12 +123,154 @@ function row(report: ReturnType<typeof buildValidationReport>, key: string) {
   );
 }
 
+function expectPooledSection(
+  report: ReturnType<typeof buildValidationReport>,
+  section: string,
+) {
+  const rows = report.rows.filter((entry) => entry.section === section);
+  expect(rows.length).toBeGreaterThan(0);
+  expect(rows.every((entry) => entry.suppressed && entry.value === null)).toBe(
+    true,
+  );
+  expect(JSON.parse(validationReportToJson(report)).rows).toEqual(report.rows);
+  const csvRows = validationReportToCsv(report)
+    .split("\n")
+    .filter((line) => line.startsWith(`row,${section},`));
+  expect(csvRows).toHaveLength(rows.length);
+  for (const line of csvRows) {
+    const fields = line.split(",");
+    expect(fields[4]).toBe("");
+    expect(fields[6]).toBe("true");
+  }
+}
+
 afterEach(() => {
   delete process.env.VERCEL_GIT_COMMIT_SHA;
   delete process.env.APP_REVISION;
 });
 
 describe("buildValidationReport", () => {
+  it.each([
+    {
+      name: "repeat count",
+      providerDays: [
+        [1, 2, 3, 4, 5],
+        [5, 6, 7, 8, 9, 10],
+      ],
+      distinct: 10,
+      repeat: 1,
+    },
+    {
+      name: "daily count",
+      providerDays: [[1, 2, 3, 4, 5], [6]],
+      distinct: 6,
+      repeat: 0,
+    },
+  ])(
+    "pools Activity when a hidden $name can be reconstructed",
+    ({ providerDays, distinct, repeat }) => {
+      const activity = {
+        distinctProviders: new Set(providerDays.flat()).size,
+        repeatProviders: providerDays[0].filter((provider) =>
+          providerDays[1].includes(provider),
+        ).length,
+        daily: Array.from({ length: WINDOW.days }, (_, day) => ({
+          date: new Date(Date.parse(WINDOW.startDate) + day * 86_400_000)
+            .toISOString()
+            .slice(0, 10),
+          distinctProviders: providerDays[day]?.length ?? 0,
+        })),
+      };
+      expect(activity.distinctProviders).toBe(distinct);
+      expect(activity.repeatProviders).toBe(repeat);
+      expectPooledSection(
+        buildValidationReport(metrics({ activity })),
+        "activity",
+      );
+    },
+  );
+
+  it("keeps Activity counts visible when distinct, repeat and daily counts are zero or at least five", () => {
+    const activity = {
+      distinctProviders: 5,
+      repeatProviders: 5,
+      daily: [
+        { date: "2026-10-23", distinctProviders: 5 },
+        { date: "2026-10-24", distinctProviders: 5 },
+        { date: "2026-10-25", distinctProviders: 0 },
+      ],
+    };
+    const report = buildValidationReport(metrics({ activity }));
+    expect(row(report, "activity/distinct_providers/")).toMatchObject({
+      value: 5,
+      suppressed: false,
+    });
+    expect(row(report, "activity/repeat_providers/")).toMatchObject({
+      value: 5,
+      suppressed: false,
+    });
+    expect(
+      row(report, "activity/active_providers_per_day/2026-10-25"),
+    ).toMatchObject({ value: 0, suppressed: false });
+    expect(
+      report.rows
+        .filter((entry) => entry.section === "activity")
+        .every((entry) => !entry.suppressed),
+    ).toBe(true);
+  });
+
+  it("pools Tracking when event totals force a hidden distinct-Repair count", () => {
+    // Five period views cover four Repairs; one earlier view adds a fifth.
+    // 6 - 5 = one earlier event, so 5 all-time Repairs requires >=4 in-period.
+    const report = buildValidationReport(
+      metrics({
+        tracking: {
+          periodViews: 5,
+          periodRepairsViewed: 4,
+          allTimeViews: 6,
+          allTimeRepairsViewed: 5,
+          allTimeRepairs: 25,
+          adoptionPercent: 20,
+        },
+      }),
+    );
+    expectPooledSection(report, "tracking");
+  });
+
+  it("keeps Tracking counts and adoption visible when no Tracking count is small", () => {
+    const input = metrics({
+      tracking: {
+        periodViews: 5,
+        periodRepairsViewed: 5,
+        allTimeViews: 10,
+        allTimeRepairsViewed: 5,
+        allTimeRepairs: 25,
+        adoptionPercent: 20,
+      },
+    });
+    input.repairs.statusNow.IN_PROGRESS = 10;
+    input.repairs.statusNow.WAITING_FOR_PARTS = 0;
+    input.repairs.created = {
+      total: 11,
+      customerRequest: 5,
+      providerCreated: 6,
+    };
+    const report = buildValidationReport(input);
+    expect(
+      report.rows
+        .filter((entry) => entry.section === "tracking")
+        .every((entry) => !entry.suppressed),
+    ).toBe(true);
+    expect(row(report, "tracking/period_views/")).toMatchObject({
+      value: 5,
+      suppressed: false,
+    });
+    expect(row(report, "tracking/adoption_percent/")).toMatchObject({
+      value: 20,
+      suppressed: false,
+    });
+  });
+
   it("emits only count-only rows and carries the window, coverage and source", () => {
     const report = buildValidationReport(metrics());
 
@@ -176,7 +318,15 @@ describe("buildValidationReport", () => {
   });
 
   it("keeps zero counts visible and leaves large counts untouched", () => {
-    const report = buildValidationReport(metrics());
+    const input = metrics();
+    input.repairs.statusNow.IN_PROGRESS = 10;
+    input.repairs.statusNow.WAITING_FOR_PARTS = 0;
+    input.repairs.created = {
+      total: 11,
+      customerRequest: 5,
+      providerCreated: 6,
+    };
+    const report = buildValidationReport(input);
 
     expect(row(report, "repairs/status_now/AWAITING_APPROVAL")).toMatchObject({
       value: 0,
@@ -203,8 +353,8 @@ describe("buildValidationReport", () => {
       expect(row(report, key)).toMatchObject({ value: null, suppressed: true });
     }
     expect(row(report, "repairs/status_now/IN_PROGRESS")).toMatchObject({
-      value: 8,
-      suppressed: false,
+      value: null,
+      suppressed: true,
     });
     expect(row(report, "tracking/all_time_repairs_viewed/")).toMatchObject({
       value: 20,
@@ -219,10 +369,15 @@ describe("buildValidationReport", () => {
     expect(csv).toContain("row,tracking,adoption_percent,,,percent,true");
   });
 
-  it("keeps the all-time Repair total and adoption when every status is zero or large", () => {
+  it("keeps the all-time Repair total and adoption when every Repair count is zero or large", () => {
     const input = metrics();
     input.repairs.statusNow.IN_PROGRESS = 10;
     input.repairs.statusNow.WAITING_FOR_PARTS = 0;
+    input.repairs.created = {
+      total: 11,
+      customerRequest: 5,
+      providerCreated: 6,
+    };
     expect(
       Object.values(input.repairs.statusNow).reduce((a, b) => a + b, 0),
     ).toBe(input.tracking.allTimeRepairs);
@@ -234,6 +389,234 @@ describe("buildValidationReport", () => {
     });
     expect(row(report, "tracking/adoption_percent/")).toMatchObject({
       value: 80,
+      suppressed: false,
+    });
+  });
+
+  it.each(["today", "7d", "30d", "custom"] as const)(
+    "pools first-week 6/5/1 Repairs across status, creation and tracking complements (%s)",
+    (mode) => {
+      const input = metrics({
+        repairs: {
+          statusNow: {
+            IN_PROGRESS: 5,
+            WAITING_FOR_PARTS: 0,
+            AWAITING_APPROVAL: 0,
+            READY: 1,
+            COMPLETED: 0,
+          },
+          created: { total: 6, customerRequest: 0, providerCreated: 6 },
+          completed: 0,
+          readyReached: 1,
+          statusMaintained: 1,
+        },
+        requests: {
+          received: 0,
+          decided: { total: 0, accepted: 0, declined: 0 },
+          pendingNow: 0,
+          cohortAccepted: 0,
+          conversionPercent: null,
+          meanDecisionSeconds: null,
+        },
+        tracking: {
+          periodViews: 6,
+          periodRepairsViewed: 6,
+          allTimeViews: 6,
+          allTimeRepairsViewed: 6,
+          allTimeRepairs: 6,
+          adoptionPercent: 100,
+        },
+        activity: {
+          distinctProviders: 1,
+          repeatProviders: 0,
+          daily: [{ date: WINDOW.startDate, distinctProviders: 1 }],
+        },
+        feedback: null,
+      });
+      const days = mode === "today" ? 1 : mode === "30d" ? 30 : 7;
+      input.window = {
+        ...WINDOW,
+        mode,
+        days,
+        endDateExclusive: new Date(
+          Date.parse(`${WINDOW.startDate}T00:00:00Z`) + days * 86_400_000,
+        )
+          .toISOString()
+          .slice(0, 10),
+        endUtc: new Date(
+          Date.parse(WINDOW.startUtc) + days * 86_400_000,
+        ).toISOString(),
+      };
+      input.asOf = new Date(
+        Date.parse(input.window.endUtc) - 60_000,
+      ).toISOString();
+      input.coverage.domain.observedEndUtc = input.asOf;
+      input.coverage.feedback = {
+        source: "FEEDBACK_MODULE",
+        coverage: "RETAINED_ROWS_ONLY",
+        status: "UNAVAILABLE",
+        asOfStart: null,
+        asOfEnd: null,
+        batches: 0,
+      };
+      expect(
+        Object.values(input.repairs.statusNow).reduce((a, b) => a + b, 0),
+      ).toBe(6);
+      expect(input.repairs.created.total).toBe(input.tracking.allTimeRepairs);
+
+      const report = buildValidationReport(input);
+      const json = JSON.parse(validationReportToJson(report));
+      const repairRows = report.rows.filter(
+        (entry) => entry.section === "repairs",
+      );
+      expect(repairRows.length).toBeGreaterThan(0);
+      expect(
+        repairRows.every((entry) => entry.suppressed && entry.value === null),
+      ).toBe(true);
+      expect(json.rows).toEqual(report.rows);
+      const csvRepairRows = validationReportToCsv(report)
+        .split("\n")
+        .filter((line) => line.startsWith("row,repairs,"));
+      expect(csvRepairRows).toHaveLength(repairRows.length);
+      for (const line of csvRepairRows) {
+        const fields = line.split(",");
+        expect(fields[4]).toBe("");
+        expect(fields[6]).toBe("true");
+      }
+      for (const key of [
+        "tracking/all_time_repairs/",
+        "tracking/adoption_percent/",
+      ]) {
+        expect(row(report, key)).toMatchObject({
+          value: null,
+          suppressed: true,
+        });
+      }
+      expect(row(report, "tracking/period_views/")).toMatchObject({
+        value: 6,
+        suppressed: false,
+      });
+      expect(row(report, "requests/received/")).toMatchObject({
+        value: 0,
+        suppressed: false,
+      });
+      expect(row(report, "requests/conversion_percent/")).toMatchObject({
+        value: null,
+        suppressed: false,
+      });
+    },
+  );
+
+  it("does not reveal a small Repair origin through a large current-status partition", () => {
+    const input = metrics();
+    input.repairs = {
+      statusNow: {
+        IN_PROGRESS: 10,
+        WAITING_FOR_PARTS: 0,
+        AWAITING_APPROVAL: 0,
+        READY: 6,
+        COMPLETED: 9,
+      },
+      created: { total: 25, customerRequest: 1, providerCreated: 24 },
+      completed: 9,
+      readyReached: 15,
+      statusMaintained: 15,
+    };
+    input.requests = {
+      received: 1,
+      decided: { total: 1, accepted: 1, declined: 0 },
+      pendingNow: 0,
+      cohortAccepted: 1,
+      conversionPercent: 100,
+      meanDecisionSeconds: 60,
+    };
+    input.activity = {
+      distinctProviders: 1,
+      repeatProviders: 0,
+      daily: [{ date: WINDOW.startDate, distinctProviders: 1 }],
+    };
+    input.tracking.periodRepairsViewed = 20;
+    input.tracking.allTimeViews = input.tracking.periodViews;
+    expect(
+      Object.values(input.repairs.statusNow).reduce((a, b) => a + b, 0),
+    ).toBe(input.repairs.created.total);
+
+    const report = buildValidationReport(input);
+    expect(
+      report.rows
+        .filter((entry) => entry.section === "repairs")
+        .every((entry) => entry.suppressed && entry.value === null),
+    ).toBe(true);
+    expect(row(report, "tracking/all_time_repairs/")).toMatchObject({
+      value: null,
+      suppressed: true,
+    });
+    expect(row(report, "tracking/adoption_percent/")).toMatchObject({
+      value: null,
+      suppressed: true,
+    });
+  });
+
+  it("pools Request counts and ratios when their complements reveal a small pending cohort", () => {
+    const input = metrics({
+      requests: {
+        received: 6,
+        decided: { total: 5, accepted: 5, declined: 0 },
+        pendingNow: 1,
+        cohortAccepted: 5,
+        conversionPercent: 83,
+        meanDecisionSeconds: 60,
+      },
+    });
+    input.repairs.created = {
+      total: 11,
+      customerRequest: 5,
+      providerCreated: 6,
+    };
+    const report = buildValidationReport(input);
+    const requestRows = report.rows.filter(
+      (entry) => entry.section === "requests",
+    );
+    expect(
+      requestRows.every((entry) => entry.suppressed && entry.value === null),
+    ).toBe(true);
+    expect(JSON.parse(validationReportToJson(report)).rows).toEqual(
+      report.rows,
+    );
+    const csvRows = validationReportToCsv(report)
+      .split("\n")
+      .filter((line) => line.startsWith("row,requests,"));
+    expect(csvRows).toHaveLength(requestRows.length);
+    expect(
+      csvRows.every(
+        (line) => line.split(",")[4] === "" && line.endsWith(",true"),
+      ),
+    ).toBe(true);
+  });
+
+  it("keeps Request counts and ratios when every Request count is zero or large", () => {
+    const report = buildValidationReport(
+      metrics({
+        requests: {
+          received: 10,
+          decided: { total: 5, accepted: 5, declined: 0 },
+          pendingNow: 5,
+          cohortAccepted: 5,
+          conversionPercent: 50,
+          meanDecisionSeconds: 60,
+        },
+      }),
+    );
+    expect(row(report, "requests/received/")).toMatchObject({
+      value: 10,
+      suppressed: false,
+    });
+    expect(row(report, "requests/decided/DECLINED")).toMatchObject({
+      value: 0,
+      suppressed: false,
+    });
+    expect(row(report, "requests/conversion_percent/")).toMatchObject({
+      value: 50,
       suppressed: false,
     });
   });
@@ -422,6 +805,12 @@ describe("report serialization", () => {
     expect(csv).toContain("meta,,suppression.minimumGroup,,5,,");
     expect(csv).toContain("glossary,,Providers onboarded,,");
     expect(csv).toContain("note,,,,");
+    expect(csv).toContain(
+      "Suppression applies within this export only; comparing overlapping periods or snapshots can reveal small changes.",
+    );
+    expect(csv).toContain(
+      "Share only reports reviewed together for disclosure with the approved internal/developer audience.",
+    );
     expect(csv).toContain("meta,,revision,,,,");
 
     const rows = csvRows(csv);

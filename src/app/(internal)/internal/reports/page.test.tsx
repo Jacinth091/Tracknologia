@@ -175,6 +175,12 @@ describe("Validation reports page", () => {
     expect(html).toContain("Counts from 1 to 4 are suppressed as &lt;5");
     expect(html).toContain("No Provider, Customer, feedback or authentication");
     expect(html).toContain("Retention policy: approved (#87)");
+    expect(html).toContain("Suppression applies within each file.");
+    expect(html).toContain("snapshots can reveal small changes.");
+    expect(html).toContain("Share only reports reviewed");
+    expect(html).toContain(
+      "together for disclosure with the approved internal/developer audience.",
+    );
     expect(html).toContain("Providers created in period.");
   });
 
